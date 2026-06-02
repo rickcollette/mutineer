@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mutineer BBS Documentation — Mutineer BBS</title>
+  <link rel="stylesheet" href="assets/css/site.css">
+</head>
+<body>
+  <header class="site-header">
+    <a href="index.html" class="logo">MUTINEER BBS</a>
+    <span class="tagline">Documentation</span>
+  </header>
+  <nav class="doc-nav"><a href="index.html" class="home">← Home</a><a href="overview.html">Overview</a><a href="getting-started.html">Getting Started</a><a href="configuration.html">Configuration</a><a href="architecture.html">Architecture</a><a href="menus-and-ui.html">Menus & UI</a><a href="messages-and-mail.html">Messages & Mail</a><a href="files-and-protocols.html">Files & Protocols</a><a href="chat-and-social.html">Chat & Social</a><a href="doors-and-scripting.html">Doors & Scripting</a><a href="sysop-guide.html">Sysop Guide</a><a href="networking-plank.html">PLANK Networking</a><a href="buccaneer.html">Buccaneer</a><a href="plugins.html">Plugins</a><a href="developer-guide.html">Developer Guide</a><a href="cli-tools.html">CLI Tools</a><a href="reference/menu-actions.html">Menu Actions</a><a href="reference/message-commands.html">Message Commands</a><a href="reference/file-commands.html">File Commands</a><a href="reference/acs-mci.html">ACS & MCI</a><a href="reference/database.html">Database Schema</a></nav>
+  <main class="doc-content"><p>&lt;!-- generated-by: gsd-doc-writer --&gt;</p>
+<h1>Mutineer BBS Documentation</h1>
+<p>Complete documentation for <strong>Mutineer BBS</strong> — a classic telnet bulletin board system written in C11, styled after Renegade BBS with a green pirate theme. SQLite persistence, modern password hashing, DOSBox DOS door runner, PLANK store-and-forward networking, and the embedded Buccaneer scripting VM.</p>
+<h2>Getting Started</h2>
+<table>
+<tr><th>Document</th><th>Description</th></tr>
+<table>
+<tr><th><a href="overview.html">Overview</a></th><th>Project summary, features, layout, binaries, dependencies</th></tr>
+<table>
+<tr><th><a href="getting-started.html">Getting Started</a></th><th>Install, build, init, run, test, troubleshooting</th></tr>
+<table>
+<tr><th><a href="configuration.html">Configuration</a></th><th>All <code>BbsConfig</code> keys from <code>include/bbs_config.h</code></th></tr>
+</table>
+<h2>Architecture and Design</h2>
+<table>
+<tr><th>Document</th><th>Description</th></tr>
+<table>
+<tr><th><a href="architecture.html">Architecture</a></th><th>Process model, startup, session lifecycle, components, source map</th></tr>
+<table>
+<tr><th><a href="menus-and-ui.html">Menus and UI</a></th><th>Menu format, templates, MCI, ACS, art files, F-keys</th></tr>
+<table>
+<tr><th><a href="developer-guide.html">Developer Guide</a></th><th>Build, test, structure, contributing</th></tr>
+</table>
+<h2>User-Facing Subsystems</h2>
+<table>
+<tr><th>Document</th><th>Description</th></tr>
+<table>
+<tr><th><a href="messages-and-mail.html">Messages and Mail</a></th><th>Message areas, M*/R* commands, QWK, FidoNet, conferences</th></tr>
+<table>
+<tr><th><a href="files-and-protocols.html">Files and Protocols</a></th><th>File areas, F* commands, batch, archives, credits</th></tr>
+<table>
+<tr><th><a href="chat-and-social.html">Chat and Social</a></th><th>Chat modes, paging, wall, whisper, oneliners</th></tr>
+<table>
+<tr><th><a href="doors-and-scripting.html">Doors and Scripting</a></th><th>Native, DOSBox, Buccaneer status, plugins comparison</th></tr>
+</table>
+<h2>Sysop and Operations</h2>
+<table>
+<tr><th>Document</th><th>Description</th></tr>
+<table>
+<tr><th><a href="sysop-guide.html">Sysop Guide</a></th><th>WFC, user admin, editors, scheduler, maintenance, security</th></tr>
+<table>
+<tr><th><a href="cli-tools.html">CLI Tools</a></th><th>All standalone command-line utilities</th></tr>
+</table>
+<h2>Networking and Extensions</h2>
+<table>
+<tr><th>Document</th><th>Description</th></tr>
+<table>
+<tr><th><a href="networking-plank.html">PLANK Networking</a></th><th>PLANK protocol, daemons, plankctl, schema</th></tr>
+<table>
+<tr><th><a href="buccaneer.html">Buccaneer</a></th><th>Language, VM, host bridge, toolchain, integration status</th></tr>
+<table>
+<tr><th><a href="plugins.html">Plugins</a></th><th>Plugin API, building, host API, examples</th></tr>
+</table>
+<h2>Reference</h2>
+<table>
+<tr><th>Document</th><th>Description</th></tr>
+<table>
+<tr><th><a href="reference/menu-actions.html">Menu Actions</a></th><th>All <code>handle_action()</code> actions from <code>session.c</code></th></tr>
+<table>
+<tr><th><a href="reference/message-commands.html">Message Commands</a></th><th>M* and R* command reference</th></tr>
+<table>
+<tr><th><a href="reference/file-commands.html">File Commands</a></th><th>F* command reference</th></tr>
+<table>
+<tr><th><a href="reference/acs-mci.html">ACS and MCI</a></th><th>Full ACS terms and MCI tokens</th></tr>
+<table>
+<tr><th><a href="reference/database.html">Database Schema</a></th><th>All SQLite tables (BBS + PLANK)</th></tr>
+</table>
+<h2>Legacy and Supplementary Docs</h2>
+<p>These older docs remain in the repository for historical context. Prefer the documents above for current reference:</p>
+<ul>
+<li><code>docs/admin.md</code> — earlier admin reference</li>
+<li><code>docs/PLANK_ADMIN.md</code> — earlier PLANK admin guide</li>
+<li><code>docs/ACS_MCI.md</code>, <code>docs/MCI.md</code>, <code>docs/TEMPLATES.md</code> — earlier template docs</li>
+<li><code>SPECS/</code> — design specifications (Buccaneer, DOS doors, PLANK)</li>
+</ul>
+<h2>Quick Links</h2>
+<pre><code class="bash">
+# Build and run
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build
+build/mutineer-initbbs -c conf/mutineer.conf -y
+build/mutineer -c conf/mutineer.conf
+</code></pre>
+<p>Default telnet port: <strong>2929</strong> (configurable in <code>conf/mutineer.conf</code>).</p>
+<h2>License</h2>
+<p>Mutineer BBS is released under the <a href="../LICENSE">MIT License</a>.</p></main>
+  <footer class="site-footer">
+    <p>Mutineer BBS — <a href="https://github.com/rickcollette/mutineer">GitHub</a> — MIT License</p>
+  </footer>
+</body>
+</html>

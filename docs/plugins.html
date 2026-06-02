@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Plugins — Mutineer BBS</title>
+  <link rel="stylesheet" href="assets/css/site.css">
+</head>
+<body>
+  <header class="site-header">
+    <a href="index.html" class="logo">MUTINEER BBS</a>
+    <span class="tagline">Documentation</span>
+  </header>
+  <nav class="doc-nav"><a href="index.html" class="home">← Home</a><a href="overview.html">Overview</a><a href="getting-started.html">Getting Started</a><a href="configuration.html">Configuration</a><a href="architecture.html">Architecture</a><a href="menus-and-ui.html">Menus & UI</a><a href="messages-and-mail.html">Messages & Mail</a><a href="files-and-protocols.html">Files & Protocols</a><a href="chat-and-social.html">Chat & Social</a><a href="doors-and-scripting.html">Doors & Scripting</a><a href="sysop-guide.html">Sysop Guide</a><a href="networking-plank.html">PLANK Networking</a><a href="buccaneer.html">Buccaneer</a><a href="plugins.html" class="active">Plugins</a><a href="developer-guide.html">Developer Guide</a><a href="cli-tools.html">CLI Tools</a><a href="reference/menu-actions.html">Menu Actions</a><a href="reference/message-commands.html">Message Commands</a><a href="reference/file-commands.html">File Commands</a><a href="reference/acs-mci.html">ACS & MCI</a><a href="reference/database.html">Database Schema</a></nav>
+  <main class="doc-content"><p>&lt;!-- generated-by: gsd-doc-writer --&gt;</p>
+<h1>Plugins</h1>
+<p>Mutineer BBS supports loadable shared object plugins (<code>.so</code>) that provide interactive door-like experiences. Plugins are loaded via <code>dlopen()</code> at startup and invoked through menu actions.</p>
+<h2>Architecture</h2>
+<pre><code class="">
+mutineer startup
+    → plugin_loader_init() reads config
+    → dlopen each .so in plugins_dir
+    → bbs_plugin_query() obtains descriptor
+    → plugin_registry stores loaded plugins
+
+User selects menu item: plugin:com.mutineer.hello
+    → plugin_registry_find()
+    → create_instance() per session
+    → on_enter() → run() → on_exit() → destroy()
+</code></pre>
+<p>Sources: <code>plugin_loader.c</code>, <code>plugin_registry.c</code>, <code>plugin_host_api.c</code>.</p>
+<h2>Configuration</h2>
+<pre><code class="ini">
+plugins_enabled=true
+plugins_dir=plugins
+plugins_allowlist=
+plugins_denylist=
+</code></pre>
+<ul>
+<li><code>plugins_allowlist</code> — if set, only listed IDs load</li>
+<li><code>plugins_denylist</code> — excluded IDs even if otherwise allowed</li>
+<li>Built plugins output to <code>build/plugins/</code> by default</li>
+</ul>
+<p>Build sample plugins:</p>
+<pre><code class="bash">
+cmake --build build --target plugins
+# Produces: build/plugins/hello.so, build/plugins/chat_plugin.so
+</code></pre>
+<h2>Plugin ABI</h2>
+<p>Stable ABI defined in <code>include/bbs_plugin_api.h</code>:</p>
+<table>
+<tr><th>Constant</th><th>Value</th></tr>
+<table>
+<tr><th><code>BBS_PLUGIN_ABI_VERSION</code></th><th><code>0x00010000</code> (v1.0)</th></tr>
+<table>
+<tr><th><code>BBS_PLUGIN_MAGIC</code></th><th><code>0x4250534F</code> (&#x27;BPSO&#x27;)</th></tr>
+</table>
+<h3>Required Export</h3>
+<p>Every plugin must export:</p>
+<pre><code class="c">
+bbs_rc_t bbs_plugin_query(uint32_t host_abi_version,
+                          const bbs_host_api_t* host,
+                          bbs_plugin_desc_t* out_desc);
+</code></pre>
+<p>Define <code>BBS_PLUGIN_IMPL=1</code> when compiling the plugin.</p>
+<h2>Plugin Descriptor</h2>
+<pre><code class="c">
+typedef struct bbs_plugin_desc {
+  uint32_t abi_version;
+  const char* id;          // &quot;com.mutineer.hello&quot;
+  const char* name;
+  const char* version;
+  const char* author;
+  const char* description;
+  uint32_t caps;           // BBS_CAP_* flags
+
+  bbs_rc_t (*init)(const bbs_host_api_t* host);
+  void     (*shutdown)(void);
+  bbs_rc_t (*create_instance)(bbs_session_t* s, void** out_inst,
+                              const bbs_plugin_instance_vtbl_t** out_vtbl);
+  const bbs_command_def_t* (*commands)(size_t* out_count);
+  void (*on_event)(const bbs_event_t* ev);
+} bbs_plugin_desc_t;
+</code></pre>
+<h3>Capabilities</h3>
+<table>
+<tr><th>Flag</th><th>Meaning</th></tr>
+<table>
+<tr><th><code>BBS_CAP_INTERACTIVE</code></th><th>Interactive session plugin</th></tr>
+<table>
+<tr><th><code>BBS_CAP_COMMANDS</code></th><th>Registers slash commands</th></tr>
+<table>
+<tr><th><code>BBS_CAP_BACKGROUND</code></th><th>Background task capable</th></tr>
+</table>
+<h2>Instance Vtable</h2>
+<p>Per-session plugin instance:</p>
+<pre><code class="c">
+typedef struct bbs_plugin_instance_vtbl {
+  bbs_rc_t (*on_enter)(void* inst, bbs_session_t* s);
+  bbs_rc_t (*run)(void* inst, bbs_session_t* s);
+  void     (*on_exit)(void* inst, bbs_session_t* s);
+  void     (*on_event)(void* inst, const bbs_event_t* ev);
+  void     (*destroy)(void* inst);
+} bbs_plugin_instance_vtbl_t;
+</code></pre>
+<h2>Host API</h2>
+<p>Host provides services via <code>bbs_host_api_t</code>:</p>
+<h3>Logging</h3>
+<pre><code class="c">
+void (*log)(bbs_log_level_t lvl, const char* subsystem, const char* msg);
+</code></pre>
+<p>Levels: DEBUG (10), INFO (20), WARN (30), ERROR (40).</p>
+<h3>Terminal I/O (<code>bbs_io_t</code>)</h3>
+<table>
+<tr><th>Method</th><th>Purpose</th></tr>
+<table>
+<tr><th><code>write()</code></th><th>Raw write to terminal</th></tr>
+<table>
+<tr><th><code>printf()</code></th><th>Formatted output</th></tr>
+<table>
+<tr><th><code>readline()</code></th><th>Read line with echo control</th></tr>
+<table>
+<tr><th><code>cls()</code></th><th>Clear screen</th></tr>
+</table>
+<h3>Scheduler (<code>bbs_sched_t</code>)</h3>
+<table>
+<tr><th>Method</th><th>Purpose</th></tr>
+<table>
+<tr><th><code>enqueue()</code></th><th>Run task on worker thread</th></tr>
+<table>
+<tr><th><code>after_ms()</code></th><th>Delayed task</th></tr>
+<table>
+<tr><th><code>cancel()</code></th><th>Cancel scheduled task</th></tr>
+</table>
+<h3>Session Info</h3>
+<table>
+<tr><th>Method</th><th>Returns</th></tr>
+<table>
+<tr><th><code>session_username()</code></th><th>User handle</th></tr>
+<table>
+<tr><th><code>session_user_id()</code></th><th>Numeric user ID</th></tr>
+<table>
+<tr><th><code>session_user_flags()</code></th><th>AR flags</th></tr>
+<table>
+<tr><th><code>session_remote_addr()</code></th><th>Client IP</th></tr>
+</table>
+<h3>Key-Value Store</h3>
+<pre><code class="c">
+bbs_rc_t (*kv_get)(const char* ns, const char* key, char* out, size_t out_sz);
+bbs_rc_t (*kv_set)(const char* ns, const char* key, const char* val);
+</code></pre>
+<p>Namespace-scoped persistence (host-defined backing).</p>
+<h3>Plugin Data Directory</h3>
+<pre><code class="c">
+bbs_rc_t (*plugin_data_dir)(const char* plugin_id, char* out, size_t out_sz);
+</code></pre>
+<h2>Events</h2>
+<p>Global and per-session events:</p>
+<table>
+<tr><th>Event</th><th>Type</th></tr>
+<table>
+<tr><th>Login</th><th><code>BBS_EVT_LOGIN</code></th></tr>
+<table>
+<tr><th>Logout</th><th><code>BBS_EVT_LOGOUT</code></th></tr>
+<table>
+<tr><th>Tick</th><th><code>BBS_EVT_TICK_1S</code></th></tr>
+<table>
+<tr><th>Shutdown</th><th><code>BBS_EVT_SHUTDOWN</code></th></tr>
+</table>
+<h2>Building a Plugin</h2>
+<p>CMake helper in root <code>CMakeLists.txt</code>:</p>
+<pre><code class="cmake">
+add_mutineer_plugin(hello hello.c hello)
+# → plugins/hello/hello.c → build/plugins/hello.so
+</code></pre>
+<p>Manual build:</p>
+<pre><code class="bash">
+gcc -shared -fPIC -DBBS_PLUGIN_IMPL=1 \
+  -I include -o myplugin.so myplugin.c
+</code></pre>
+<h2>Example: Hello Plugin</h2>
+<p><code>plugins/hello/hello.c</code> — minimal interactive plugin:</p>
+<ol>
+<li>Greets user with handle, ID, IP</li>
+<li>Echo loop until user types <code>exit</code></li>
+<li>Supports <code>cls</code>, <code>help</code>, <code>count</code> commands</li>
+</ol>
+<p>Menu entry in <code>menus/main.mnu</code>:</p>
+<pre><code class="">
+1|Hello Plugin|plugin:com.mutineer.hello|L10
+</code></pre>
+<p>Plugin ID: <code>com.mutineer.hello</code>.</p>
+<h2>Example: Chat Plugin</h2>
+<p><code>plugins/chat/chat.c</code> — plugin-based chat room as alternative to built-in <code>chat.c</code>.</p>
+<p>Menu entry:</p>
+<pre><code class="">
+2|Chat Plugin|plugin:com.mutineer.chat|L10
+</code></pre>
+<h2>Menu Integration</h2>
+<p>Action format: <code>plugin:&lt;plugin_id&gt;</code></p>
+<p>Handled in <code>handle_action()</code> (<code>session.c</code>):</p>
+<ol>
+<li>Check <code>plugin_loader_enabled()</code></li>
+<li>Find plugin in registry</li>
+<li>Create instance, run lifecycle</li>
+<li>Return to menu on exit</li>
+</ol>
+<p>List loaded plugins: <code>plugins</code> action (sysop).</p>
+<h2>Return Codes</h2>
+<table>
+<tr><th>Code</th><th>Meaning</th></tr>
+<table>
+<tr><th><code>BBS_OK</code></th><th>Success</th></tr>
+<table>
+<tr><th><code>BBS_EINVAL</code></th><th>Invalid argument</th></tr>
+<table>
+<tr><th><code>BBS_EUNSUPPORTED</code></th><th>Unsupported operation</th></tr>
+<table>
+<tr><th><code>BBS_EIO</code></th><th>I/O error (disconnect)</th></tr>
+<table>
+<tr><th><code>BBS_EPERM</code></th><th>Permission denied</th></tr>
+<table>
+<tr><th><code>BBS_EINTERNAL</code></th><th>Internal error</th></tr>
+<table>
+<tr><th><code>BBS_ETIMEOUT</code></th><th>Timeout</th></tr>
+</table>
+<h2>Testing</h2>
+<pre><code class="bash">
+cmake --build build --target plugins
+ctest --test-dir build -R plugin
+# test_plugin.c — loader, registry, lifecycle
+</code></pre>
+<h2>Comparison</h2>
+<table>
+<tr><th>Aspect</th><th>Plugin</th><th>Buccaneer</th><th>Native Door</th></tr>
+<table>
+<tr><th>Language</th><th>C</th><th>Buccaneer script</th><th>Any</th></tr>
+<table>
+<tr><th>Process isolation</th><th>No (in-process)</th><th>No (VM)</th><th>Yes (fork)</th></tr>
+<table>
+<tr><th>ABI stability</th><th>Published v1.0</th><th>Internal</th><th>N/A</th></tr>
+<table>
+<tr><th>Hot reload</th><th>Replace .so + restart</th><th>Recompile</th><th>Replace binary</th></tr>
+<table>
+<tr><th>Best for</th><th>Rich native features</th><th>Scripts (WIP)</th><th>Legacy DOS/Linux doors</th></tr>
+</table>
+<h2>Security Notes</h2>
+<ul>
+<li>Plugins run as the BBS user with full process privileges</li>
+<li>Only load trusted <code>.so</code> files</li>
+<li>Use allowlist in production</li>
+<li>No sandboxing — treat plugins like core BBS code</li>
+</ul>
+<h2>Related Documentation</h2>
+<ul>
+<li><a href="doors-and-scripting.html">Doors and Scripting</a></li>
+<li><a href="configuration.html">Configuration</a> — plugin settings</li>
+<li><a href="developer-guide.html">Developer Guide</a> — building from source</li>
+</ul></main>
+  <footer class="site-footer">
+    <p>Mutineer BBS — <a href="https://github.com/rickcollette/mutineer">GitHub</a> — MIT License</p>
+  </footer>
+</body>
+</html>

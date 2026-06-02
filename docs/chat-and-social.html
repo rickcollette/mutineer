@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chat and Social — Mutineer BBS</title>
+  <link rel="stylesheet" href="assets/css/site.css">
+</head>
+<body>
+  <header class="site-header">
+    <a href="index.html" class="logo">MUTINEER BBS</a>
+    <span class="tagline">Documentation</span>
+  </header>
+  <nav class="doc-nav"><a href="index.html" class="home">← Home</a><a href="overview.html">Overview</a><a href="getting-started.html">Getting Started</a><a href="configuration.html">Configuration</a><a href="architecture.html">Architecture</a><a href="menus-and-ui.html">Menus & UI</a><a href="messages-and-mail.html">Messages & Mail</a><a href="files-and-protocols.html">Files & Protocols</a><a href="chat-and-social.html" class="active">Chat & Social</a><a href="doors-and-scripting.html">Doors & Scripting</a><a href="sysop-guide.html">Sysop Guide</a><a href="networking-plank.html">PLANK Networking</a><a href="buccaneer.html">Buccaneer</a><a href="plugins.html">Plugins</a><a href="developer-guide.html">Developer Guide</a><a href="cli-tools.html">CLI Tools</a><a href="reference/menu-actions.html">Menu Actions</a><a href="reference/message-commands.html">Message Commands</a><a href="reference/file-commands.html">File Commands</a><a href="reference/acs-mci.html">ACS & MCI</a><a href="reference/database.html">Database Schema</a></nav>
+  <main class="doc-content"><p>&lt;!-- generated-by: gsd-doc-writer --&gt;</p>
+<h1>Chat and Social</h1>
+<p>Mutineer BBS provides real-time communication between online users: split-screen chat, teleconference rooms, sysop paging, wall broadcasts, whispers, oneliners, and short messages.</p>
+<h2>Chat Modes</h2>
+<h3>Line Chat (<code>linechat</code> action)</h3>
+<p>Simple multi-line chat mode. Users type messages broadcast to all participants in the chat session. Exited with a quit command.</p>
+<h3>Split-Screen Chat (<code>splitchat</code> action)</h3>
+<p>Two-panel ANSI chat between two nodes implemented in <code>src/chat.c</code>:</p>
+<pre><code class="c">
+void split_chat_start(Session* s, Session* other);
+</code></pre>
+<ul>
+<li>Caller selects target node by number</li>
+<li>Screen splits: local input on bottom, remote messages on top</li>
+<li>Real-time bidirectional communication</li>
+<li>Either party can exit to return to BBS</li>
+</ul>
+<p>Menu action <code>chat</code> enters the chat subsystem (may offer mode selection).</p>
+<h3>Teleconference (<code>cmd_teleconf</code>)</h3>
+<p>Multi-user chat rooms with DB-backed state:</p>
+<table>
+<tr><th>Function</th><th>Purpose</th></tr>
+<table>
+<tr><th><code>teleconf_create_room()</code></th><th>Create room with name, topic, privacy, password</th></tr>
+<table>
+<tr><th><code>teleconf_join_room()</code></th><th>Join by room ID</th></tr>
+<table>
+<tr><th><code>teleconf_leave_room()</code></th><th>Leave current room</th></tr>
+<table>
+<tr><th><code>teleconf_broadcast()</code></th><th>Send message to all room members</th></tr>
+<table>
+<tr><th><code>teleconf_list_rooms()</code></th><th>List active rooms</th></tr>
+<table>
+<tr><th><code>teleconf_who_in_room()</code></th><th>Show participants</th></tr>
+</table>
+<p>Initialized at startup via <code>teleconf_init()</code> with DB handle from <code>teleconf_set_db()</code>.</p>
+<h2>Sysop Paging</h2>
+<p>Menu action <code>page</code> sends a page request to the sysop:</p>
+<ol>
+<li>User enters page message</li>
+<li>System attempts to notify sysop on WFC/console</li>
+<li>If sysop unavailable, message may fall back to email</li>
+<li>Limited by config <code>max_page_sysop</code> (default 3 per session; 0=unlimited)</li>
+</ol>
+<p>Users with <code>STATUS_NOPAGE</code> or AC restrictions may be blocked from paging.</p>
+<h2>Wall and Whisper</h2>
+<h3>Wall (<code>wall</code> action)</h3>
+<p>Broadcast message to all online users:</p>
+<pre><code class="">
+[Wall] Handle: message text
+</code></pre>
+<p>Uses <code>online_broadcast()</code> to send to all active sessions.</p>
+<h3>Whisper (<code>whisper</code> action)</h3>
+<p>Private message to a specific node:</p>
+<ol>
+<li>Prompt for target node number</li>
+<li>Prompt for message text</li>
+<li>Delivered only to session on that node via <code>online_get_node()</code></li>
+</ol>
+<h2>Oneliners</h2>
+<p>One-line public messages stored in <code>oneliners</code> table:</p>
+<table>
+<tr><th>Field</th><th>Purpose</th></tr>
+<table>
+<tr><th><code>user_id</code> / <code>user_handle</code></th><th>Author</th></tr>
+<table>
+<tr><th><code>text</code></th><th>Oneliner content</th></tr>
+<table>
+<tr><th><code>posted_at</code></th><th>Timestamp</th></tr>
+</table>
+<p>Menu action <code>oneliners</code> displays recent oneliners and allows posting new ones.</p>
+<h2>Short Messages (SMW)</h2>
+<p>Short Messages Waiting — private brief messages between users:</p>
+<table>
+<tr><th>Table</th><th>Purpose</th></tr>
+<table>
+<tr><th><code>short_messages</code></th><th>Message store with read flag</th></tr>
+</table>
+<p>Menu action <code>smw</code> checks and displays waiting short messages. User field <code>smw</code> tracks waiting count.</p>
+<p>Fields: <code>from_user</code>, <code>to_user</code>, <code>from_handle</code>, <code>to_handle</code>, <code>message</code>, <code>read_flag</code>.</p>
+<h2>Chat Logging</h2>
+<p>When <code>chat_log_path</code> is set in config, chat sessions log to files in that directory.</p>
+<p>Additionally, <code>chat_logs</code> table stores structured logs:</p>
+<table>
+<tr><th>Field</th><th>Purpose</th></tr>
+<table>
+<tr><th><code>chat_type</code></th><th><code>split</code>, <code>teleconf</code>, or <code>sysop</code></th></tr>
+<table>
+<tr><th><code>room_id</code></th><th>Teleconference room (if applicable)</th></tr>
+<table>
+<tr><th><code>from_user</code> / <code>from_handle</code></th><th>Sender</th></tr>
+<table>
+<tr><th><code>to_user</code> / <code>to_handle</code></th><th>Recipient (split chat)</th></tr>
+<table>
+<tr><th><code>message</code></th><th>Content</th></tr>
+<table>
+<tr><th><code>logged_at</code></th><th>Timestamp</th></tr>
+</table>
+<p>Empty <code>chat_log_path</code> disables file logging; DB logging may still occur depending on code path.</p>
+<h2>Restrictions</h2>
+<table>
+<tr><th>Flag</th><th>Effect</th></tr>
+<table>
+<tr><th><code>AC_RCHAT</code></th><th>Restricted from chat (ACS <code>RC</code>)</th></tr>
+<table>
+<tr><th><code>STATUS_NOCHAT</code></th><th>Not available for chat requests</th></tr>
+<table>
+<tr><th><code>STATUS_NOPAGE</code></th><th>Cannot be paged</th></tr>
+<table>
+<tr><th><code>AC_RUSERLIST</code></th><th>Cannot view who&#x27;s online (<code>who</code> action)</th></tr>
+</table>
+<h2>Who&#x27;s Online</h2>
+<p>Menu action <code>who</code> (key <code>W</code> on main menu) lists active nodes:</p>
+<pre><code class="">
+Online users (nodes):
+  Node 1  CaptainHook    IP 192.168.1.10   online
+  Node 2  FirstMate      IP 192.168.1.11   chat
+</code></pre>
+<p>Data from <code>nodes</code> table via <code>db_node_list()</code>.</p>
+<h2>WFC Chat Indicator</h2>
+<p>WFC console shows chat status with configurable character (<code>wfc_status_chat_char</code>, default <code>S</code>). Node status transitions: idle → logging → online → chat.</p>
+<h2>Interactive Tests</h2>
+<p>Expect tests cover chat flows:</p>
+<pre><code class="bash">
+ctest --test-dir build -R expect_suite
+# includes test_chat.exp, interactive_chat.exp
+</code></pre>
+<h2>Plugin Chat</h2>
+<p>Sample plugin <code>plugins/chat/chat.c</code> demonstrates plugin-based chat as alternative to built-in chat. Invoked via:</p>
+<pre><code class="">
+2|Chat Plugin|plugin:com.mutineer.chat|L10
+</code></pre>
+<p>See <a href="plugins.html">Plugins</a> for plugin vs native chat comparison.</p>
+<h2>Related Documentation</h2>
+<ul>
+<li><a href="configuration.html">Configuration</a> — <code>chat_log_path</code>, <code>max_page_sysop</code></li>
+<li><a href="sysop-guide.html">Sysop Guide</a> — WFC monitoring</li>
+<li><a href="menus-and-ui.html">Menus and UI</a> — menu keys for chat actions</li>
+<li><a href="reference/menu-actions.html">Reference: Menu Actions</a></li>
+</ul></main>
+  <footer class="site-footer">
+    <p>Mutineer BBS — <a href="https://github.com/rickcollette/mutineer">GitHub</a> — MIT License</p>
+  </footer>
+</body>
+</html>

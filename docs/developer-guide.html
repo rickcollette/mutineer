@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Developer Guide — Mutineer BBS</title>
+  <link rel="stylesheet" href="assets/css/site.css">
+</head>
+<body>
+  <header class="site-header">
+    <a href="index.html" class="logo">MUTINEER BBS</a>
+    <span class="tagline">Documentation</span>
+  </header>
+  <nav class="doc-nav"><a href="index.html" class="home">← Home</a><a href="overview.html">Overview</a><a href="getting-started.html">Getting Started</a><a href="configuration.html">Configuration</a><a href="architecture.html">Architecture</a><a href="menus-and-ui.html">Menus & UI</a><a href="messages-and-mail.html">Messages & Mail</a><a href="files-and-protocols.html">Files & Protocols</a><a href="chat-and-social.html">Chat & Social</a><a href="doors-and-scripting.html">Doors & Scripting</a><a href="sysop-guide.html">Sysop Guide</a><a href="networking-plank.html">PLANK Networking</a><a href="buccaneer.html">Buccaneer</a><a href="plugins.html">Plugins</a><a href="developer-guide.html" class="active">Developer Guide</a><a href="cli-tools.html">CLI Tools</a><a href="reference/menu-actions.html">Menu Actions</a><a href="reference/message-commands.html">Message Commands</a><a href="reference/file-commands.html">File Commands</a><a href="reference/acs-mci.html">ACS & MCI</a><a href="reference/database.html">Database Schema</a></nav>
+  <main class="doc-content"><p>&lt;!-- generated-by: gsd-doc-writer --&gt;</p>
+<h1>Developer Guide</h1>
+<p>Guide for contributors working on Mutineer BBS core, tools, plugins, and tests.</p>
+<h2>Build System</h2>
+<p>CMake 3.16+, C11 standard. Primary build:</p>
+<pre><code class="bash">
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
+cmake --build build
+</code></pre>
+<h3>CMake Targets</h3>
+<table>
+<tr><th>Target</th><th>Output</th></tr>
+<table>
+<tr><th><code>mutineer</code></th><th>Main BBS server</th></tr>
+<table>
+<tr><th><code>tools</code></th><th>All BBS CLI utilities</th></tr>
+<table>
+<tr><th><code>plank</code></th><th>PLANK daemons and tools</th></tr>
+<table>
+<tr><th><code>plugins</code></th><th>Sample plugins (hello, chat)</th></tr>
+</table>
+<h3>Compile Flags</h3>
+<ul>
+<li><code>-Wall -Wextra -Wpedantic</code> on all targets</li>
+<li>Optional: <code>-DENABLE_ASAN=ON</code> for AddressSanitizer</li>
+</ul>
+<h3>Dependencies</h3>
+<p>Required: SQLite3, OpenSSL, pthreads, libdl.</p>
+<p>Optional: libargon2, libzstd (PLANK compression).</p>
+<h2>Project Structure</h2>
+<pre><code class="">
+include/           Public headers (bbs_*.h, plank/*.h)
+src/
+  main.c           Entry point
+  session.c        Largest file — session, menus, handle_action()
+  db.c             SQLite layer
+  msg_cmds.c       Message commands
+  file_cmds.c      File commands
+  doors.c          Door launcher
+  chat.c           Chat subsystem
+  acs.c / mci.c    Access control and templates
+  plugin_*.c       Plugin system
+  tools/           CLI tool main() files
+  plank/           PLANK protocol
+  buccaneer/       Scripting language (separate Makefile)
+menus/             Menu definitions (operator-editable)
+sql/               Database schemas
+tests/             Unit and integration tests
+plugins/           Sample plugins
+conf/              Default configuration
+</code></pre>
+<h2>Coding Conventions</h2>
+<ul>
+<li>C11 standard, no compiler extensions required</li>
+<li><code>snprintf</code> for all string formatting into buffers</li>
+<li>Error handling: log via <code>log_*()</code> and return error codes</li>
+<li>SQLite via <code>db_*()</code> wrapper — avoid raw SQL in session code where possible</li>
+<li>ACS checks before privileged operations</li>
+<li>Thread safety: mutex-protect global online list</li>
+</ul>
+<h2>Key Entry Points</h2>
+<table>
+<tr><th>Function</th><th>File</th><th>When Called</th></tr>
+<table>
+<tr><th><code>main()</code></th><th><code>main.c</code></th><th>Process start</th></tr>
+<table>
+<tr><th><code>net_run_listener()</code></th><th><code>net_listener.c</code></th><th>Accept loop</th></tr>
+<table>
+<tr><th><code>session_run()</code></th><th><code>session.c</code></th><th>Per-connection thread</th></tr>
+<table>
+<tr><th><code>handle_action()</code></th><th><code>session.c</code></th><th>Menu selection</th></tr>
+<table>
+<tr><th><code>handle_msg_command()</code></th><th><code>msg_cmds.c</code></th><th>M*/R* input</th></tr>
+<table>
+<tr><th><code>handle_file_command()</code></th><th><code>file_cmds.c</code></th><th>F* input</th></tr>
+<table>
+<tr><th><code>cfg_load()</code></th><th><code>config.c</code></th><th>Config parse</th></tr>
+<table>
+<tr><th><code>db_open()</code></th><th><code>db.c</code></th><th>Database open</th></tr>
+</table>
+<h2>Adding a Menu Action</h2>
+<ol>
+<li>Choose action name (lowercase, no spaces)</li>
+<li>Add handler branch in <code>handle_action()</code> in <code>session.c</code></li>
+<li>Add menu item in appropriate <code>.mnu</code> file</li>
+<li>Document in <code>docs/reference/menu-actions.md</code></li>
+<li>Add expect test if interactive behavior</li>
+</ol>
+<p>For command-style actions (M*/F*), add to <code>msg_cmds.c</code> or <code>file_cmds.c</code> instead.</p>
+<h2>Adding a CLI Tool</h2>
+<ol>
+<li>Create <code>src/tools/mutineer-mytool.c</code></li>
+<li>Add to CMakeLists.txt via <code>add_mutineer_tool(mutineer-mytool)</code></li>
+<li>Share common sources via <code>TOOL_COMMON_SOURCES</code></li>
+<li>Document in <code>docs/cli-tools.md</code></li>
+<li>Add test in <code>tests/test_tools.c</code> or shell script</li>
+</ol>
+<h2>Database Changes</h2>
+<ol>
+<li>Edit <code>sql/schema.sql</code> (or <code>sql/plank_schema.sql</code> for PLANK)</li>
+<li>Add migration logic in <code>startup.c</code> or <code>db.c</code> if needed</li>
+<li>Update <code>docs/reference/database.md</code></li>
+<li>Update <code>mutineer-initbbs</code> seed data if applicable</li>
+</ol>
+<h2>Testing</h2>
+<h3>Unit Tests (ctest)</h3>
+<pre><code class="bash">
+cmake --build build
+ctest --test-dir build --exclude-regex &quot;tools_cli|expect_suite&quot;
+</code></pre>
+<table>
+<tr><th>Test</th><th>Covers</th></tr>
+<table>
+<tr><th><code>test_acs</code></th><th>ACS expression parser</th></tr>
+<table>
+<tr><th><code>test_mci</code></th><th>MCI token expansion</th></tr>
+<table>
+<tr><th><code>test_menu</code></th><th>Menu file parsing</th></tr>
+<table>
+<tr><th><code>test_menu_template</code></th><th>Template rendering</th></tr>
+<table>
+<tr><th><code>test_doors</code></th><th>Door launcher</th></tr>
+<table>
+<tr><th><code>test_plugin</code></th><th>Plugin loader</th></tr>
+<table>
+<tr><th><code>test_plank_*</code></th><th>PLANK subsystems</th></tr>
+<table>
+<tr><th><code>test_tools</code></th><th>CLI tool DB operations</th></tr>
+<table>
+<tr><th><code>test_file_cmds</code></th><th>File command logic</th></tr>
+<table>
+<tr><th><code>test_smoke</code></th><th>Basic integration</th></tr>
+</table>
+<h3>CLI Tests</h3>
+<pre><code class="bash">
+ctest --test-dir build -R tools_cli
+# runs tests/test_tools_cli.sh
+</code></pre>
+<h3>Interactive Tests</h3>
+<p>Requires <code>expect</code>:</p>
+<pre><code class="bash">
+ctest --test-dir build -R expect_suite
+# runs tests/run_expect_tests.sh
+</code></pre>
+<p>Tests: login, auth, messages, files, chat, admin, vote, multilogin, etc.</p>
+<h3>Menu Validation</h3>
+<pre><code class="bash">
+build/mutineer-validate menus
+</code></pre>
+<p>Always run before committing menu changes.</p>
+<h2>Debug Build</h2>
+<pre><code class="bash">
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DENABLE_ASAN=ON
+cmake --build build
+</code></pre>
+<p>Run under debugger:</p>
+<pre><code class="bash">
+gdb --args build/mutineer --config conf/mutineer.conf
+</code></pre>
+<h2>Plugin Development</h2>
+<p>See <a href="plugins.html">Plugins</a>. Build with:</p>
+<pre><code class="bash">
+cmake --build build --target plugins
+</code></pre>
+<p>Test:</p>
+<pre><code class="bash">
+ctest --test-dir build -R plugin
+</code></pre>
+<h2>Buccaneer Development</h2>
+<p>Separate Makefile in <code>src/buccaneer/</code>:</p>
+<pre><code class="bash">
+cd src/buccaneer &amp;&amp; make test
+</code></pre>
+<h2>Branch Conventions</h2>
+<p>No formal convention documented. Use descriptive branch names:</p>
+<ul>
+<li><code>feat/my-feature</code></li>
+<li><code>fix/bug-description</code></li>
+<li><code>docs/update-guide</code></li>
+</ul>
+<h2>Pull Request Guidelines</h2>
+<p>Before submitting:</p>
+<ol>
+<li>Build succeeds with <code>-Wall -Wextra -Wpedantic</code></li>
+<li><code>ctest --test-dir build --exclude-regex &quot;tools_cli|expect_suite&quot;</code> passes</li>
+<li><code>mutineer-validate menus</code> passes if menus changed</li>
+<li>Document new config keys in <code>docs/configuration.md</code></li>
+<li>Document new actions/commands in reference docs</li>
+</ol>
+<h2>License</h2>
+<p>Mutineer BBS is MIT licensed. See <a href="../LICENSE">LICENSE</a>.</p>
+<p>Contributions are accepted under the same license.</p>
+<h2>Related Documentation</h2>
+<ul>
+<li><a href="architecture.html">Architecture</a></li>
+<li><a href="cli-tools.html">CLI Tools</a></li>
+<li><a href="getting-started.html">Getting Started</a></li>
+<li><a href="reference/">Reference</a></li>
+</ul></main>
+  <footer class="site-footer">
+    <p>Mutineer BBS — <a href="https://github.com/rickcollette/mutineer">GitHub</a> — MIT License</p>
+  </footer>
+</body>
+</html>

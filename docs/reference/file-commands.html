@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>File Commands Reference — Mutineer BBS</title>
+  <link rel="stylesheet" href="../assets/css/site.css">
+</head>
+<body>
+  <header class="site-header">
+    <a href="../index.html" class="logo">MUTINEER BBS</a>
+    <span class="tagline">Documentation</span>
+  </header>
+  <nav class="doc-nav"><a href="../index.html" class="home">← Home</a><a href="../overview.html">Overview</a><a href="../getting-started.html">Getting Started</a><a href="../configuration.html">Configuration</a><a href="../architecture.html">Architecture</a><a href="../menus-and-ui.html">Menus & UI</a><a href="../messages-and-mail.html">Messages & Mail</a><a href="../files-and-protocols.html">Files & Protocols</a><a href="../chat-and-social.html">Chat & Social</a><a href="../doors-and-scripting.html">Doors & Scripting</a><a href="../sysop-guide.html">Sysop Guide</a><a href="../networking-plank.html">PLANK Networking</a><a href="../buccaneer.html">Buccaneer</a><a href="../plugins.html">Plugins</a><a href="../developer-guide.html">Developer Guide</a><a href="../cli-tools.html">CLI Tools</a><a href="../reference/menu-actions.html">Menu Actions</a><a href="../reference/message-commands.html">Message Commands</a><a href="../reference/file-commands.html">File Commands</a><a href="../reference/acs-mci.html">ACS & MCI</a><a href="../reference/database.html">Database Schema</a></nav>
+  <main class="doc-content"><p>&lt;!-- generated-by: gsd-doc-writer --&gt;</p>
+<h1>File Commands Reference</h1>
+<p>Two-letter <code>F*</code> commands for file area operations. Enter at the <code>:</code> prompt in file mode.</p>
+<p>Dispatched by <code>handle_file_command()</code> in <code>src/file_cmds.c</code>. Declarations in <code>include/bbs_file_cmds.h</code>.</p>
+<h2>Command Table</h2>
+<table>
+<tr><th>Cmd</th><th>Function</th><th>Description</th></tr>
+<table>
+<tr><th><code>FA</code></th><th><code>cmd_file_area_change</code></th><th>Change current file area</th></tr>
+<table>
+<tr><th><code>FB</code></th><th><code>cmd_file_batch_download</code></th><th>Download all files in batch queue</th></tr>
+<table>
+<tr><th><code>FC</code></th><th><code>cmd_file_batch_clear</code></th><th>Clear batch download queue</th></tr>
+<table>
+<tr><th><code>FD</code></th><th><code>cmd_file_download</code></th><th>Download file by number</th></tr>
+<table>
+<tr><th><code>FE</code></th><th><code>cmd_file_extended</code></th><th>Show extended description</th></tr>
+<table>
+<tr><th><code>FF</code></th><th><code>cmd_file_find</code></th><th>Find files by name/description</th></tr>
+<table>
+<tr><th><code>FG</code></th><th><code>cmd_file_area_list</code></th><th>List accessible file areas</th></tr>
+<table>
+<tr><th><code>FJ</code></th><th><code>cmd_file_batch_upload</code></th><th>Batch upload multiple files</th></tr>
+<table>
+<tr><th><code>FK</code></th><th><code>cmd_file_batch_remove</code></th><th>Remove entry from batch queue</th></tr>
+<table>
+<tr><th><code>FL</code></th><th><code>cmd_file_list</code></th><th>List files in current area</th></tr>
+<table>
+<tr><th><code>FN</code></th><th><code>cmd_file_new_scan</code></th><th>List files uploaded since scan date</th></tr>
+<table>
+<tr><th><code>FP</code></th><th><code>cmd_file_set_scan_date</code></th><th>Set new-file scan cutoff date</th></tr>
+<table>
+<tr><th><code>FQ</code></th><th><code>cmd_file_archive_extract</code></th><th>Extract archive to temp directory</th></tr>
+<table>
+<tr><th><code>FR</code></th><th><code>cmd_file_raw_dir</code></th><th>Raw directory listing (expert)</th></tr>
+<table>
+<tr><th><code>FT</code></th><th><code>cmd_file_archive_test</code></th><th>Test archive integrity</th></tr>
+<table>
+<tr><th><code>FU</code></th><th><code>cmd_file_upload</code></th><th>Upload file to current area</th></tr>
+<table>
+<tr><th><code>FV</code></th><th><code>cmd_file_view_archive</code></th><th>View archive contents listing</th></tr>
+<table>
+<tr><th><code>FX</code></th><th><code>cmd_file_expert_toggle</code></th><th>Toggle expert mode display</th></tr>
+<table>
+<tr><th><code>FZ</code></th><th><code>cmd_file_zippy_search</code></th><th>Fast wildcard filename search</th></tr>
+</table>
+<h2>Area Commands</h2>
+<h3>FA — Area Change</h3>
+<p>Changes <code>s-&gt;current_file_area</code>. Validates ACS on <code>acs_list</code> before switching.</p>
+<h3>FG — Area List</h3>
+<p>Lists file areas with ID, name, and path. Filters by ACS.</p>
+<h2>Listing Commands</h2>
+<h3>FL — File List</h3>
+<p>Paginated file listing in current area:</p>
+<pre><code class="">
+#123 FILENAME.ZIP     12345 bytes by Uploader
+  Short description here
+</code></pre>
+<p>Sorted per area <code>sort_type</code> (name/date/size).</p>
+<h3>FR — Raw Directory</h3>
+<p>Expert-mode raw listing without formatting. Requires expert mode or sysop.</p>
+<h3>FN — New Scan</h3>
+<p>Lists files uploaded after user&#x27;s scan date (<code>FP</code> sets this). Shows <code>[NEW]</code> marker.</p>
+<h3>FE — Extended Description</h3>
+<p>Displays <code>extended_desc</code> and <code>file_id_diz</code> fields for specified file number.</p>
+<h2>Download Commands</h2>
+<h3>FD — Download</h3>
+<p>Download file by number:</p>
+<ol>
+<li>Validate file exists and ACS on <code>acs_download</code></li>
+<li>Check credits (cost ≈ KB + 1) unless free</li>
+<li>Check download ratio unless <code>AC_FNODLRATIO</code></li>
+<li>Check daily limits from security level</li>
+<li>Launch transfer protocol or raw send</li>
+<li>Update download stats</li>
+</ol>
+<h3>FB — Batch Download</h3>
+<p>Download all files queued in session batch queue. Processes sequentially with credit checks per file.</p>
+<h2>Upload Commands</h2>
+<h3>FU — Upload</h3>
+<p>Upload to current area:</p>
+<ol>
+<li>ACS check on <code>acs_upload</code></li>
+<li>Protocol receive or filename prompt</li>
+<li>Description prompt</li>
+<li>SHA-256 hash and duplicate detection</li>
+<li>Insert file record; may enter upload queue if validation required</li>
+</ol>
+<h3>FJ — Batch Upload</h3>
+<p>Upload multiple files in one session. Prompts for each file sequentially.</p>
+<h2>Batch Queue Commands</h2>
+<p>Session maintains in-memory batch queue (max size defined in session struct).</p>
+<table>
+<tr><th>Cmd</th><th>Action</th></tr>
+<table>
+<tr><th>Queue</th><th>Select file number during FL or at prompt</th></tr>
+<table>
+<tr><th><code>FK</code></th><th>Remove specific queue entry by index</th></tr>
+<table>
+<tr><th><code>FC</code></th><th>Clear entire queue</th></tr>
+<table>
+<tr><th><code>FB</code></th><th>Download all queued</th></tr>
+</table>
+<p>Menu action <code>batchrun</code> triggers batch download from main menu.</p>
+<h2>Search Commands</h2>
+<h3>FF — Find</h3>
+<p>Prompts for search string. Matches filename and description in current area.</p>
+<h3>FZ — Zippy Search</h3>
+<p>Wildcard search (supports <code>*</code> and <code>?</code> patterns). Faster than FF for pattern matching.</p>
+<h2>Archive Commands</h2>
+<p>Requires external tools (zip, tar, unrar, 7z) on PATH.</p>
+<h3>FV — View Archive</h3>
+<p>Lists contents of archive file without extracting.</p>
+<h3>FT — Archive Test</h3>
+<p>Tests archive integrity. Reports errors if corrupted.</p>
+<h3>FQ — Archive Extract</h3>
+<p>Extracts archive to temporary directory for browsing. Does not add extracted files to area.</p>
+<p>Supported formats depend on installed tools and area <code>archive_type</code>.</p>
+<h2>Configuration Commands</h2>
+<h3>FP — Set Scan Date</h3>
+<p>Sets user&#x27;s new-file scan cutoff to specified date or &quot;today&quot;. Used by <code>FN</code> to determine new files.</p>
+<h3>FX — Expert Toggle</h3>
+<p>Toggles <code>STATUS_EXPERT</code> on user. Expert mode shows additional detail in listings and enables <code>FR</code>.</p>
+<h2>Credit and Ratio</h2>
+<p>Downloads deduct credits unless:</p>
+<ul>
+<li>File has <code>FILE_FLAG_FREE</code></li>
+<li>Area has <code>FA_FLAG_FREEFILES</code></li>
+<li>User has <code>AC_FNOCREDITS</code></li>
+</ul>
+<p>Ratio enforced via security level and ACS <code>DR</code> unless <code>AC_FNODLRATIO</code>.</p>
+<h2>Error Messages</h2>
+<pre><code class="">
+Unknown file command.
+Access denied.
+Not enough credits.
+File missing.
+Upload failed (cannot store file).
+</code></pre>
+<p>Named art <code>NOCREDTS</code> may display on credit failure.</p>
+<h2>Usage Examples</h2>
+<pre><code class="">
+:FG              List file areas
+:FA 2            Change to area 2
+:FL              List files
+:FD 15           Download file #15
+:FU              Upload file
+:FF ZIP          Find files matching &quot;ZIP&quot;
+:FN              Show new files
+:FB              Download batch queue
+:FC              Clear batch queue
+:FV 20           View archive contents of #20
+:FT 20           Test archive #20
+:FX              Toggle expert mode
+</code></pre>
+<h2>Related Documentation</h2>
+<ul>
+<li><a href="../files-and-protocols.html">Files and Protocols</a></li>
+<li><a href="message-commands.html">Reference: Message Commands</a></li>
+<li><a href="../configuration.html">Configuration</a></li>
+</ul></main>
+  <footer class="site-footer">
+    <p>Mutineer BBS — <a href="https://github.com/rickcollette/mutineer">GitHub</a> — MIT License</p>
+  </footer>
+</body>
+</html>

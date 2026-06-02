@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CLI Tools — Mutineer BBS</title>
+  <link rel="stylesheet" href="assets/css/site.css">
+</head>
+<body>
+  <header class="site-header">
+    <a href="index.html" class="logo">MUTINEER BBS</a>
+    <span class="tagline">Documentation</span>
+  </header>
+  <nav class="doc-nav"><a href="index.html" class="home">← Home</a><a href="overview.html">Overview</a><a href="getting-started.html">Getting Started</a><a href="configuration.html">Configuration</a><a href="architecture.html">Architecture</a><a href="menus-and-ui.html">Menus & UI</a><a href="messages-and-mail.html">Messages & Mail</a><a href="files-and-protocols.html">Files & Protocols</a><a href="chat-and-social.html">Chat & Social</a><a href="doors-and-scripting.html">Doors & Scripting</a><a href="sysop-guide.html">Sysop Guide</a><a href="networking-plank.html">PLANK Networking</a><a href="buccaneer.html">Buccaneer</a><a href="plugins.html">Plugins</a><a href="developer-guide.html">Developer Guide</a><a href="cli-tools.html" class="active">CLI Tools</a><a href="reference/menu-actions.html">Menu Actions</a><a href="reference/message-commands.html">Message Commands</a><a href="reference/file-commands.html">File Commands</a><a href="reference/acs-mci.html">ACS & MCI</a><a href="reference/database.html">Database Schema</a></nav>
+  <main class="doc-content"><p>&lt;!-- generated-by: gsd-doc-writer --&gt;</p>
+<h1>CLI Tools</h1>
+<p>Mutineer ships standalone command-line utilities for initialization, maintenance, statistics, offline mail, and PLANK networking. All tools share <code>db.c</code>, <code>config.c</code>, and related core sources.</p>
+<p>Build all BBS tools:</p>
+<pre><code class="bash">
+cmake --build build --target tools
+</code></pre>
+<p>Build PLANK tools:</p>
+<pre><code class="bash">
+cmake --build build --target plank
+</code></pre>
+<p>Default config path: <code>conf/mutineer.conf</code> (most tools accept <code>-c</code> override).</p>
+<h2>BBS Tools</h2>
+<h3>mutineer-initbbs</h3>
+<p>Initialize database, directories, and seed data.</p>
+<pre><code class="bash">
+mutineer-initbbs [options]
+
+Options:
+  -c, --config &lt;path&gt;   Config file (default: conf/mutineer.conf)
+  -y, --yes             Auto-create all missing items
+  -n, --dry-run         Report only, don&#x27;t create
+  -v, --verbose         Verbose output
+  -h, --help            Show help
+</code></pre>
+<p>Exit codes: 0=OK, 1=bad args, 2=missing (dry-run), 3=user declined, 4=create failed.</p>
+<p>Examples:</p>
+<pre><code class="bash">
+mutineer-initbbs -y
+mutineer-initbbs -n -v
+mutineer-initbbs -c /etc/mutineer.conf -y
+</code></pre>
+<h3>mutineer-maint</h3>
+<p>Database maintenance.</p>
+<pre><code class="bash">
+mutineer-maint [options] &lt;command&gt;
+
+Commands:
+  vacuum      Reclaim disk space
+  reindex     Rebuild indexes
+  analyze     Update query planner statistics
+  integrity   Check database integrity
+  backup      Create database backup
+
+Options:
+  -c, --config &lt;path&gt;
+  -o, --output &lt;path&gt;   Backup destination
+  -v, --verbose
+  -h, --help
+</code></pre>
+<p>Examples:</p>
+<pre><code class="bash">
+mutineer-maint vacuum
+mutineer-maint backup -o /backup/mutineer-$(date +%Y%m%d).db
+mutineer-maint integrity -v
+</code></pre>
+<h3>mutineer-stats</h3>
+<p>Display system statistics.</p>
+<pre><code class="bash">
+mutineer-stats [options]
+
+Options:
+  -c, --config &lt;path&gt;
+  -j, --json            JSON output
+  -s, --short           key=value pairs
+  -h, --help
+</code></pre>
+<p>Reports calls, uploads, downloads, posts, emails from <code>stats</code>, <code>daily_stats</code>, and <code>system_info</code> tables.</p>
+<h3>mutineer-qwkgen</h3>
+<p>Generate QWK offline mail packets.</p>
+<pre><code class="bash">
+mutineer-qwkgen [options]
+  -c, --config &lt;path&gt;
+  -u, --user &lt;handle&gt;   Target user
+  -h, --help
+</code></pre>
+<p>Used by sysops/cron for offline mail distribution.</p>
+<h3>mutineer-msgpack</h3>
+<p>Pack/prune message areas.</p>
+<pre><code class="bash">
+mutineer-msgpack [options]
+  -c, --config &lt;path&gt;
+  -a, --area &lt;id&gt;       Target area
+  -k, --keep &lt;count&gt;    Messages to retain
+  -h, --help
+</code></pre>
+<h3>mutineer-userpack</h3>
+<p>Pack/prune user records.</p>
+<pre><code class="bash">
+mutineer-userpack [options]
+  -c, --config &lt;path&gt;
+  -h, --help
+</code></pre>
+<h3>mutineer-filepack</h3>
+<p>Pack/prune file area records.</p>
+<pre><code class="bash">
+mutineer-filepack [options]
+  -c, --config &lt;path&gt;
+  -h, --help
+</code></pre>
+<h3>mutineer-netmail-export</h3>
+<p>Export FidoNet netmail queue.</p>
+<pre><code class="bash">
+mutineer-netmail-export [options]
+  -c, --config &lt;path&gt;
+  -o, --output &lt;dir&gt;    Output directory
+  -h, --help
+</code></pre>
+<p>Exports pending records from <code>fido_netmail</code> table to BSO format.</p>
+<h3>mutineer-validate</h3>
+<p>Validate menu and template files.</p>
+<pre><code class="bash">
+mutineer-validate &lt;path&gt;
+
+Examples:
+  mutineer-validate menus
+  mutineer-validate menus/main.mnu
+</code></pre>
+<p>Checks parse errors, missing templates, invalid ACS/MCI. Registered as ctest <code>validate_menus</code>.</p>
+<h2>PLANK Tools</h2>
+<h3>plankd</h3>
+<p>PLANK link daemon — manages outbound/inbound sync.</p>
+<pre><code class="bash">
+plankd [options]
+  -c, --config &lt;path&gt;
+  -d, --database &lt;path&gt;
+  -f, --foreground      Don&#x27;t daemonize
+  -h, --help
+</code></pre>
+<p>Run alongside <code>mutineer</code> for network sync.</p>
+<h3>coved</h3>
+<p>COVE hub daemon for downstream fan-out.</p>
+<pre><code class="bash">
+coved [options]
+  -c, --config &lt;path&gt;
+  -d, --database &lt;path&gt;
+  -h, --help
+</code></pre>
+<h3>plankctl</h3>
+<p>Administrative control for PLANK state.</p>
+<pre><code class="bash">
+plankctl [options] &lt;command&gt; [command-options]
+
+Options:
+  -c, --config FILE
+  -d, --database FILE
+  -V, --version
+
+Commands:
+  status        Node status
+  init          Initialize node identity
+  peers         List peers
+  links         List links
+  link-add      Add link
+  areas         List PLANK areas
+  queue         Outbound queue
+  journal       Journal entries
+  deadletters   Failed deliveries
+  quarantine    Quarantined objects
+  audit         Audit log
+  rescan        Trigger rescan
+  requeue       Requeue dead letters
+  verify        Integrity check
+  export-key    Export public key
+</code></pre>
+<h3>plankpack</h3>
+<p>Bundle pack/unpack for offline exchange.</p>
+<pre><code class="bash">
+plankpack &lt;command&gt; [options]
+  export    Create bundle
+  import    Import bundle
+  -h, --help
+</code></pre>
+<h3>plank-offline</h3>
+<p>Offline import/export operations.</p>
+<pre><code class="bash">
+plank-offline [options] &lt;command&gt; [command-options]
+  -c, --config FILE
+  -d, --database FILE
+  -h, --help
+</code></pre>
+<h2>Buccaneer Tools</h2>
+<p>Built from <code>src/buccaneer/Makefile</code> (not CMake root):</p>
+<table>
+<tr><th>Tool</th><th>Purpose</th></tr>
+<table>
+<tr><th><code>bucc</code></th><th>Compile .bucc sources</th></tr>
+<table>
+<tr><th><code>bucc-linter</code></th><th>Lint source files</th></tr>
+<table>
+<tr><th><code>bucc-formatter</code></th><th>Format source</th></tr>
+<table>
+<tr><th><code>bucc-simulator</code></th><th>Run compiled modules</th></tr>
+</table>
+<h2>Cron Integration</h2>
+<p>Example scheduler entries (see <code>scripts/crontabs</code>):</p>
+<pre><code class="cron">
+0 3 * * * /path/to/mutineer-maint vacuum
+0 4 * * * /path/to/mutineer-msgpack -k 500
+*/5 * * * * /path/to/plankd -c /etc/mutineer.conf
+</code></pre>
+<p>Events in <code>events</code> table may also invoke these tools via <code>scheduler.c</code>.</p>
+<h2>Testing CLI Tools</h2>
+<pre><code class="bash">
+ctest --test-dir build -R tools
+ctest --test-dir build -R tools_cli
+</code></pre>
+<p><code>tests/test_tools.c</code> validates DB operations. <code>tests/test_tools_cli.sh</code> runs CLI smoke tests.</p>
+<h2>Related Documentation</h2>
+<ul>
+<li><a href="getting-started.html">Getting Started</a></li>
+<li><a href="sysop-guide.html">Sysop Guide</a></li>
+<li><a href="networking-plank.html">PLANK Networking</a></li>
+<li><a href="configuration.html">Configuration</a></li>
+</ul></main>
+  <footer class="site-footer">
+    <p>Mutineer BBS — <a href="https://github.com/rickcollette/mutineer">GitHub</a> — MIT License</p>
+  </footer>
+</body>
+</html>

@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sysop Guide — Mutineer BBS</title>
+  <link rel="stylesheet" href="assets/css/site.css">
+</head>
+<body>
+  <header class="site-header">
+    <a href="index.html" class="logo">MUTINEER BBS</a>
+    <span class="tagline">Documentation</span>
+  </header>
+  <nav class="doc-nav"><a href="index.html" class="home">← Home</a><a href="overview.html">Overview</a><a href="getting-started.html">Getting Started</a><a href="configuration.html">Configuration</a><a href="architecture.html">Architecture</a><a href="menus-and-ui.html">Menus & UI</a><a href="messages-and-mail.html">Messages & Mail</a><a href="files-and-protocols.html">Files & Protocols</a><a href="chat-and-social.html">Chat & Social</a><a href="doors-and-scripting.html">Doors & Scripting</a><a href="sysop-guide.html" class="active">Sysop Guide</a><a href="networking-plank.html">PLANK Networking</a><a href="buccaneer.html">Buccaneer</a><a href="plugins.html">Plugins</a><a href="developer-guide.html">Developer Guide</a><a href="cli-tools.html">CLI Tools</a><a href="reference/menu-actions.html">Menu Actions</a><a href="reference/message-commands.html">Message Commands</a><a href="reference/file-commands.html">File Commands</a><a href="reference/acs-mci.html">ACS & MCI</a><a href="reference/database.html">Database Schema</a></nav>
+  <main class="doc-content"><p>&lt;!-- generated-by: gsd-doc-writer --&gt;</p>
+<h1>Sysop Guide</h1>
+<p>This guide covers day-to-day BBS administration: WFC monitoring, user management, editors, scheduled maintenance, and security practices.</p>
+<h2>WFC Console</h2>
+<p>The Who&#x27;s On Full Color (WFC) console runs as a background thread when <code>wfc_enabled=1</code> (default). Implemented in <code>src/wfc.c</code>.</p>
+<h3>Display</h3>
+<p>WFC shows a grid of node slots with status characters:</p>
+<table>
+<tr><th>Config Key</th><th>Default</th><th>Meaning</th></tr>
+<table>
+<tr><th><code>wfc_status_idle_char</code></th><th><code>I</code></th><th>Node idle</th></tr>
+<table>
+<tr><th><code>wfc_status_logging_char</code></th><th><code>L</code></th><th>User logging in</th></tr>
+<table>
+<tr><th><code>wfc_status_online_char</code></th><th><code>A</code></th><th>User online</th></tr>
+<table>
+<tr><th><code>wfc_status_chat_char</code></th><th><code>S</code></th><th>User in chat</th></tr>
+</table>
+<h3>Tuning</h3>
+<pre><code class="ini">
+wfc_enabled=1
+wfc_refresh_ms=1000
+wfc_blank_sec=300
+wfc_node_num=1
+wfc_fg_color=11
+wfc_bg_color=0
+</code></pre>
+<ul>
+<li><code>wfc_blank_sec=0</code> disables screen blanking</li>
+<li>WFC runs on the local terminal where <code>mutineer</code> was started</li>
+<li>Remote sysops use telnet + F-key editors instead</li>
+</ul>
+<h2>User Administration</h2>
+<h3>User Editor (<code>useredit</code> action)</h3>
+<p>Full-screen user record editor for sysops with <code>+A</code> AR flag:</p>
+<ul>
+<li>Handle, real name, email, phone, address</li>
+<li>Security level and download security level</li>
+<li>AR and AC flags</li>
+<li>Credits, file points, time bank</li>
+<li>Expiration date, lock/delete status</li>
+<li>Notes and sysop messages</li>
+</ul>
+<h3>Security Levels</h3>
+<p>Managed in <code>security_levels</code> table:</p>
+<table>
+<tr><th>Field</th><th>Purpose</th></tr>
+<table>
+<tr><th><code>level</code></th><th>Numeric security level</th></tr>
+<table>
+<tr><th><code>time_limit_min</code></th><th>Per-call time limit</th></tr>
+<table>
+<tr><th><code>call_allow</code></th><th>Calls per day</th></tr>
+<table>
+<tr><th><code>dl_one_day</code> / <code>dl_k_one_day</code></th><th>Download limits</th></tr>
+<table>
+<tr><th><code>download_ratio_num/den</code></th><th>Required UL/DL ratio</th></tr>
+<table>
+<tr><th><code>post_ratio_num/den</code></th><th>Required post ratio</th></tr>
+<table>
+<tr><th><code>email_allow</code> / <code>vote_allow</code> / <code>anon_allow</code></th><th>Feature permissions</th></tr>
+</table>
+<h3>Validation Levels</h3>
+<p><code>validation_levels</code> table defines account validation workflows (new user approval, expiration demotion).</p>
+<h3>Guest Account</h3>
+<pre><code class="ini">
+guest_enabled=1
+guest_handle=GUEST
+guest_level_id=1
+</code></pre>
+<h3>New User Flow</h3>
+<ol>
+<li>Caller selects New User on logon menu</li>
+<li>Collects handle, password, profile fields</li>
+<li>Optional sysop validation queue</li>
+<li>Welcome letter sent if <code>welcome_letter_enabled=1</code></li>
+</ol>
+<h2>Editors</h2>
+<p>Remote sysop editors accessible via menu actions and F-keys:</p>
+<table>
+<tr><th>Action</th><th>Purpose</th></tr>
+<table>
+<tr><th><code>useredit</code></th><th>User records</th></tr>
+<table>
+<tr><th><code>confeditor</code></th><th>Conferences and membership</th></tr>
+<table>
+<tr><th><code>areaadmin</code></th><th>Message areas</th></tr>
+<table>
+<tr><th><code>fileadmin</code></th><th>File areas</th></tr>
+<table>
+<tr><th><code>protocoleditor</code></th><th>Transfer protocols</th></tr>
+<table>
+<tr><th><code>menueditor</code></th><th>Menu files (.mnu)</th></tr>
+<table>
+<tr><th><code>voteeditor</code></th><th>Vote topics and choices</th></tr>
+<table>
+<tr><th><code>eventeditor</code></th><th>Scheduled events</th></tr>
+<table>
+<tr><th><code>fidoeditor</code></th><th>FidoNet AKAs and echolinks</th></tr>
+<table>
+<tr><th><code>qwkneteditor</code></th><th>QWK hubs and area links</th></tr>
+<table>
+<tr><th><code>subscriptioneditor</code></th><th>Subscription types</th></tr>
+</table>
+<h3>Menu Editor</h3>
+<p>Edit menu files in <code>menus/</code> directory:</p>
+<ul>
+<li>Add/remove/reorder items</li>
+<li>Set ACS, flags, passwords</li>
+<li>Validate syntax before save</li>
+</ul>
+<p>Run <code>mutineer-validate menus</code> after external edits.</p>
+<h2>Scheduler</h2>
+<p>Background thread (<code>scheduler.c</code>) polls <code>events</code> table every <code>scheduler_tick_sec</code> (default 30s).</p>
+<h3>Event Types</h3>
+<table>
+<tr><th>Type</th><th>Trigger</th></tr>
+<table>
+<tr><th><code>scheduled</code></th><th>Cron-like schedule string</th></tr>
+<table>
+<tr><th><code>logon</code></th><th>On user login</th></tr>
+<table>
+<tr><th><code>permission</code></th><th>ACS-gated event</th></tr>
+</table>
+<h3>Event Fields</h3>
+<table>
+<tr><th>Field</th><th>Purpose</th></tr>
+<table>
+<tr><th><code>name</code></th><th>Event identifier</th></tr>
+<table>
+<tr><th><code>schedule</code></th><th>Schedule expression</th></tr>
+<table>
+<tr><th><code>command</code></th><th>Command to execute</th></tr>
+<table>
+<tr><th><code>acs</code></th><th>ACS for permission events</th></tr>
+<table>
+<tr><th><code>warning_min</code></th><th>Minutes warning before run</th></tr>
+<table>
+<tr><th><code>enabled</code></th><th>Active flag</th></tr>
+</table>
+<p>Example commands: run <code>mutineer-maint vacuum</code>, pack tools, external scripts.</p>
+<p>Sample crontab entries in <code>scripts/crontabs</code>.</p>
+<h2>Maintenance</h2>
+<h3>In-BBS Maintenance (<code>maintenance</code> action)</h3>
+<p>Provides menu for:</p>
+<ul>
+<li>User pack (<code>mutineer-userpack</code>)</li>
+<li>Message pack (<code>mutineer-msgpack</code>)</li>
+<li>File pack (<code>mutineer-filepack</code>)</li>
+<li>Index rebuild</li>
+<li>System statistics display</li>
+</ul>
+<p>Implemented in <code>src/maint.c</code>.</p>
+<h3>CLI Maintenance</h3>
+<pre><code class="bash">
+build/mutineer-maint vacuum
+build/mutineer-maint reindex
+build/mutineer-maint analyze
+build/mutineer-maint integrity -v
+build/mutineer-maint backup -o /backup/mutineer.db
+</code></pre>
+<h3>File Validation</h3>
+<p><code>validatefiles</code> action scans file areas for inconsistencies between DB and disk.</p>
+<h3>Database Backup</h3>
+<pre><code class="bash">
+build/mutineer-maint backup -o /path/to/backup.db
+# or
+scripts/backup
+</code></pre>
+<p>Stop BBS or use SQLite backup API for consistent snapshots during heavy load.</p>
+<h2>Security</h2>
+<h3>Password Hashing</h3>
+<ul>
+<li>New passwords: PBKDF2 via OpenSSL</li>
+<li>Optional Argon2 upgrade when <code>password_upgrade=1</code> and libargon2 linked</li>
+<li>Password expiration: <code>password_expire_days</code> (0=disabled)</li>
+</ul>
+<h3>Login Throttling</h3>
+<pre><code class="ini">
+login_window_sec=120
+login_max_attempts=5
+</code></pre>
+<p>Tracks failed attempts per IP/user within the window.</p>
+<h3>Access Control</h3>
+<ul>
+<li><strong>AR flags</strong> (A–Z): grant capabilities (<code>+A</code> = sysop)</li>
+<li><strong>AC flags</strong>: restrict activities (<code>RP</code> = no post, <code>RM</code> = no messages)</li>
+<li><strong>ACS strings</strong>: on menus, areas, doors, events</li>
+</ul>
+<h3>Multi-Login</h3>
+<pre><code class="ini">
+allow_multi_login=0   # block duplicate sessions
+max_calls_per_day=0   # unlimited; set &gt;0 to cap daily logins
+</code></pre>
+<h3>Account Status</h3>
+<table>
+<tr><th>Flag</th><th>Effect</th></tr>
+<table>
+<tr><th><code>STATUS_LOCKED</code></th><th>Cannot log in</th></tr>
+<table>
+<tr><th><code>STATUS_DELETED</code></th><th>Soft deleted</th></tr>
+<table>
+<tr><th><code>AC_RLOGON</code></th><th>Restricted from logon</th></tr>
+</table>
+<h3>Signals</h3>
+<ul>
+<li><code>SIGUSR1</code> to BBS process triggers broadcast file check (<code>broadcast_check()</code>)</li>
+<li><code>SIGINT</code>/<code>SIGTERM</code> graceful shutdown</li>
+</ul>
+<h2>Logging</h2>
+<p>Main log: <code>logs_path</code> (default <code>logs/mutineer.log</code>).</p>
+<p>Log levels via <code>log.c</code>: info, warn, error. Door launches, login failures, and plugin events logged.</p>
+<h2>Statistics</h2>
+<table>
+<tr><th>Source</th><th>Data</th></tr>
+<table>
+<tr><th><code>stats</code> table</th><th>Lifetime counters</th></tr>
+<table>
+<tr><th><code>daily_stats</code></th><th>Today only</th></tr>
+<table>
+<tr><th><code>history</code></th><th>Per-day archive</th></tr>
+<table>
+<tr><th><code>system_info</code></th><th>BBS metadata</th></tr>
+</table>
+<pre><code class="bash">
+build/mutineer-stats
+build/mutineer-stats -j    # JSON output
+build/mutineer-stats -s    # key=value short format
+</code></pre>
+<h2>Bulletins and Auto Message</h2>
+<table>
+<tr><th>Table</th><th>Purpose</th></tr>
+<table>
+<tr><th><code>bulletins</code></th><th>Sysop bulletins with ACS</th></tr>
+<table>
+<tr><th><code>automsg</code></th><th>Single auto-message (id=1)</th></tr>
+</table>
+<p>Menu action <code>bulletins</code> displays bulletins filtered by ACS.</p>
+<h2>Voting</h2>
+<table>
+<tr><th>Action</th><th>Purpose</th></tr>
+<table>
+<tr><th><code>vote</code></th><th>User voting booth</th></tr>
+<table>
+<tr><th><code>voteresults</code></th><th>View results (sysop/ACS gated)</th></tr>
+<table>
+<tr><th><code>voteeditor</code></th><th>Create/edit vote topics</th></tr>
+</table>
+<p>Tables: <code>votes</code>, <code>vote_choices</code>, <code>vote_ballots</code>, <code>user_votes</code>.</p>
+<h2>Time Bank</h2>
+<p>Action <code>timebank</code> lets users deposit/withdraw session minutes from <code>users.timebank</code> balance.</p>
+<h2>Subscriptions</h2>
+<table>
+<tr><th>Action</th><th>Purpose</th></tr>
+<table>
+<tr><th><code>subscriptioneditor</code></th><th>Manage subscription types</th></tr>
+<table>
+<tr><th><code>subscribe</code></th><th>User purchase/activate subscription</th></tr>
+</table>
+<p>ACS term <code>E#</code> checks active subscription type.</p>
+<h2>Operational Scripts</h2>
+<table>
+<tr><th>Script</th><th>Purpose</th></tr>
+<table>
+<tr><th><code>scripts/start</code></th><th>Start BBS daemon</th></tr>
+<table>
+<tr><th><code>scripts/stop</code></th><th>Stop BBS</th></tr>
+<table>
+<tr><th><code>scripts/start-screen</code></th><th>Start in screen session</th></tr>
+<table>
+<tr><th><code>scripts/watchdog</code></th><th>Auto-restart on crash</th></tr>
+<table>
+<tr><th><code>scripts/bbs-wall</code></th><th>Send wall to online users</th></tr>
+</table>
+<h2>Related Documentation</h2>
+<ul>
+<li><a href="configuration.html">Configuration</a></li>
+<li><a href="cli-tools.html">CLI Tools</a></li>
+<li><a href="architecture.html">Architecture</a></li>
+<li><a href="reference/menu-actions.html">Reference: Menu Actions</a></li>
+</ul></main>
+  <footer class="site-footer">
+    <p>Mutineer BBS — <a href="https://github.com/rickcollette/mutineer">GitHub</a> — MIT License</p>
+  </footer>
+</body>
+</html>

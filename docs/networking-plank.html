@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PLANK Networking — Mutineer BBS</title>
+  <link rel="stylesheet" href="assets/css/site.css">
+</head>
+<body>
+  <header class="site-header">
+    <a href="index.html" class="logo">MUTINEER BBS</a>
+    <span class="tagline">Documentation</span>
+  </header>
+  <nav class="doc-nav"><a href="index.html" class="home">← Home</a><a href="overview.html">Overview</a><a href="getting-started.html">Getting Started</a><a href="configuration.html">Configuration</a><a href="architecture.html">Architecture</a><a href="menus-and-ui.html">Menus & UI</a><a href="messages-and-mail.html">Messages & Mail</a><a href="files-and-protocols.html">Files & Protocols</a><a href="chat-and-social.html">Chat & Social</a><a href="doors-and-scripting.html">Doors & Scripting</a><a href="sysop-guide.html">Sysop Guide</a><a href="networking-plank.html" class="active">PLANK Networking</a><a href="buccaneer.html">Buccaneer</a><a href="plugins.html">Plugins</a><a href="developer-guide.html">Developer Guide</a><a href="cli-tools.html">CLI Tools</a><a href="reference/menu-actions.html">Menu Actions</a><a href="reference/message-commands.html">Message Commands</a><a href="reference/file-commands.html">File Commands</a><a href="reference/acs-mci.html">ACS & MCI</a><a href="reference/database.html">Database Schema</a></nav>
+  <main class="doc-content"><p>&lt;!-- generated-by: gsd-doc-writer --&gt;</p>
+<h1>PLANK Networking</h1>
+<p>PLANK (Packet Link for Area Networked Knowledge) is Mutineer&#x27;s store-and-forward message networking protocol. Nodes exchange signed CBOR objects in bundles over TLS links or offline packet files.</p>
+<h2>Overview</h2>
+<pre><code class="">
+┌─────────────┐     TLS link      ┌─────────────┐
+│  BBS Node A │ ◄──────────────► │  BBS Node B │
+│  (mutineer) │                   │  (mutineer) │
+└──────┬──────┘                   └──────┬──────┘
+       │                                 │
+       ▼                                 ▼
+   plankd daemon                    plankd daemon
+       │                                 │
+       ▼                                 ▼
+   SQLite plank_* tables          SQLite plank_* tables
+</code></pre>
+<p>PLANK runs <strong>outside</strong> the main BBS process. Daemons share the same SQLite database as <code>mutineer</code>.</p>
+<h2>Protocol Stack</h2>
+<table>
+<tr><th>Layer</th><th>Implementation</th></tr>
+<table>
+<tr><th>Transport</th><th>TLS (OpenSSL) on default port 2930</th></tr>
+<table>
+<tr><th>Framing</th><th>Length-prefixed frames (<code>max_frame_bytes</code>)</th></tr>
+<table>
+<tr><th>Bundles</th><th>Compressed object collections (optional ZSTD)</th></tr>
+<table>
+<tr><th>Objects</th><th>CBOR-encoded, Ed25519 signed envelopes</th></tr>
+<table>
+<tr><th>Storage</th><th>Content-addressed <code>plank_objects</code> table</th></tr>
+<table>
+<tr><th>Sync</th><th>Journal-based cursor tracking per link</th></tr>
+</table>
+<p>Sources: <code>src/plank/</code> — see <code>include/plank/plank.h</code> for public API.</p>
+<h2>Daemons</h2>
+<table>
+<tr><th>Daemon</th><th>Purpose</th></tr>
+<table>
+<tr><th><code>plankd</code></th><th>Link manager — outbound/inbound sync with peers</th></tr>
+<table>
+<tr><th><code>coved</code></th><th>COVE hub — fan-out to downstream nodes</th></tr>
+</table>
+<p>Build:</p>
+<pre><code class="bash">
+cmake --build build --target plank
+</code></pre>
+<p>Run (typical):</p>
+<pre><code class="bash">
+build/plankd -c conf/mutineer.conf
+build/coved -c conf/mutineer.conf
+</code></pre>
+<h2>CLI Tools</h2>
+<table>
+<tr><th>Tool</th><th>Purpose</th></tr>
+<table>
+<tr><th><code>plankctl</code></th><th>Administrative control</th></tr>
+<table>
+<tr><th><code>plankpack</code></th><th>Bundle pack/unpack for offline exchange</th></tr>
+<table>
+<tr><th><code>plank-offline</code></th><th>Offline import/export operations</th></tr>
+</table>
+<h3>plankctl Commands</h3>
+<pre><code class="bash">
+plankctl status              # Node status
+plankctl init                # Initialize node identity
+plankctl peers               # List configured peers
+plankctl links               # List configured links
+plankctl link-add            # Add new link
+plankctl areas               # List PLANK areas
+plankctl queue               # Outbound queue
+plankctl journal             # Object journal entries
+plankctl deadletters         # Failed deliveries
+plankctl quarantine          # Quarantined objects
+plankctl audit               # Audit log
+plankctl rescan              # Trigger journal rescan
+plankctl requeue             # Requeue dead letters
+plankctl verify              # Integrity verification
+plankctl export-key          # Export node public key
+</code></pre>
+<p>Options: <code>-c</code> config file, <code>-d</code> database file, <code>-V</code> version.</p>
+<h2>Schema</h2>
+<p>PLANK tables are defined in <code>sql/plank_schema.sql</code>. Apply after base <code>schema.sql</code>:</p>
+<pre><code class="bash">
+sqlite3 data/mutineer.db &lt; sql/schema.sql
+sqlite3 data/mutineer.db &lt; sql/plank_schema.sql
+</code></pre>
+<h3>Core Tables</h3>
+<table>
+<tr><th>Table</th><th>Purpose</th></tr>
+<table>
+<tr><th><code>plank_node_identity</code></th><th>Local node ID, keys, name (singleton)</th></tr>
+<table>
+<tr><th><code>plank_peers</code></th><th>Known peer nodes and trust levels</th></tr>
+<table>
+<tr><th><code>plank_links</code></th><th>Configured links (host, port, direction)</th></tr>
+<table>
+<tr><th><code>plank_link_sessions</code></th><th>Active link sessions</th></tr>
+<table>
+<tr><th><code>plank_link_cursors</code></th><th>Sync cursors per link/direction</th></tr>
+<table>
+<tr><th><code>plank_areas</code></th><th>Network-aware message areas</th></tr>
+<table>
+<tr><th><code>plank_area_policies</code></th><th>Moderation and ACL policies</th></tr>
+<table>
+<tr><th><code>plank_subscriptions</code></th><th>Per-link area subscriptions</th></tr>
+<table>
+<tr><th><code>plank_objects</code></th><th>Immutable content-addressed objects</th></tr>
+<table>
+<tr><th><code>plank_messages</code></th><th>Denormalized message objects</th></tr>
+<table>
+<tr><th><code>plank_attachments</code></th><th>Attachment metadata</th></tr>
+<table>
+<tr><th><code>plank_journal</code></th><th>Append-only event log</th></tr>
+<table>
+<tr><th><code>plank_outbound_queue</code></th><th>Pending outbound objects</th></tr>
+<table>
+<tr><th><code>plank_import_history</code></th><th>Bundle import deduplication</th></tr>
+<table>
+<tr><th><code>plank_dedupe</code></th><th>Object deduplication window</th></tr>
+<table>
+<tr><th><code>plank_deadletters</code></th><th>Failed delivery queue</th></tr>
+<table>
+<tr><th><code>plank_quarantine</code></th><th>Policy-violating objects</th></tr>
+<table>
+<tr><th><code>plank_moderation</code></th><th>Moderation events</th></tr>
+<table>
+<tr><th><code>plank_receipts</code></th><th>Delivery acknowledgements</th></tr>
+<table>
+<tr><th><code>plank_routes</code></th><th>Direct message routing</th></tr>
+<table>
+<tr><th><code>plank_user_exports</code></th><th>Per-user offline packets</th></tr>
+<table>
+<tr><th><code>plank_user_replies</code></th><th>Imported user reply bundles</th></tr>
+<table>
+<tr><th><code>plank_audit</code></th><th>Audit trail</th></tr>
+<table>
+<tr><th><code>plank_config</code></th><th>PLANK-specific config key/value</th></tr>
+</table>
+<p>Full table reference: <a href="reference/database.html">Database Schema</a>.</p>
+<h3>COVE Tables</h3>
+<table>
+<tr><th>Table</th><th>Purpose</th></tr>
+<table>
+<tr><th><code>cove_downstream</code></th><th>Downstream link tracking</th></tr>
+<table>
+<tr><th><code>cove_upstream</code></th><th>Upstream link tracking</th></tr>
+<table>
+<tr><th><code>cove_fanout_queue</code></th><th>Area fan-out delivery queue</th></tr>
+</table>
+<h2>Node Identity</h2>
+<p><code>plankctl init</code> generates:</p>
+<ul>
+<li>16-byte random <code>node_id</code></li>
+<li>Ed25519 signing keypair</li>
+<li>X25519 link authentication keys</li>
+<li>Node name and network name</li>
+</ul>
+<p>Stored in <code>plank_node_identity</code> (singleton row, <code>id=1</code>).</p>
+<p>Peer trust levels: 0=untrusted, 1=configured, 2=verified.</p>
+<h2>Area Mapping</h2>
+<p>PLANK areas link to local BBS message areas via <code>plank_areas.local_area_id</code>:</p>
+<pre><code class="">
+area_addr = &quot;slug@origin_node@network&quot;
+</code></pre>
+<p>When a user posts to a mapped local area, a PLANK object may be journaled and queued for export to subscribed links.</p>
+<h2>Offline Exchange</h2>
+<p>For air-gapped or dial-up nodes:</p>
+<pre><code class="bash">
+plankpack export -o bundle.plk ...
+plankpack import -i bundle.plk ...
+plank-offline export ...
+plank-offline import ...
+</code></pre>
+<p>Bundles are signed, deduplicated on import via <code>plank_import_history</code>.</p>
+<h2>Security</h2>
+<ul>
+<li>Ed25519 signatures on all objects</li>
+<li>TLS with certificate fingerprint pinning (<code>tls_fingerprint</code> in peers)</li>
+<li>Quarantine for policy violations</li>
+<li>Moderation events propagated to peers</li>
+<li>Max hop count (default 16) prevents routing loops</li>
+</ul>
+<h2>Optional Compression</h2>
+<p>When <code>libzstd</code> is available at build time, bundles may be ZSTD compressed (<code>HAVE_ZSTD=1</code>).</p>
+<h2>Testing</h2>
+<pre><code class="bash">
+ctest --test-dir build -R plank_
+# test_plank_cbor, test_plank_crypto, test_plank_store,
+# test_plank_bundle, test_plank_link, test_plank_route, test_plank_policy
+</code></pre>
+<h2>Integration with BBS</h2>
+<ul>
+<li>BBS core does not embed PLANK protocol handling</li>
+<li>Shared SQLite database connects subsystems</li>
+<li>Message posts in linked areas create export candidates</li>
+<li>User offline packets tracked in <code>plank_user_exports</code></li>
+<li>Scheduler/cron may invoke <code>plankd</code> and pack tools</li>
+</ul>
+<h2>Related Documentation</h2>
+<ul>
+<li><a href="reference/database.html">Reference: Database</a></li>
+<li><a href="cli-tools.html">CLI Tools</a></li>
+<li><a href="messages-and-mail.html">Messages and Mail</a></li>
+<li>Legacy: <code>docs/PLANK_ADMIN.md</code>, <code>SPECS/PLANK/</code></li>
+</ul></main>
+  <footer class="site-footer">
+    <p>Mutineer BBS — <a href="https://github.com/rickcollette/mutineer">GitHub</a> — MIT License</p>
+  </footer>
+</body>
+</html>

@@ -3,326 +3,49 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Mutineer BBS</title>
-  <style>
-    :root {
-      --green: #00cc66;
-      --green-dim: #009944;
-      --green-dark: #004422;
-      --bg: #0a0f0a;
-      --bg2: #0f180f;
-      --text: #ccffcc;
-      --text-dim: #88bb88;
-      --border: #1a3322;
-      --yellow: #ffcc00;
-      --red: #ff4444;
-      --cyan: #00cccc;
-    }
-
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-
-    body {
-      background: var(--bg);
-      color: var(--text);
-      font-family: 'Courier New', 'Lucida Console', monospace;
-      line-height: 1.7;
-      min-height: 100vh;
-    }
-
-    /* Scanline overlay */
-    body::before {
-      content: '';
-      position: fixed;
-      inset: 0;
-      background: repeating-linear-gradient(
-        0deg,
-        transparent,
-        transparent 2px,
-        rgba(0,0,0,0.15) 2px,
-        rgba(0,0,0,0.15) 4px
-      );
-      pointer-events: none;
-      z-index: 9999;
-    }
-
-    header {
-      background: var(--bg2);
-      border-bottom: 2px solid var(--green-dim);
-      padding: 2rem 1rem 1.5rem;
-      text-align: center;
-    }
-
-    .logo-ascii {
-      color: var(--green);
-      font-size: clamp(0.45rem, 1.5vw, 0.8rem);
-      line-height: 1.15;
-      white-space: pre;
-      display: inline-block;
-      text-shadow: 0 0 8px var(--green);
-      margin-bottom: 1rem;
-    }
-
-    h1 {
-      color: var(--green);
-      font-size: 2.2rem;
-      font-weight: normal;
-      text-shadow: 0 0 12px var(--green);
-      letter-spacing: 0.15em;
-    }
-
-    .tagline {
-      color: var(--text-dim);
-      font-size: 0.95rem;
-      margin-top: 0.4rem;
-    }
-
-    .blink {
-      animation: blink 1.2s step-end infinite;
-    }
-    @keyframes blink { 50% { opacity: 0; } }
-
-    nav {
-      background: var(--green-dark);
-      border-bottom: 1px solid var(--green-dim);
-      display: flex;
-      justify-content: center;
-      gap: 0.5rem;
-      flex-wrap: wrap;
-      padding: 0.5rem 1rem;
-    }
-
-    nav a {
-      color: var(--green);
-      text-decoration: none;
-      padding: 0.3rem 0.8rem;
-      border: 1px solid var(--green-dim);
-      font-size: 0.9rem;
-      transition: background 0.15s, color 0.15s;
-    }
-    nav a:hover {
-      background: var(--green);
-      color: var(--bg);
-    }
-
-    main {
-      max-width: 1100px;
-      margin: 0 auto;
-      padding: 2rem 1rem;
-    }
-
-    .hero {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 2rem;
-      margin-bottom: 3rem;
-    }
-    @media (max-width: 700px) { .hero { grid-template-columns: 1fr; } }
-
-    .hero-text h2 {
-      color: var(--yellow);
-      font-size: 1.4rem;
-      font-weight: normal;
-      margin-bottom: 1rem;
-    }
-
-    .hero-text p { color: var(--text-dim); margin-bottom: 0.8rem; }
-
-    .term {
-      background: #000;
-      border: 2px solid var(--green-dim);
-      border-radius: 4px;
-      padding: 1rem 1.2rem;
-      font-size: 0.85rem;
-      box-shadow: 0 0 20px rgba(0,204,102,0.15);
-    }
-    .term .prompt { color: var(--green); }
-    .term .comment { color: var(--text-dim); }
-    .term .output { color: var(--cyan); }
-
-    section {
-      margin-bottom: 3rem;
-    }
-
-    section h2 {
-      color: var(--green);
-      font-size: 1.3rem;
-      font-weight: normal;
-      border-bottom: 1px solid var(--border);
-      padding-bottom: 0.5rem;
-      margin-bottom: 1.2rem;
-      letter-spacing: 0.08em;
-    }
-    section h2::before { content: '// '; color: var(--green-dim); }
-
-    .feature-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-      gap: 1rem;
-    }
-
-    .feature-card {
-      background: var(--bg2);
-      border: 1px solid var(--border);
-      padding: 1rem 1.2rem;
-      border-left: 3px solid var(--green-dim);
-    }
-
-    .feature-card h3 {
-      color: var(--yellow);
-      font-size: 0.95rem;
-      margin-bottom: 0.5rem;
-      font-weight: normal;
-    }
-
-    .feature-card p {
-      color: var(--text-dim);
-      font-size: 0.85rem;
-      line-height: 1.6;
-    }
-
-    .install-box {
-      background: #000;
-      border: 1px solid var(--green-dim);
-      padding: 1.2rem 1.5rem;
-      margin: 1rem 0;
-    }
-    .install-box code {
-      display: block;
-      color: var(--green);
-      font-size: 0.9rem;
-      margin: 0.3rem 0;
-    }
-    .install-box .comment-line { color: var(--text-dim); }
-
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 0.9rem;
-      margin: 1rem 0;
-    }
-    th {
-      background: var(--green-dark);
-      color: var(--green);
-      text-align: left;
-      padding: 0.5rem 0.8rem;
-      font-weight: normal;
-      border: 1px solid var(--border);
-    }
-    td {
-      padding: 0.5rem 0.8rem;
-      border: 1px solid var(--border);
-      color: var(--text-dim);
-    }
-    tr:nth-child(even) td { background: var(--bg2); }
-
-    .badge-row {
-      display: flex;
-      gap: 0.5rem;
-      flex-wrap: wrap;
-      margin: 1rem 0;
-    }
-    .badge {
-      background: var(--green-dark);
-      color: var(--green);
-      border: 1px solid var(--green-dim);
-      padding: 0.2rem 0.6rem;
-      font-size: 0.8rem;
-    }
-
-    .cta-row {
-      display: flex;
-      gap: 1rem;
-      flex-wrap: wrap;
-      margin-top: 1.5rem;
-    }
-    .btn {
-      display: inline-block;
-      padding: 0.6rem 1.4rem;
-      text-decoration: none;
-      font-family: inherit;
-      font-size: 0.95rem;
-      transition: background 0.15s, color 0.15s;
-      border: 2px solid;
-    }
-    .btn-primary {
-      background: var(--green);
-      color: var(--bg);
-      border-color: var(--green);
-    }
-    .btn-primary:hover { background: var(--green-dim); border-color: var(--green-dim); }
-    .btn-secondary {
-      background: transparent;
-      color: var(--cyan);
-      border-color: var(--cyan);
-    }
-    .btn-secondary:hover { background: var(--cyan); color: var(--bg); }
-
-    footer {
-      text-align: center;
-      color: var(--text-dim);
-      font-size: 0.8rem;
-      padding: 2rem 1rem;
-      border-top: 1px solid var(--border);
-      margin-top: 2rem;
-    }
-    footer a { color: var(--green-dim); text-decoration: none; }
-    footer a:hover { color: var(--green); }
-  </style>
+  <title>Mutineer BBS — Classic Telnet BBS in C</title>
+  <link rel="stylesheet" href="assets/css/site.css">
 </head>
 <body>
 
-<header>
-  <div class="logo-ascii">
-███╗   ███╗██╗   ██╗████████╗██╗███╗   ██╗███████╗███████╗██████╗
+<header class="landing-header">
+  <div class="logo-ascii">███╗   ███╗██╗   ██╗████████╗██╗███╗   ██╗███████╗███████╗██████╗
 ████╗ ████║██║   ██║╚══██╔══╝██║████╗  ██║██╔════╝██╔════╝██╔══██╗
 ██╔████╔██║██║   ██║   ██║   ██║██╔██╗ ██║█████╗  █████╗  ██████╔╝
 ██║╚██╔╝██║██║   ██║   ██║   ██║██║╚██╗██║██╔══╝  ██╔══╝  ██╔══██╗
 ██║ ╚═╝ ██║╚██████╔╝   ██║   ██║██║ ╚████║███████╗███████╗██║  ██║
 ╚═╝     ╚═╝ ╚═════╝    ╚═╝   ╚═╝╚═╝  ╚═══╝╚══════╝╚══════╝╚═╝  ╚═╝</div>
   <h1>MUTINEER BBS</h1>
-  <p class="tagline">A classic telnet BBS — written in C&nbsp;&nbsp;<span class="blink">▮</span></p>
+  <p class="tagline" style="color:var(--text-dim);margin-top:0.4rem;">A classic telnet BBS — written in C&nbsp;&nbsp;<span class="blink">▮</span></p>
 </header>
 
-<nav>
+<nav class="landing-nav">
   <a href="#features">Features</a>
+  <a href="#docs">Documentation</a>
   <a href="#install">Install</a>
-  <a href="#doors">Doors</a>
-  <a href="#plank">PLANK</a>
-  <a href="#buccaneer">Buccaneer</a>
   <a href="https://github.com/rickcollette/mutineer" target="_blank">GitHub</a>
 </nav>
 
-<main>
+<main class="landing-main">
 
   <div class="hero">
-    <div class="hero-text">
+    <div>
       <h2>Sail the digital seas.</h2>
-      <p>
-        Mutineer is a full-featured telnet BBS server built from scratch in C11,
-        styled after the classic Renegade BBS with a green pirate theme. It runs
-        on modern Linux with SQLite persistence and supports up to 256 concurrent
-        nodes.
-      </p>
-      <p>
-        From threaded message boards and offline QWK mail to real DOS doors running
-        under DOSBox with live socket passthrough — Mutineer aims for authentic
-        BBS nostalgia with modern security and reliability.
-      </p>
+      <p>Mutineer is a full-featured telnet BBS server built from scratch in C11, styled after the classic Renegade BBS with a green pirate theme. SQLite persistence, DOS doors, PLANK networking, and an embedded scripting VM.</p>
       <div class="badge-row">
         <span class="badge">C11</span>
         <span class="badge">SQLite</span>
         <span class="badge">OpenSSL</span>
-        <span class="badge">pthreads</span>
         <span class="badge">DOSBox</span>
         <span class="badge">MIT License</span>
       </div>
-      <div class="cta-row">
-        <a class="btn btn-primary" href="https://github.com/rickcollette/mutineer" target="_blank">View on GitHub</a>
-        <a class="btn btn-secondary" href="#install">Quick Start</a>
-      </div>
+      <p style="margin-top:1rem;">
+        <a class="btn btn-primary" href="docs/index.html">Read the Docs</a>
+        <a class="btn btn-secondary" href="https://github.com/rickcollette/mutineer" target="_blank">GitHub</a>
+      </p>
     </div>
     <div class="term">
-      <div class="comment-line comment">$ telnet localhost 2929</div>
+      <div class="comment">$ telnet localhost 2929</div>
       <br>
       <div class="output">  ╔══════════════════════════════════╗</div>
       <div class="output">  ║    W e l c o m e   A b o a r d  ║</div>
@@ -334,187 +57,60 @@
     </div>
   </div>
 
-  <!-- FEATURES -->
   <section id="features">
     <h2>Features</h2>
     <div class="feature-grid">
-      <div class="feature-card">
-        <h3>Multi-Node Telnet</h3>
-        <p>Thread-per-connection architecture supports up to 256 concurrent callers.
-           Real-time node tracking, inter-node whisper, wall broadcasts, and a
-           WFC (Waiting for Caller) console.</p>
-      </div>
-      <div class="feature-card">
-        <h3>Message System</h3>
-        <p>Threaded message boards, private email with CC, QWK offline mail packets
-           (with NDX index files), FidoNet netmail export, taglines, full-screen
-           editor, and per-user scan flags.</p>
-      </div>
-      <div class="feature-card">
-        <h3>File Areas</h3>
-        <p>Upload/download with credits and ratio enforcement. Batch operations,
-           archive test and extract (zip, tar, rar, 7z), file validation sysop
-           command, and configurable file points.</p>
-      </div>
-      <div class="feature-card">
-        <h3>DOS Door Runner</h3>
-        <p>Runs classic DOS BBS doors under DOSBox with per-launch isolated runtime
-           trees and serial nullmodem socket inheritance. The Aladdin Adventure door
-           from 1992 is included as a reference.</p>
-      </div>
-      <div class="feature-card">
-        <h3>ACS System</h3>
-        <p>Full expression parser: security levels, AR/AC flags, age, time, credits,
-           conference membership, subscription presence (E#), login counts (C#),
-           post/call ratio (PC), download ratio (DR), and boolean operators.</p>
-      </div>
-      <div class="feature-card">
-        <h3>Sysop Tools</h3>
-        <p>Remote F-key shortcuts (F1=who, F2=broadcast, F3=kick, F4=stats, F8=twit,
-           F10=chat). Editors for users, conferences, protocols, votes, events, and
-           menus — all accessible from within a remote session.</p>
-      </div>
-      <div class="feature-card">
-        <h3>Chat &amp; Paging</h3>
-        <p>Split-screen two-panel ANSI chat using proper scroll regions,
-           teleconference channel chat, sysop page with configurable attempt limit
-           and email fallback, per-session chat logging to file.</p>
-      </div>
-      <div class="feature-card">
-        <h3>Color Schemes</h3>
-        <p>Eight named built-in color schemes selectable per-user. MCI tokens
-           ^0–^9 map through the active scheme. Sysop green pirate theme is the
-           default.</p>
-      </div>
+      <div class="feature-card"><h3>Multi-Node Telnet</h3><p>Thread-per-connection, up to 256 nodes. WFC console, whisper, wall broadcasts.</p></div>
+      <div class="feature-card"><h3>Message System</h3><p>Threaded boards, private email, QWK offline mail, FidoNet netmail, FSEditor.</p></div>
+      <div class="feature-card"><h3>File Areas</h3><p>Upload/download, credits/ratio enforcement, batch ops, archive test/extract.</p></div>
+      <div class="feature-card"><h3>DOS Door Runner</h3><p>DOSBox with serial nullmodem socket passthrough. Aladdin Adventure included.</p></div>
+      <div class="feature-card"><h3>ACS System</h3><p>Full expression parser: levels, flags, ratios, time, credits, conferences.</p></div>
+      <div class="feature-card"><h3>PLANK Networking</h3><p>Store-and-forward federation with Ed25519 signatures and CBOR objects.</p></div>
+      <div class="feature-card"><h3>Buccaneer VM</h3><p>Embedded scripting language for interactive doors. Pascal-like syntax.</p></div>
+      <div class="feature-card"><h3>Plugins</h3><p>Loadable .so modules via dlopen with capability-controlled host API.</p></div>
     </div>
   </section>
 
-  <!-- INSTALL -->
+  <section id="docs">
+    <h2>Documentation</h2>
+    <div class="doc-grid">
+      <div class="doc-card"><h3><a href="docs/getting-started.html">Getting Started</a></h3><p>Install, build, initialize, run, connect.</p></div>
+      <div class="doc-card"><h3><a href="docs/configuration.html">Configuration</a></h3><p>All mutineer.conf settings.</p></div>
+      <div class="doc-card"><h3><a href="docs/architecture.html">Architecture</a></h3><p>System design, components, workflows.</p></div>
+      <div class="doc-card"><h3><a href="docs/menus-and-ui.html">Menus &amp; UI</a></h3><p>Menu files, templates, MCI, ACS.</p></div>
+      <div class="doc-card"><h3><a href="docs/messages-and-mail.html">Messages &amp; Mail</a></h3><p>Boards, email, QWK, FidoNet.</p></div>
+      <div class="doc-card"><h3><a href="docs/files-and-protocols.html">Files &amp; Protocols</a></h3><p>File areas, upload/download, batch ops.</p></div>
+      <div class="doc-card"><h3><a href="docs/chat-and-social.html">Chat &amp; Social</a></h3><p>Chat, paging, wall, whisper.</p></div>
+      <div class="doc-card"><h3><a href="docs/doors-and-scripting.html">Doors &amp; Scripting</a></h3><p>Native, DOSBox, Buccaneer, plugins.</p></div>
+      <div class="doc-card"><h3><a href="docs/sysop-guide.html">Sysop Guide</a></h3><p>WFC, user admin, maintenance.</p></div>
+      <div class="doc-card"><h3><a href="docs/networking-plank.html">PLANK Networking</a></h3><p>Federation protocol and tools.</p></div>
+      <div class="doc-card"><h3><a href="docs/buccaneer.html">Buccaneer</a></h3><p>Scripting language and VM.</p></div>
+      <div class="doc-card"><h3><a href="docs/developer-guide.html">Developer Guide</a></h3><p>Build, test, contribute.</p></div>
+      <div class="doc-card"><h3><a href="docs/cli-tools.html">CLI Tools</a></h3><p>All command-line utilities.</p></div>
+      <div class="doc-card"><h3><a href="docs/index.html">Full Index →</a></h3><p>Complete documentation index with reference pages.</p></div>
+    </div>
+  </section>
+
   <section id="install">
     <h2>Quick Start</h2>
-
-    <h3 style="color:var(--text-dim);font-weight:normal;margin-bottom:0.8rem;">Dependencies</h3>
     <div class="install-box">
-      <code class="comment-line comment"># Debian/Ubuntu</code>
-      <code>apt-get install build-essential cmake libsqlite3-dev libssl-dev dosbox</code>
-      <code class="comment-line comment"># Optional: Argon2 password upgrade path</code>
-      <code>apt-get install libargon2-dev</code>
-    </div>
-
-    <h3 style="color:var(--text-dim);font-weight:normal;margin:1rem 0 0.8rem;">Build &amp; Run</h3>
-    <div class="install-box">
-      <code class="comment-line comment"># Clone</code>
+      <code class="comment"># Clone &amp; build</code>
       <code>git clone https://github.com/rickcollette/mutineer.git</code>
       <code>cd mutineer</code>
-      <br>
-      <code class="comment-line comment"># Build</code>
       <code>cmake -S . -B build -DCMAKE_BUILD_TYPE=Release</code>
       <code>cmake --build build</code>
-      <br>
-      <code class="comment-line comment"># Initialize fresh database</code>
+      <code class="comment"># Initialize &amp; run</code>
       <code>build/mutineer-initbbs -c conf/mutineer.conf</code>
-      <br>
-      <code class="comment-line comment"># Start (default port 2929)</code>
       <code>build/mutineer -c conf/mutineer.conf</code>
-      <br>
-      <code class="comment-line comment"># Connect</code>
+      <code class="comment"># Connect</code>
       <code>telnet localhost 2929</code>
     </div>
-
-    <h3 style="color:var(--text-dim);font-weight:normal;margin:1rem 0 0.8rem;">Run Tests</h3>
-    <div class="install-box">
-      <code>cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug</code>
-      <code>cmake --build build</code>
-      <code>ctest --test-dir build --exclude-regex "tools_cli|expect_suite"</code>
-    </div>
-  </section>
-
-  <!-- DOORS -->
-  <section id="doors">
-    <h2>DOS Door Runner</h2>
-    <p style="color:var(--text-dim);margin-bottom:1rem;">
-      Mutineer supports classic DOS BBS doors via DOSBox with full serial nullmodem
-      socket inheritance — the caller's live telnet socket is passed directly to
-      DOSBox on launch.
-    </p>
-
-    <table>
-      <tr><th>Feature</th><th>Detail</th></tr>
-      <tr><td>Isolation</td><td>Per-launch runtime tree under <code>door_runtime_path/&lt;name&gt;/node&lt;N&gt;/&lt;id&gt;/</code></td></tr>
-      <tr><td>Socket passthrough</td><td>DOSBox <code>-socket &lt;fd&gt;</code> with <code>serial1=nullmodem inhsocket:1 telnet:1</code></td></tr>
-      <tr><td>Dropfiles</td><td>DOOR.SYS, DOOR32.SYS, DORINFO1.DEF, CHAIN.TXT, PCBOARD.SYS, CALLINFO.BBS, SFDOORS.DAT</td></tr>
-      <tr><td>Timeout</td><td>Configurable per-door and global; clean SIGTERM → SIGKILL sequence</td></tr>
-      <tr><td>Multi-node safe</td><td>Each node gets its own isolated game/ directory — no file collisions</td></tr>
-    </table>
-
-    <p style="color:var(--text-dim);margin-top:1rem;">
-      A real 16-bit DOS COM test door (<code>doors/testdoor/TESTDOOR.COM</code>) and
-      the Aladdin Adventure text adventure from 1992 are included as reference doors.
-    </p>
-  </section>
-
-  <!-- PLANK -->
-  <section id="plank">
-    <h2>PLANK Networking</h2>
-    <p style="color:var(--text-dim);margin-bottom:1rem;">
-      PLANK (Packet Link for Area Networked Knowledge) is a store-and-forward message
-      networking protocol for offline packet exchange between Mutineer nodes — the
-      spiritual successor to FidoNet echomail for a modern telnet BBS world.
-    </p>
-    <div class="feature-grid">
-      <div class="feature-card">
-        <h3>Store &amp; Forward</h3>
-        <p>Messages are bundled into signed CBOR packets, stored locally, and
-           exchanged with peer nodes on a configurable schedule.</p>
-      </div>
-      <div class="feature-card">
-        <h3>Ed25519 Identity</h3>
-        <p>Each node has a cryptographic identity. Bundles are signed by the
-           originating node and verified on receipt.</p>
-      </div>
-      <div class="feature-card">
-        <h3>plankctl / plank-offline</h3>
-        <p>Admin CLI for managing links, queues, dead-letters, and quarantine.
-           User-facing offline packet export/import tool.</p>
-      </div>
-      <div class="feature-card">
-        <h3>Deduplication</h3>
-        <p>Object-level and bundle-level deduplication prevents message storms
-           when connected to multiple peers.</p>
-      </div>
-    </div>
-  </section>
-
-  <!-- BUCCANEER -->
-  <section id="buccaneer">
-    <h2>Buccaneer Scripting VM</h2>
-    <p style="color:var(--text-dim);margin-bottom:1rem;">
-      Buccaneer is an embedded scripting language for writing interactive BBS doors.
-      Pascal-like syntax compiles to bytecode that runs in a sandboxed stack-based VM
-      with capability-controlled host function access.
-    </p>
-    <div class="install-box">
-      <code class="comment-line comment">// hello.bucc — a minimal Buccaneer door</code>
-      <code>PROCEDURE Main</code>
-      <code>  TERM.PRINTLN("Ahoy, " &amp; USER.NAME() &amp; "!")</code>
-      <code>  TERM.PRINTLN("Your security level: " &amp; USER.SECURITY())</code>
-      <code>  DOOR.EXIT</code>
-      <code>END</code>
-    </div>
-    <p style="color:var(--text-dim);margin-top:0.8rem;">
-      The compiler, VM, and host bridge are in <code>src/buccaneer/</code>.
-      See <code>BUCC_TODO.md</code> for known gaps and open implementation work.
-    </p>
   </section>
 
 </main>
 
-<footer>
-  <p>
-    Mutineer BBS &mdash;
-    <a href="https://github.com/rickcollette/mutineer" target="_blank">github.com/rickcollette/mutineer</a>
-    &mdash; MIT License &mdash; &copy; 2026 Rick Collette
-  </p>
+<footer class="site-footer">
+  <p>Mutineer BBS — <a href="https://github.com/rickcollette/mutineer">github.com/rickcollette/mutineer</a> — MIT License — &copy; 2026 Rick Collette</p>
 </footer>
 
 </body>

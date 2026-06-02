@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Message Commands Reference — Mutineer BBS</title>
+  <link rel="stylesheet" href="../assets/css/site.css">
+</head>
+<body>
+  <header class="site-header">
+    <a href="../index.html" class="logo">MUTINEER BBS</a>
+    <span class="tagline">Documentation</span>
+  </header>
+  <nav class="doc-nav"><a href="../index.html" class="home">← Home</a><a href="../overview.html">Overview</a><a href="../getting-started.html">Getting Started</a><a href="../configuration.html">Configuration</a><a href="../architecture.html">Architecture</a><a href="../menus-and-ui.html">Menus & UI</a><a href="../messages-and-mail.html">Messages & Mail</a><a href="../files-and-protocols.html">Files & Protocols</a><a href="../chat-and-social.html">Chat & Social</a><a href="../doors-and-scripting.html">Doors & Scripting</a><a href="../sysop-guide.html">Sysop Guide</a><a href="../networking-plank.html">PLANK Networking</a><a href="../buccaneer.html">Buccaneer</a><a href="../plugins.html">Plugins</a><a href="../developer-guide.html">Developer Guide</a><a href="../cli-tools.html">CLI Tools</a><a href="../reference/menu-actions.html">Menu Actions</a><a href="../reference/message-commands.html">Message Commands</a><a href="../reference/file-commands.html">File Commands</a><a href="../reference/acs-mci.html">ACS & MCI</a><a href="../reference/database.html">Database Schema</a></nav>
+  <main class="doc-content"><p>&lt;!-- generated-by: gsd-doc-writer --&gt;</p>
+<h1>Message Commands Reference</h1>
+<p>Two-letter commands for message and email operations. Enter at the <code>:</code> prompt in message mode or via menu data fields.</p>
+<p>Dispatched by <code>handle_msg_command()</code> in <code>src/msg_cmds.c</code>. Declarations in <code>include/bbs_msg_cmds.h</code>.</p>
+<h2>M* Commands (Message)</h2>
+<table>
+<tr><th>Cmd</th><th>Function</th><th>Description</th></tr>
+<table>
+<tr><th><code>MA</code></th><th><code>cmd_msg_area_change</code></th><th>Change current message area by number or name</th></tr>
+<table>
+<tr><th><code>MG</code></th><th><code>cmd_msg_area_list</code></th><th>List all accessible message areas</th></tr>
+<table>
+<tr><th><code>MN</code></th><th><code>cmd_msg_new_scan</code></th><th>Scan areas for new messages since last visit</th></tr>
+<table>
+<tr><th><code>MP</code></th><th><code>cmd_msg_post</code></th><th>Post new message in current area</th></tr>
+<table>
+<tr><th><code>MR</code></th><th><code>cmd_msg_read</code></th><th>Read message by number</th></tr>
+<table>
+<tr><th><code>MS</code></th><th><code>cmd_msg_search</code></th><th>Search messages by subject/body keyword</th></tr>
+<table>
+<tr><th><code>MW</code></th><th><code>cmd_msg_write_email</code></th><th>Compose private email to user</th></tr>
+<table>
+<tr><th><code>MY</code></th><th><code>cmd_msg_your_scan</code></th><th>Scan for messages addressed to you</th></tr>
+<table>
+<tr><th><code>MZ</code></th><th><code>cmd_msg_toggle_scan_areas</code></th><th>Toggle per-area new-scan participation</th></tr>
+</table>
+<h3>MA — Area Change</h3>
+<p>Changes <code>s-&gt;current_msg_area</code>. Prompts for area number or name. ACS checked against area <code>acs_read</code>.</p>
+<h3>MG — Area List</h3>
+<p>Lists areas passing ACS with area ID and name. Respects conference membership.</p>
+<h3>MN — New Scan</h3>
+<p>Scans enabled areas (per <code>user_msg_scan_areas</code>) for messages posted since user&#x27;s last read pointer. Shows count and optional jump-to-read.</p>
+<h3>MP — Post</h3>
+<p>Opens post flow:</p>
+<ol>
+<li>Check <code>acs_post</code> and <code>AC_RPOST</code></li>
+<li>Prompt subject (or full-screen editor if enabled)</li>
+<li>Prompt body</li>
+<li>Append signature/tagline if configured</li>
+<li>Insert via <code>db_message_post()</code></li>
+</ol>
+<p>Supports anonymous posting per area <code>anon_policy</code>.</p>
+<h3>MR — Read</h3>
+<p>Read message by number in current area. Displays header, body, and attachment info. Offers reply/forward/delete options.</p>
+<h3>MS — Search</h3>
+<p>Prompts for search string. Searches subject and body in current area or all areas.</p>
+<h3>MW — Write Email</h3>
+<p>Private email composition:</p>
+<ol>
+<li>Prompt recipient handle</li>
+<li>Validate user exists</li>
+<li>Subject and body entry</li>
+<li>Sets <code>to_user</code> on message record</li>
+</ol>
+<p>Blocked by <code>AC_REMAIL</code>.</p>
+<h3>MY — Your Scan</h3>
+<p>Scans for messages where user is recipient (<code>to_user</code> or @mention patterns).</p>
+<h3>MZ — Toggle Scan Areas</h3>
+<p>Interactive toggle of <code>user_msg_scan_areas.scan_enabled</code> per area. Disabled areas skipped by <code>MN</code>/<code>RN</code>.</p>
+<h2>R* Commands (Read)</h2>
+<table>
+<tr><th>Cmd</th><th>Function</th><th>Description</th></tr>
+<table>
+<tr><th><code>RA</code></th><th><code>cmd_msg_read</code></th><th>Read all messages (alias for MR sequence)</th></tr>
+<table>
+<tr><th><code>RC</code></th><th><code>cmd_msg_continuous_read</code></th><th>Continuous read — advance through messages</th></tr>
+<table>
+<tr><th><code>RE</code></th><th><code>cmd_msg_reply</code></th><th>Reply to current/ specified message</th></tr>
+<table>
+<tr><th><code>RJ</code></th><th><code>cmd_msg_jump_reply</code></th><th>Jump to message number then reply</th></tr>
+<table>
+<tr><th><code>RL</code></th><th><code>cmd_msg_list</code></th><th>List message headers in current area</th></tr>
+<table>
+<tr><th><code>RM</code></th><th><code>cmd_msg_edit</code></th><th>Edit own message (if not read-only area)</th></tr>
+<table>
+<tr><th><code>RN</code></th><th><code>cmd_msg_read_new</code></th><th>Read all new messages sequentially</th></tr>
+<table>
+<tr><th><code>RP</code></th><th><code>cmd_msg_read_private</code></th><th>Read private mail messages</th></tr>
+<table>
+<tr><th><code>RQ</code></th><th><code>cmd_msg_quick_scan</code></th><th>Quick header scan without reading bodies</th></tr>
+<table>
+<tr><th><code>RT</code></th><th><code>cmd_msg_thread_view</code></th><th>Display message thread tree</th></tr>
+<table>
+<tr><th><code>RV</code></th><th><code>cmd_msg_view_attachment</code></th><th>View or download file attachment</th></tr>
+<table>
+<tr><th><code>RY</code></th><th><code>cmd_msg_your_messages</code></th><th>List messages authored by or sent to you</th></tr>
+</table>
+<h3>RC — Continuous Read</h3>
+<p>Reads messages sequentially without returning to prompt between each. Exit with <code>Q</code> or blank.</p>
+<h3>RE — Reply</h3>
+<p>Reply to message:</p>
+<ol>
+<li>Quote original body with <code>&gt;</code> prefix</li>
+<li>Prompt for reply body</li>
+<li>Set <code>reply_to</code> and <code>thread_root</code> links</li>
+<li>Subject prefixed with <code>Re:</code></li>
+</ol>
+<h3>RJ — Jump Reply</h3>
+<p>Combines jump to message number + reply flow.</p>
+<h3>RL — List</h3>
+<p>Paginated header list: ID, subject, author, date. Respects expert mode display level.</p>
+<h3>RM — Edit</h3>
+<p>Edit user&#x27;s own message if area policy allows. Sysop may edit any message with <code>acs_sysop</code>.</p>
+<h3>RN — Read New</h3>
+<p>Reads all messages marked new since last visit across scan-enabled areas.</p>
+<h3>RP — Read Private</h3>
+<p>Filters messages with private attribute or <code>to_user</code> set to current user.</p>
+<h3>RQ — Quick Scan</h3>
+<p>Header-only scan showing subject lines. Faster than full read for high-volume areas.</p>
+<h3>RT — Thread View</h3>
+<p>Displays thread tree with indentation based on <code>reply_to</code> chain (up to depth limit).</p>
+<h3>RV — View Attachment</h3>
+<p>If message has <code>file_attached</code>, offer view/download of attachment file.</p>
+<h3>RY — Your Messages</h3>
+<p>Lists messages where user is author or named recipient.</p>
+<h2>Full-Screen Editor</h2>
+<p><code>fsedit_edit()</code> shared editor for MP, MW, and RE:</p>
+<ul>
+<li>Arrow key navigation (if terminal supports)</li>
+<li>Line editing commands</li>
+<li>Auto-save draft to <code>drafts</code> table on disconnect</li>
+</ul>
+<p>Toggle default via <code>togglefse</code> menu action.</p>
+<h2>QWK Commands</h2>
+<p>Separate from M*/R* dispatch but related:</p>
+<table>
+<tr><th>Cmd</th><th>Function</th><th>Description</th></tr>
+<table>
+<tr><th>QWK download</th><th><code>cmd_qwk_download</code></th><th>Generate QWK packet for user</th></tr>
+<table>
+<tr><th>QWK upload</th><th><code>cmd_qwk_upload</code></th><th>Import REP reply packet</th></tr>
+</table>
+<p>Invoked from <code>netmail</code> menu action.</p>
+<h2>Error Messages</h2>
+<p>Unknown commands produce:</p>
+<pre><code class="">
+Unknown message command.
+Unknown read command.
+</code></pre>
+<h2>Usage Examples</h2>
+<p>At message area prompt:</p>
+<pre><code class="">
+:MG              List areas
+:MA 3            Change to area 3
+:MN              Scan for new
+:MP              Post message
+:MR 42           Read message 42
+:RE              Reply to last read
+:MW              Write email
+:RN              Read all new
+:MZ              Toggle scan areas
+</code></pre>
+<p>From menu (<code>menus/message.mnu</code>):</p>
+<pre><code class="">
+Z|Toggle Scan Areas|messages|MZ|L10
+</code></pre>
+<h2>Related Documentation</h2>
+<ul>
+<li><a href="../messages-and-mail.html">Messages and Mail</a></li>
+<li><a href="file-commands.html">Reference: File Commands</a></li>
+<li><a href="../menus-and-ui.html">Menus and UI</a></li>
+</ul></main>
+  <footer class="site-footer">
+    <p>Mutineer BBS — <a href="https://github.com/rickcollette/mutineer">GitHub</a> — MIT License</p>
+  </footer>
+</body>
+</html>

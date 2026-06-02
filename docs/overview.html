@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mutineer BBS Overview — Mutineer BBS</title>
+  <link rel="stylesheet" href="assets/css/site.css">
+</head>
+<body>
+  <header class="site-header">
+    <a href="index.html" class="logo">MUTINEER BBS</a>
+    <span class="tagline">Documentation</span>
+  </header>
+  <nav class="doc-nav"><a href="index.html" class="home">← Home</a><a href="overview.html" class="active">Overview</a><a href="getting-started.html">Getting Started</a><a href="configuration.html">Configuration</a><a href="architecture.html">Architecture</a><a href="menus-and-ui.html">Menus & UI</a><a href="messages-and-mail.html">Messages & Mail</a><a href="files-and-protocols.html">Files & Protocols</a><a href="chat-and-social.html">Chat & Social</a><a href="doors-and-scripting.html">Doors & Scripting</a><a href="sysop-guide.html">Sysop Guide</a><a href="networking-plank.html">PLANK Networking</a><a href="buccaneer.html">Buccaneer</a><a href="plugins.html">Plugins</a><a href="developer-guide.html">Developer Guide</a><a href="cli-tools.html">CLI Tools</a><a href="reference/menu-actions.html">Menu Actions</a><a href="reference/message-commands.html">Message Commands</a><a href="reference/file-commands.html">File Commands</a><a href="reference/acs-mci.html">ACS & MCI</a><a href="reference/database.html">Database Schema</a></nav>
+  <main class="doc-content"><p>&lt;!-- generated-by: gsd-doc-writer --&gt;</p>
+<h1>Mutineer BBS Overview</h1>
+<p>Mutineer BBS is a classic telnet bulletin board system for Linux, written in C11. It targets operators who want Renegade-style menus, message and file areas, doors, and sysop tools — with modern persistence (SQLite), password hashing (PBKDF2 with optional Argon2 upgrade), and extensibility via loadable plugins and the Buccaneer scripting VM.</p>
+<h2>Design Goals</h2>
+<ul>
+<li><strong>Classic BBS UX</strong> — ANSI menus, MCI template expansion, ACS access control, hotkeys, and F-key sysop shortcuts.</li>
+<li><strong>Thread-per-connection</strong> — Up to 256 concurrent telnet nodes without blocking the main listener.</li>
+<li><strong>SQLite everywhere</strong> — Users, messages, files, doors, votes, events, QWK/FidoNet queues, and PLANK objects share one database.</li>
+<li><strong>Safe door execution</strong> — Native doors via <code>fork</code>/<code>exec</code>; DOS doors via isolated DOSBox runtime trees with serial nullmodem socket inheritance.</li>
+<li><strong>Offline networking</strong> — PLANK store-and-forward packets; QWK offline mail; FidoNet netmail export.</li>
+</ul>
+<h2>Feature Summary</h2>
+<h3>Connectivity and Sessions</h3>
+<table>
+<tr><th>Feature</th><th>Description</th></tr>
+<table>
+<tr><th>Multi-node telnet</th><th>Thread-per-connection on configurable bind/port (default <code>0.0.0.0:2929</code>)</th></tr>
+<table>
+<tr><th>Login throttling</th><th>Per-IP/user attempt limits via <code>login_window_sec</code> / <code>login_max_attempts</code></th></tr>
+<table>
+<tr><th>Guest account</th><th>Optional guest login with configurable handle and security level</th></tr>
+<table>
+<tr><th>Multi-login control</th><th>Block or allow duplicate logins per user</th></tr>
+<table>
+<tr><th>Idle timeout</th><th>Disconnect inactive sessions after <code>idle_timeout_sec</code></th></tr>
+<table>
+<tr><th>Session time limit</th><th>Per-call minute limit from security level or config default</th></tr>
+</table>
+<h3>Messages and Mail</h3>
+<ul>
+<li>Threaded message areas with ACS read/post/sysop controls</li>
+<li>Private email with CC, taglines, signatures, full-screen editor</li>
+<li>M*/R* command set (Renegade-compatible two-letter commands)</li>
+<li>QWK offline mail pack generation and upload</li>
+<li>FidoNet netmail export and echomail area linking</li>
+<li>Conference membership with ACS <code>J#</code> and <code>C?</code> terms</li>
+<li>Message drafts saved on disconnect during composition</li>
+</ul>
+<h3>Files and Downloads</h3>
+<ul>
+<li>Multiple file areas with per-area ACS and flags</li>
+<li>Upload/download with credit and ratio enforcement</li>
+<li>Batch download queue (FB/FC/FK commands)</li>
+<li>Archive test/extract/view (zip, tar, rar, 7z via external tools)</li>
+<li>SHA-256 duplicate detection on upload</li>
+<li>Protocol launcher for configured transfer protocols</li>
+</ul>
+<h3>Doors and Scripting</h3>
+<ul>
+<li>Native executable doors with dropfile generation (DOOR.SYS, DORINFO1.DEF)</li>
+<li>DOSBox DOS door runner with per-launch isolation</li>
+<li>Buccaneer embedded bytecode VM (Pascal-like syntax)</li>
+<li>Loadable <code>.so</code> plugins via <code>dlopen</code> with stable ABI</li>
+</ul>
+<h3>Sysop Tools</h3>
+<ul>
+<li>WFC (Who&#x27;s On Full Color) console with node status grid</li>
+<li>Remote editors: users, conferences, protocols, votes, events, menus, Fido/QWK</li>
+<li>File validation and maintenance commands</li>
+<li>Scheduler thread for cron-like events</li>
+<li>Color scheme picker (8 named schemes)</li>
+</ul>
+<h3>Chat and Social</h3>
+<ul>
+<li>Split-screen two-panel ANSI chat between nodes</li>
+<li>Teleconference rooms with optional passwords</li>
+<li>Sysop paging with email fallback</li>
+<li>Wall broadcast and node whisper</li>
+<li>Oneliners and short messages (SMW)</li>
+<li>Optional per-session chat file logging</li>
+</ul>
+<h3>Networking</h3>
+<ul>
+<li><strong>PLANK</strong> — Store-and-forward CBOR object protocol with Ed25519 signing</li>
+<li><strong>QWK</strong> — Hub-linked area import/export with packet queue</li>
+<li><strong>FidoNet</strong> — AKA management, echomail links, netmail queue</li>
+</ul>
+<h2>Project Layout</h2>
+<pre><code class="">
+mutineer-bbs/
+├── src/                 BBS core (session, menus, messages, files, doors, chat)
+│   ├── tools/           Standalone CLI utilities
+│   ├── plank/           PLANK protocol implementation
+│   └── buccaneer/       Buccaneer language (lexer, parser, VM, host bridge)
+├── include/             Public headers
+├── sql/                 schema.sql (BBS) + plank_schema.sql (PLANK extension)
+├── conf/                Default configuration (mutineer.conf)
+├── menus/               Menu definitions (.mnu) and ANSI/ASCII templates
+├── art/                 System display art files
+├── plugins/             Example loadable plugins (hello, chat)
+├── doors/               Sample door programs (testdoor — 16-bit DOS COM)
+├── tests/               Unit tests (ctest) and expect integration tests
+├── scripts/             start/stop/backup/watchdog shell helpers
+├── docs/                This documentation set
+└── SPECS/               Design specifications
+</code></pre>
+<h2>Binaries</h2>
+<p>Built by CMake into <code>build/</code> (or your chosen build directory):</p>
+<h3>Main Server</h3>
+<table>
+<tr><th>Binary</th><th>Purpose</th></tr>
+<table>
+<tr><th><code>mutineer</code></th><th>Main BBS telnet server</th></tr>
+</table>
+<h3>BBS CLI Tools</h3>
+<table>
+<tr><th>Binary</th><th>Purpose</th></tr>
+<table>
+<tr><th><code>mutineer-initbbs</code></th><th>Initialize database, directories, sanity checks</th></tr>
+<table>
+<tr><th><code>mutineer-maint</code></th><th>vacuum, reindex, analyze, integrity, backup</th></tr>
+<table>
+<tr><th><code>mutineer-stats</code></th><th>Display system statistics (normal/JSON/short)</th></tr>
+<table>
+<tr><th><code>mutineer-qwkgen</code></th><th>Generate QWK offline mail packets</th></tr>
+<table>
+<tr><th><code>mutineer-msgpack</code></th><th>Pack/prune message areas</th></tr>
+<table>
+<tr><th><code>mutineer-userpack</code></th><th>Pack/prune user records</th></tr>
+<table>
+<tr><th><code>mutineer-filepack</code></th><th>Pack/prune file areas</th></tr>
+<table>
+<tr><th><code>mutineer-netmail-export</code></th><th>Export FidoNet netmail queue</th></tr>
+<table>
+<tr><th><code>mutineer-validate</code></th><th>Validate menu/template files</th></tr>
+</table>
+<h3>PLANK Tools</h3>
+<table>
+<tr><th>Binary</th><th>Purpose</th></tr>
+<table>
+<tr><th><code>plankd</code></th><th>PLANK link daemon (outbound/inbound sync)</th></tr>
+<table>
+<tr><th><code>coved</code></th><th>COVE hub daemon</th></tr>
+<table>
+<tr><th><code>plankctl</code></th><th>Administrative control (status, peers, links, queue)</th></tr>
+<table>
+<tr><th><code>plankpack</code></th><th>Bundle pack/unpack for offline exchange</th></tr>
+<table>
+<tr><th><code>plank-offline</code></th><th>Offline import/export operations</th></tr>
+</table>
+<h3>Buccaneer Tools</h3>
+<p>Built from <code>src/buccaneer/Makefile</code>:</p>
+<table>
+<tr><th>Binary</th><th>Purpose</th></tr>
+<table>
+<tr><th><code>bucc</code></th><th>Buccaneer compiler</th></tr>
+<table>
+<tr><th><code>bucc-linter</code></th><th>Static analysis</th></tr>
+<table>
+<tr><th><code>bucc-formatter</code></th><th>Source formatter</th></tr>
+<table>
+<tr><th><code>bucc-simulator</code></th><th>Standalone VM simulator</th></tr>
+</table>
+<h3>Test Binaries</h3>
+<p><code>test_acs</code>, <code>test_doors</code>, <code>test_mci</code>, <code>test_menu</code>, <code>test_menu_template</code>, <code>test_smoke</code>, <code>test_tools</code>, <code>test_file_cmds</code>, <code>test_plugin</code>, and <code>test_plank_*</code> suites.</p>
+<h2>Dependencies</h2>
+<table>
+<tr><th>Library / Tool</th><th>Required</th><th>Notes</th></tr>
+<table>
+<tr><th>SQLite3</th><th>Yes</th><th><code>libsqlite3-dev</code> — persistent storage</th></tr>
+<table>
+<tr><th>OpenSSL</th><th>Yes</th><th><code>libssl-dev</code> — PBKDF2 password hashing, PLANK crypto</th></tr>
+<table>
+<tr><th>pthreads</th><th>Yes</th><th>Thread-per-connection model</th></tr>
+<table>
+<tr><th>libargon2</th><th>Optional</th><th>Argon2 password upgrade when <code>password_upgrade=1</code></th></tr>
+<table>
+<tr><th>libzstd</th><th>Optional</th><th>PLANK bundle compression</th></tr>
+<table>
+<tr><th>DOSBox</th><th>Optional</th><th>DOS door runner (<code>dosbox</code> on PATH or <code>dosbox_path</code>)</th></tr>
+<table>
+<tr><th>zip/unzip, tar, unrar, 7z</th><th>Optional</th><th>Archive operations in file commands</th></tr>
+</table>
+<p>Debian/Ubuntu install:</p>
+<pre><code class="bash">
+apt-get install libsqlite3-dev libssl-dev libargon2-dev dosbox
+</code></pre>
+<h2>Configuration Entry Point</h2>
+<p>Primary config file: <code>conf/mutineer.conf</code> (key=value format). See <a href="configuration.html">Configuration</a> for all keys.</p>
+<p>Key paths:</p>
+<pre><code class="ini">
+port=2929
+db_path=data/mutineer.db
+menu_main=menus/main.mnu
+art_path=art
+bbs_name=Mutineer BBS
+sysop_name=Sysop
+</code></pre>
+<h2>Documentation Map</h2>
+<ul>
+<li>New users: <a href="getting-started.html">Getting Started</a></li>
+<li>Operators: <a href="sysop-guide.html">Sysop Guide</a>, <a href="configuration.html">Configuration</a></li>
+<li>Developers: <a href="developer-guide.html">Developer Guide</a>, <a href="architecture.html">Architecture</a></li>
+<li>Command reference: <a href="reference/">reference/</a></li>
+</ul></main>
+  <footer class="site-footer">
+    <p>Mutineer BBS — <a href="https://github.com/rickcollette/mutineer">GitHub</a> — MIT License</p>
+  </footer>
+</body>
+</html>

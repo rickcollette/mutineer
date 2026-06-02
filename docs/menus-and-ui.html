@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Menus and UI — Mutineer BBS</title>
+  <link rel="stylesheet" href="assets/css/site.css">
+</head>
+<body>
+  <header class="site-header">
+    <a href="index.html" class="logo">MUTINEER BBS</a>
+    <span class="tagline">Documentation</span>
+  </header>
+  <nav class="doc-nav"><a href="index.html" class="home">← Home</a><a href="overview.html">Overview</a><a href="getting-started.html">Getting Started</a><a href="configuration.html">Configuration</a><a href="architecture.html">Architecture</a><a href="menus-and-ui.html" class="active">Menus & UI</a><a href="messages-and-mail.html">Messages & Mail</a><a href="files-and-protocols.html">Files & Protocols</a><a href="chat-and-social.html">Chat & Social</a><a href="doors-and-scripting.html">Doors & Scripting</a><a href="sysop-guide.html">Sysop Guide</a><a href="networking-plank.html">PLANK Networking</a><a href="buccaneer.html">Buccaneer</a><a href="plugins.html">Plugins</a><a href="developer-guide.html">Developer Guide</a><a href="cli-tools.html">CLI Tools</a><a href="reference/menu-actions.html">Menu Actions</a><a href="reference/message-commands.html">Message Commands</a><a href="reference/file-commands.html">File Commands</a><a href="reference/acs-mci.html">ACS & MCI</a><a href="reference/database.html">Database Schema</a></nav>
+  <main class="doc-content"><p>&lt;!-- generated-by: gsd-doc-writer --&gt;</p>
+<h1>Menus and UI</h1>
+<p>Mutineer BBS presents a classic ANSI/ASCII menu interface modeled after Renegade BBS. Menus combine definition files (<code>.mnu</code>), display templates (<code>.ans</code>/<code>.asc</code>), MCI token expansion, and ACS access control.</p>
+<h2>Menu Files</h2>
+<p>Menu definitions live in <code>menus/</code> as <code>.mnu</code> files. The main menu is configured via <code>menu_main</code> in config (default <code>menus/main.mnu</code>).</p>
+<h3>Enhanced Format</h3>
+<pre><code class="">
+# Comment line
+@TITLE Main Menu
+@FLAGS clrscr,autotime
+@PROMPT Command:
+@ART main.ans
+@FALLBACK logon
+@COLS 2
+KEY|Label|Action|Data|ACS|CmdFlags|Password
+</code></pre>
+<h3>Legacy Format (still supported)</h3>
+<pre><code class="">
+KEY|Label|Action|ACS
+</code></pre>
+<p>Example from <code>menus/main.mnu</code>:</p>
+<pre><code class="">
+W|Who&#x27;s Online|who|
+M|Messages|messages|L10
+F|Files|files|L10
+O|Doors|doors|L20
+Q|Logoff|logout|
+</code></pre>
+<h3>Menu Directives</h3>
+<table>
+<tr><th>Directive</th><th>Description</th></tr>
+<table>
+<tr><th><code>@TITLE</code></th><th>Menu title displayed in generic renderer</th></tr>
+<table>
+<tr><th><code>@FLAGS</code></th><th>Comma-separated menu flags (see below)</th></tr>
+<table>
+<tr><th><code>@PROMPT</code></th><th>Custom input prompt (default <code>Selection: </code>)</th></tr>
+<table>
+<tr><th><code>@ART</code></th><th>ANSI/ASCII art file to display before menu</th></tr>
+<table>
+<tr><th><code>@FALLBACK</code></th><th>Fallback menu if no valid selection</th></tr>
+<table>
+<tr><th><code>@COLS</code></th><th>Column count for generic menu layout</th></tr>
+</table>
+<h3>Menu Flags (<code>include/bbs_menu.h</code>)</h3>
+<table>
+<tr><th>Flag</th><th>Constant</th><th>Effect</th></tr>
+<table>
+<tr><th><code>clrscr</code></th><th><code>MENU_FLAG_CLRSCR_BEFORE</code></th><th>Clear screen before display</th></tr>
+<table>
+<tr><th><code>nocenter</code></th><th><code>MENU_FLAG_DONT_CENTER</code></th><th>Don&#x27;t center menu title</th></tr>
+<table>
+<tr><th><code>notitle</code></th><th><code>MENU_FLAG_NO_MENU_TITLE</code></th><th>Hide menu title</th></tr>
+<table>
+<tr><th><code>pause</code></th><th><code>MENU_FLAG_FORCE_PAUSE</code></th><th>Pause after display</th></tr>
+<table>
+<tr><th><code>autotime</code></th><th><code>MENU_FLAG_AUTO_TIME</code></th><th>Show time remaining</th></tr>
+<table>
+<tr><th><code>noprompt</code></th><th><code>MENU_FLAG_NO_MENU_PROMPT</code></th><th>Hide selection prompt</th></tr>
+<table>
+<tr><th><code>lightbar</code></th><th><code>MENU_FLAG_USE_LIGHTBAR</code></th><th>Lightbar navigation</th></tr>
+<table>
+<tr><th><code>hotkeys</code></th><th><code>MENU_FLAG_HOTKEYS</code></th><th>Hot keys (no ENTER required)</th></tr>
+</table>
+<h3>Command Flags</h3>
+<table>
+<tr><th>Flag</th><th>Constant</th><th>Effect</th></tr>
+<table>
+<tr><th><code>hidden</code></th><th><code>CMD_FLAG_HIDDEN</code></th><th>Don&#x27;t display in menu</th></tr>
+<table>
+<tr><th><code>unhidden</code></th><th><code>CMD_FLAG_UNHIDDEN</code></th><th>Always display (override ACS hide)</th></tr>
+<table>
+<tr><th><code>password</code></th><th><code>CMD_FLAG_PASSWORD</code></th><th>Require password entry</th></tr>
+<table>
+<tr><th><code>sysoplog</code></th><th><code>CMD_FLAG_SYSOP_LOG</code></th><th>Log selection to sysop log</th></tr>
+</table>
+<h3>Menu Item Fields</h3>
+<table>
+<tr><th>Field</th><th>Description</th></tr>
+<table>
+<tr><th><code>KEY</code></th><th>Single character or multi-char key string</th></tr>
+<table>
+<tr><th><code>Label</code></th><th>Display text (may contain MCI tokens)</th></tr>
+<table>
+<tr><th><code>Action</code></th><th>Action name passed to <code>handle_action()</code></th></tr>
+<table>
+<tr><th><code>Data</code></th><th>Optional parameter (command data, submenu name)</th></tr>
+<table>
+<tr><th><code>ACS</code></th><th>Access control expression; empty = everyone</th></tr>
+<table>
+<tr><th><code>CmdFlags</code></th><th>Command flags (enhanced format)</th></tr>
+<table>
+<tr><th><code>Password</code></th><th>Required password if <code>password</code> flag set</th></tr>
+</table>
+<h3>Submenus</h3>
+<p>Use action <code>menu</code> with data set to another menu filename (without path):</p>
+<pre><code class="">
+R|Return|menu|
+</code></pre>
+<p>Or navigate to a named menu:</p>
+<pre><code class="">
+M|Messages|menu|message.mnu
+</code></pre>
+<h2>Template Files</h2>
+<p>Each menu typically has companion art files in the same directory:</p>
+<table>
+<tr><th>Extension</th><th>Format</th></tr>
+<table>
+<tr><th><code>.ans</code></th><th>ANSI color art with escape sequences</th></tr>
+<table>
+<tr><th><code>.asc</code></th><th>ASCII plain text art</th></tr>
+</table>
+<p>Templates embed MCI tokens that expand at display time. The <code>@ART</code> directive or menu name convention (<code>main.mnu</code> → <code>main.ans</code>) selects the template.</p>
+<p><code>menu_template.c</code> loads the art file, runs <code>mci_expand()</code>, and sends the result to the terminal.</p>
+<h2>MCI (Menu Code Interface)</h2>
+<p>MCI tokens embed dynamic data in menus and templates. Implemented in <code>src/mci.c</code>.</p>
+<h3>Color Scheme Tokens</h3>
+<p>User-selectable color schemes (0–7) map <code>^0</code> through <code>^9</code> to ANSI colors:</p>
+<table>
+<tr><th>Token</th><th>Role</th></tr>
+<table>
+<tr><th><code>^0</code></th><th>Primary accent</th></tr>
+<table>
+<tr><th><code>^1</code></th><th>Secondary</th></tr>
+<table>
+<tr><th><code>^2</code></th><th>Text</th></tr>
+<table>
+<tr><th><code>^3</code></th><th>Dim text</th></tr>
+<table>
+<tr><th><code>^4</code></th><th>Highlight</th></tr>
+<table>
+<tr><th><code>^5</code></th><th>Error/alert</th></tr>
+<table>
+<tr><th><code>^6</code></th><th>Success</th></tr>
+<table>
+<tr><th><code>^7</code></th><th>Label</th></tr>
+<table>
+<tr><th><code>^8</code></th><th>Border</th></tr>
+<table>
+<tr><th><code>^9</code></th><th>Title</th></tr>
+</table>
+<p>Schemes: Mutineer Green (default), Classic Blue, Amber, Cyan, Red Sunset, Magenta, Monochrome, Bright White.</p>
+<p>Users change scheme via the <code>pickscheme</code> menu action.</p>
+<h3>Attribute Tokens</h3>
+<table>
+<tr><th>Token</th><th>Effect</th></tr>
+<table>
+<tr><th><code>~L#</code></th><th>Set foreground color (0–15)</th></tr>
+<table>
+<tr><th><code>~B#</code></th><th>Set background color (0–7)</th></tr>
+<table>
+<tr><th><code>~K0</code> / <code>~K1</code></th><th>Blink off/on</th></tr>
+<table>
+<tr><th><code>~RS</code></th><th>Reset all attributes</th></tr>
+</table>
+<h3>User MCI (<code>~XX</code>)</h3>
+<table>
+<tr><th>Token</th><th>Expands To</th></tr>
+<table>
+<tr><th><code>~UN</code></th><th>User handle</th></tr>
+<table>
+<tr><th><code>~RN</code></th><th>Real name</th></tr>
+<table>
+<tr><th><code>~U#</code></th><th>User ID</th></tr>
+<table>
+<tr><th><code>~AG</code></th><th>Age (from birth date)</th></tr>
+<table>
+<tr><th><code>~BD</code></th><th>Birth date</th></tr>
+<table>
+<tr><th><code>~SX</code></th><th>Sex (M/F/U)</th></tr>
+<table>
+<tr><th><code>~SL</code></th><th>Security level</th></tr>
+<table>
+<tr><th><code>~CR</code></th><th>Credits</th></tr>
+<table>
+<tr><th><code>~FP</code></th><th>File points</th></tr>
+<table>
+<tr><th><code>~TL</code></th><th>Time left (minutes)</th></tr>
+<table>
+<tr><th><code>~TB</code></th><th>Time bank balance</th></tr>
+<table>
+<tr><th><code>~LG</code></th><th>Total logons</th></tr>
+<table>
+<tr><th><code>~NN</code></th><th>Node number</th></tr>
+<table>
+<tr><th><code>~MP</code></th><th>Messages posted</th></tr>
+<table>
+<tr><th><code>~UL</code> / <code>~DL</code></th><th>Upload/download counts</th></tr>
+<table>
+<tr><th><code>~UK</code> / <code>~DK</code></th><th>Upload/download KB</th></tr>
+</table>
+<h3>System MCI (<code>~XX</code>)</h3>
+<table>
+<tr><th>Token</th><th>Expands To</th></tr>
+<table>
+<tr><th><code>~BN</code></th><th>BBS name</th></tr>
+<table>
+<tr><th><code>~SN</code></th><th>Sysop name</th></tr>
+<table>
+<tr><th><code>~TC</code></th><th>Total calls</th></tr>
+<table>
+<tr><th><code>~NU</code></th><th>Number of users</th></tr>
+<table>
+<tr><th><code>~NF</code></th><th>Number of files</th></tr>
+<table>
+<tr><th><code>~NM</code></th><th>Number of messages</th></tr>
+<table>
+<tr><th><code>~NO</code></th><th>Users online</th></tr>
+<table>
+<tr><th><code>~VR</code></th><th>Version string</th></tr>
+<table>
+<tr><th><code>~DA</code></th><th>Current date</th></tr>
+<table>
+<tr><th><code>~TM</code></th><th>Current time</th></tr>
+</table>
+<h3>Area MCI</h3>
+<table>
+<tr><th>Token</th><th>Expands To</th></tr>
+<table>
+<tr><th><code>~AN</code></th><th>Current message or file area name</th></tr>
+<table>
+<tr><th><code>~AR</code></th><th>User AR flags list</th></tr>
+</table>
+<h3>Legacy Percent Codes (<code>%XX</code>)</h3>
+<table>
+<tr><th>Token</th><th>Expands To</th></tr>
+<table>
+<tr><th><code>%UN</code></th><th>User handle</th></tr>
+<table>
+<tr><th><code>%SL</code></th><th>Security level</th></tr>
+<table>
+<tr><th><code>%CR</code></th><th>Credits</th></tr>
+<table>
+<tr><th><code>%TL</code></th><th>Time left</th></tr>
+<table>
+<tr><th><code>%NN</code></th><th>Node number</th></tr>
+<table>
+<tr><th><code>%DA</code> / <code>%TM</code></th><th>Date/time</th></tr>
+<table>
+<tr><th><code>%PO</code></th><th>Posts count</th></tr>
+<table>
+<tr><th><code>%MT</code> / <code>%FT</code></th><th>Total messages/files</th></tr>
+<table>
+<tr><th><code>%MA</code> / <code>%FA</code></th><th>Messages/files in current area</th></tr>
+<table>
+<tr><th><code>%NO</code></th><th>Users online</th></tr>
+<table>
+<tr><th><code>%PE</code></th><th>Pause prompt</th></tr>
+<table>
+<tr><th>`%?expr{text\</th><th>else}`</th><th>ACS conditional text</th></tr>
+</table>
+<p>Full token list: <a href="reference/acs-mci.html">ACS and MCI Reference</a>.</p>
+<h2>ACS (Access Control Strings)</h2>
+<p>ACS expressions control menu item visibility and area access. Evaluated by <code>acs_allows()</code> in <code>src/acs.c</code>.</p>
+<h3>Syntax</h3>
+<ul>
+<li><strong>Precedence:</strong> <code>!</code> (NOT) &gt; <code>&amp;</code> (AND) &gt; <code>|</code> (OR)</li>
+<li><strong>Grouping:</strong> Parentheses <code>(expr)</code></li>
+<li><strong>Terms:</strong> Letter + optional digits/character</li>
+</ul>
+<h3>Standard Terms</h3>
+<table>
+<tr><th>Term</th><th>Meaning</th></tr>
+<table>
+<tr><th><code>S#</code></th><th>Security level &gt;= #</th></tr>
+<table>
+<tr><th><code>D#</code></th><th>Download security level &gt;= #</th></tr>
+<table>
+<tr><th><code>F?</code></th><th>AR flag ? set (A–Z)</th></tr>
+<table>
+<tr><th><code>R?</code></th><th>AC restriction flag ? set</th></tr>
+<table>
+<tr><th><code>A#</code></th><th>Age &gt;= #</th></tr>
+<table>
+<tr><th><code>C#</code></th><th>Total logons &gt;= #</th></tr>
+<table>
+<tr><th><code>C?</code></th><th>In conference ? (A–Z)</th></tr>
+<table>
+<tr><th><code>G?</code></th><th>Gender is ? (M/F)</th></tr>
+<table>
+<tr><th><code>H#</code></th><th>Current hour = #</th></tr>
+<table>
+<tr><th><code>N#</code></th><th>Node number = #</th></tr>
+<table>
+<tr><th><code>P#</code></th><th>Credits &gt;= #</th></tr>
+<table>
+<tr><th><code>T#</code></th><th>Time remaining &gt;= #</th></tr>
+<table>
+<tr><th><code>U#</code></th><th>User number = #</th></tr>
+<table>
+<tr><th><code>V</code></th><th>User validated (not expired)</th></tr>
+<table>
+<tr><th><code>W#</code></th><th>Day of week = # (0=Sun)</th></tr>
+<table>
+<tr><th><code>X#</code></th><th>Days until expiration &lt;= #</th></tr>
+<table>
+<tr><th><code>Z</code></th><th>Meets post ratio</th></tr>
+<table>
+<tr><th><code>PC</code></th><th>Post/call ratio met</th></tr>
+<table>
+<tr><th><code>DR</code></th><th>Download ratio met</th></tr>
+<table>
+<tr><th><code>J#</code></th><th>Member of conference #</th></tr>
+<table>
+<tr><th><code>E#</code></th><th>Active subscription type # (0=any)</th></tr>
+</table>
+<h3>Legacy Terms</h3>
+<table>
+<tr><th>Term</th><th>Meaning</th></tr>
+<table>
+<tr><th><code>SLnn</code> / <code>Lnn</code></th><th>Security level &gt;= nn</th></tr>
+<table>
+<tr><th><code>+X</code></th><th>AR flag X set</th></tr>
+<table>
+<tr><th><code>ARABC</code></th><th>All listed AR flags set</th></tr>
+<table>
+<tr><th><code>C&gt;=N</code></th><th>Credits comparison</th></tr>
+<table>
+<tr><th><code>T&gt;=N</code></th><th>Time comparison</th></tr>
+<table>
+<tr><th><code>R&gt;=N</code></th><th>Ratio comparison</th></tr>
+</table>
+<h3>Menu ACS Examples</h3>
+<pre><code class="">
+L10          # Level 10 or higher
++A           # AR flag A (sysop)
+S50&amp;FA       # Level 50+ with AR flag F
+L20|+B       # Level 20+ OR AR flag B
+!(R P)       # NOT restricted from posting
+</code></pre>
+<h2>Art Files</h2>
+<p>System art lives in <code>art/</code> (configurable via <code>art_path</code>):</p>
+<table>
+<tr><th>File</th><th>Typical Use</th></tr>
+<table>
+<tr><th><code>motd.ans</code></th><th>Message of the day (config <code>motd</code>)</th></tr>
+<table>
+<tr><th><code>welcome.txt</code></th><th>Welcome letter text</th></tr>
+<table>
+<tr><th><code>logon.ans</code></th><th>Logon screen</th></tr>
+<table>
+<tr><th>Named art</th><th>Referenced by <code>send_named_art()</code> (e.g., <code>NOCREDTS</code>)</th></tr>
+</table>
+<p>Art files are plain files with ANSI escape sequences. They may contain MCI tokens expanded at display time.</p>
+<p>Validate art paths during development with <code>mutineer-validate</code>.</p>
+<h2>F-Key Shortcuts</h2>
+<p>Sysop remote commands are bound to function keys during online sessions. The session loop intercepts F-key ANSI sequences and dispatches to <code>handle_action()</code> or editors.</p>
+<p>Typical bindings (sysop level required):</p>
+<table>
+<tr><th>Key</th><th>Action</th></tr>
+<table>
+<tr><th>F1</th><th>User editor</th></tr>
+<table>
+<tr><th>F2</th><th>Conference editor</th></tr>
+<table>
+<tr><th>F3</th><th>Protocol editor</th></tr>
+<table>
+<tr><th>F4</th><th>Menu editor</th></tr>
+<table>
+<tr><th>F5</th><th>Validate files</th></tr>
+<table>
+<tr><th>F6</th><th>Vote editor</th></tr>
+<table>
+<tr><th>F7</th><th>Event editor</th></tr>
+<table>
+<tr><th>F8</th><th>Fido editor</th></tr>
+<table>
+<tr><th>F9</th><th>QWK network editor</th></tr>
+<table>
+<tr><th>F10</th><th>Maintenance</th></tr>
+</table>
+<p>Exact bindings are defined in <code>session.c</code> F-key handling. Sysop must have appropriate AR flags (typically <code>+A</code>).</p>
+<h2>Menu Validation</h2>
+<p>Validate all menus before deployment:</p>
+<pre><code class="bash">
+build/mutineer-validate menus
+build/mutineer-validate menus/main.mnu
+</code></pre>
+<p>Checks: file parse, ACS syntax, template existence, MCI token validity.</p>
+<h2>Related Documentation</h2>
+<ul>
+<li><a href="reference/acs-mci.html">Reference: ACS and MCI</a></li>
+<li><a href="reference/menu-actions.html">Reference: Menu Actions</a></li>
+<li><a href="architecture.html">Architecture</a></li>
+<li><a href="sysop-guide.html">Sysop Guide</a> — menu editor</li>
+</ul></main>
+  <footer class="site-footer">
+    <p>Mutineer BBS — <a href="https://github.com/rickcollette/mutineer">GitHub</a> — MIT License</p>
+  </footer>
+</body>
+</html>

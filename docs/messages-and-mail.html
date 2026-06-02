@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Messages and Mail — Mutineer BBS</title>
+  <link rel="stylesheet" href="assets/css/site.css">
+</head>
+<body>
+  <header class="site-header">
+    <a href="index.html" class="logo">MUTINEER BBS</a>
+    <span class="tagline">Documentation</span>
+  </header>
+  <nav class="doc-nav"><a href="index.html" class="home">← Home</a><a href="overview.html">Overview</a><a href="getting-started.html">Getting Started</a><a href="configuration.html">Configuration</a><a href="architecture.html">Architecture</a><a href="menus-and-ui.html">Menus & UI</a><a href="messages-and-mail.html" class="active">Messages & Mail</a><a href="files-and-protocols.html">Files & Protocols</a><a href="chat-and-social.html">Chat & Social</a><a href="doors-and-scripting.html">Doors & Scripting</a><a href="sysop-guide.html">Sysop Guide</a><a href="networking-plank.html">PLANK Networking</a><a href="buccaneer.html">Buccaneer</a><a href="plugins.html">Plugins</a><a href="developer-guide.html">Developer Guide</a><a href="cli-tools.html">CLI Tools</a><a href="reference/menu-actions.html">Menu Actions</a><a href="reference/message-commands.html">Message Commands</a><a href="reference/file-commands.html">File Commands</a><a href="reference/acs-mci.html">ACS & MCI</a><a href="reference/database.html">Database Schema</a></nav>
+  <main class="doc-content"><p>&lt;!-- generated-by: gsd-doc-writer --&gt;</p>
+<h1>Messages and Mail</h1>
+<p>Mutineer BBS provides threaded message areas, private email, offline QWK mail, and FidoNet netmail/echomail integration. Message operations use two-letter M* (message) and R* (read) commands compatible with classic BBS conventions.</p>
+<h2>Message Areas</h2>
+<p>Message areas are stored in the <code>message_areas</code> table with optional conference linkage.</p>
+<h3>Area Fields</h3>
+<table>
+<tr><th>Field</th><th>Purpose</th></tr>
+<table>
+<tr><th><code>name</code></th><th>Display name</th></tr>
+<table>
+<tr><th><code>filename</code></th><th>Base filename for area storage</th></tr>
+<table>
+<tr><th><code>acs_read</code></th><th>ACS required to read</th></tr>
+<table>
+<tr><th><code>acs_post</code></th><th>ACS required to post</th></tr>
+<table>
+<tr><th><code>acs_sysop</code></th><th>ACS for sysop functions</th></tr>
+<table>
+<tr><th><code>anon_policy</code></th><th>Anonymous posting policy (0=No, 1=Yes, 2=Forced, 3=DearAbby, 4=AnyName)</th></tr>
+<table>
+<tr><th><code>max_msgs</code></th><th>Maximum messages retained</th></tr>
+<table>
+<tr><th><code>password</code></th><th>Optional area password</th></tr>
+<table>
+<tr><th><code>origin</code></th><th>Origin line for echomail</th></tr>
+</table>
+<h3>Conferences</h3>
+<p>Conferences group message areas. Users join via <code>joinconf</code>/<code>leaveconf</code> actions or conference editor.</p>
+<ul>
+<li>ACS term <code>C?</code> checks if user is in conference letter <code>?</code> (A=0)</li>
+<li>ACS term <code>J#</code> checks conference membership by ID in DB</li>
+<li><code>conference_membership</code> table tracks joins</li>
+</ul>
+<h2>Message Commands (M*)</h2>
+<p>Dispatched by <code>handle_msg_command()</code> in <code>src/msg_cmds.c</code>:</p>
+<table>
+<tr><th>Command</th><th>Handler</th><th>Description</th></tr>
+<table>
+<tr><th><code>MA</code></th><th><code>cmd_msg_area_change</code></th><th>Change current message area</th></tr>
+<table>
+<tr><th><code>MG</code></th><th><code>cmd_msg_area_list</code></th><th>List available message areas</th></tr>
+<table>
+<tr><th><code>MN</code></th><th><code>cmd_msg_new_scan</code></th><th>Scan for new messages</th></tr>
+<table>
+<tr><th><code>MP</code></th><th><code>cmd_msg_post</code></th><th>Post new message</th></tr>
+<table>
+<tr><th><code>MR</code></th><th><code>cmd_msg_read</code></th><th>Read message by number</th></tr>
+<table>
+<tr><th><code>MS</code></th><th><code>cmd_msg_search</code></th><th>Search messages</th></tr>
+<table>
+<tr><th><code>MW</code></th><th><code>cmd_msg_write_email</code></th><th>Write private email</th></tr>
+<table>
+<tr><th><code>MY</code></th><th><code>cmd_msg_your_scan</code></th><th>Scan messages addressed to you</th></tr>
+<table>
+<tr><th><code>MZ</code></th><th><code>cmd_msg_toggle_scan_areas</code></th><th>Toggle per-area scan flags</th></tr>
+</table>
+<p>Enter commands at the <code>:</code> prompt in message mode or via menu data fields (e.g., <code>MZ</code> in <code>menus/message.mnu</code>).</p>
+<h2>Read Commands (R*)</h2>
+<table>
+<tr><th>Command</th><th>Handler</th><th>Description</th></tr>
+<table>
+<tr><th><code>RA</code></th><th><code>cmd_msg_read</code></th><th>Read all (alias)</th></tr>
+<table>
+<tr><th><code>RC</code></th><th><code>cmd_msg_continuous_read</code></th><th>Continuous read mode</th></tr>
+<table>
+<tr><th><code>RE</code></th><th><code>cmd_msg_reply</code></th><th>Reply to message</th></tr>
+<table>
+<tr><th><code>RJ</code></th><th><code>cmd_msg_jump_reply</code></th><th>Jump to message and reply</th></tr>
+<table>
+<tr><th><code>RL</code></th><th><code>cmd_msg_list</code></th><th>List messages in area</th></tr>
+<table>
+<tr><th><code>RM</code></th><th><code>cmd_msg_edit</code></th><th>Edit own message</th></tr>
+<table>
+<tr><th><code>RN</code></th><th><code>cmd_msg_read_new</code></th><th>Read new messages</th></tr>
+<table>
+<tr><th><code>RP</code></th><th><code>cmd_msg_read_private</code></th><th>Read private mail</th></tr>
+<table>
+<tr><th><code>RQ</code></th><th><code>cmd_msg_quick_scan</code></th><th>Quick scan headers</th></tr>
+<table>
+<tr><th><code>RT</code></th><th><code>cmd_msg_thread_view</code></th><th>Thread tree view</th></tr>
+<table>
+<tr><th><code>RV</code></th><th><code>cmd_msg_view_attachment</code></th><th>View/download attachment</th></tr>
+<table>
+<tr><th><code>RY</code></th><th><code>cmd_msg_your_messages</code></th><th>Your messages list</th></tr>
+</table>
+<p>Full reference: <a href="reference/message-commands.html">Message Commands</a>.</p>
+<h2>Posting Flow</h2>
+<ol>
+<li>User enters area (menu or <code>MA</code>)</li>
+<li>ACS check on <code>acs_post</code></li>
+<li>AC flag check (<code>AC_RPOST</code>, <code>AC_RPOSTAN</code> for anonymous)</li>
+<li>Subject/body collected via line editor or full-screen editor (<code>fsedit_edit</code>)</li>
+<li>Optional signature/tagline appended if user toggles enabled</li>
+<li><code>db_message_post()</code> inserts record with threading (<code>reply_to</code>, <code>thread_root</code>)</li>
+<li>Stats updated; echomail queue populated if linked</li>
+</ol>
+<h3>Full-Screen Editor</h3>
+<p>Toggle via <code>togglefse</code> menu action. Shared between message and email composition (<code>fsedit_edit()</code> in <code>msg_cmds.c</code>).</p>
+<h3>Signatures and Taglines</h3>
+<table>
+<tr><th>Action</th><th>Description</th></tr>
+<table>
+<tr><th><code>setsignature</code></th><th>Set user signature text</th></tr>
+<table>
+<tr><th><code>settagline</code></th><th>Set user tagline text</th></tr>
+</table>
+<p>User record fields: <code>signature</code>, <code>tagline</code>, <code>use_signature</code>, <code>use_tagline</code>.</p>
+<h2>Private Email</h2>
+<p>Private mail uses the message system with <code>to_user</code> set:</p>
+<ul>
+<li><code>MW</code> — compose email to handle</li>
+<li><code>RP</code> — read private messages</li>
+<li><code>MY</code> / <code>RY</code> — scan/list messages to you</li>
+</ul>
+<p>Email restricted by AC flag <code>AC_REMAIL</code>. Security level may limit daily email via <code>email_allow</code> in security levels.</p>
+<h2>QWK Offline Mail</h2>
+<p>QWK support in <code>src/qwk.c</code> enables offline mail packets for remote readers.</p>
+<h3>Database Tables</h3>
+<table>
+<tr><th>Table</th><th>Purpose</th></tr>
+<table>
+<tr><th><code>qwk_hubs</code></th><th>Network hub definitions</th></tr>
+<table>
+<tr><th><code>qwk_area_links</code></th><th>Map local areas to hub conferences</th></tr>
+<table>
+<tr><th><code>qwk_packet_queue</code></th><th>Pending import/export packets</th></tr>
+<table>
+<tr><th><code>mail_packets</code></th><th>Generated packet records per user</th></tr>
+</table>
+<h3>User Flow</h3>
+<p>Menu action <code>netmail</code> provides QWK download/upload. CLI tool <code>mutineer-qwkgen</code> generates packets for batch/cron use.</p>
+<h3>QWK Commands (in session)</h3>
+<table>
+<tr><th>Command</th><th>Handler</th><th>Description</th></tr>
+<table>
+<tr><th>QWK download</th><th><code>cmd_qwk_download</code></th><th>Generate and download QWK packet</th></tr>
+<table>
+<tr><th>QWK upload</th><th><code>cmd_qwk_upload</code></th><th>Upload REP packet</th></tr>
+</table>
+<p>User field <code>last_qwk</code> tracks last packet date.</p>
+<h2>FidoNet</h2>
+<p>FidoNet support in <code>src/fido_netmail.c</code>:</p>
+<h3>Tables</h3>
+<table>
+<tr><th>Table</th><th>Purpose</th></tr>
+<table>
+<tr><th><code>fido_akas</code></th><th>Up to 20 AKA addresses (zone:net/node.point)</th></tr>
+<table>
+<tr><th><code>fido_echolinks</code></th><th>Echo tag to message area mapping</th></tr>
+<table>
+<tr><th><code>fido_netmail</code></th><th>Outbound netmail queue</th></tr>
+<table>
+<tr><th><code>fido_echomail_queue</code></th><th>Echomail export queue</th></tr>
+</table>
+<h3>Sysop Tools</h3>
+<table>
+<tr><th>Action</th><th>Description</th></tr>
+<table>
+<tr><th><code>fidoeditor</code></th><th>Manage AKAs and echolinks</th></tr>
+<table>
+<tr><th><code>fidosend</code></th><th>Send pending netmail</th></tr>
+</table>
+<p>CLI: <code>mutineer-netmail-export</code> exports the netmail queue to BSO format.</p>
+<h2>Message Attributes</h2>
+<p>Messages carry <code>attr</code> and <code>net_attr</code> bitsets for local and FidoNet semantics (private, sent, deleted, netmail, etc.). See <code>include/bbs_msg_defs.h</code>.</p>
+<h2>Drafts</h2>
+<p>Incomplete compositions saved to <code>drafts</code> table on disconnect:</p>
+<table>
+<tr><th>Field</th><th>Purpose</th></tr>
+<table>
+<tr><th><code>user_id</code></th><th>Owner</th></tr>
+<table>
+<tr><th><code>area_id</code></th><th>Target area</th></tr>
+<table>
+<tr><th><code>to_user_id</code> / <code>to_name</code></th><th>Email recipient</th></tr>
+<table>
+<tr><th><code>subject</code> / <code>body</code></th><th>Draft content</th></tr>
+</table>
+<h2>Scan Flags</h2>
+<p><code>MZ</code> toggles per-user area scan participation in <code>user_msg_scan_areas</code>. Disabled areas are skipped during <code>MN</code>/<code>RN</code> scans.</p>
+<h2>Restrictions</h2>
+<p>AC flags blocking message activity:</p>
+<table>
+<tr><th>Flag</th><th>ACS</th><th>Effect</th></tr>
+<table>
+<tr><th><code>AC_RMSG</code></th><th><code>RM</code></th><th>Block message areas entirely</th></tr>
+<table>
+<tr><th><code>AC_RPOST</code></th><th><code>RP</code></th><th>Block posting</th></tr>
+<table>
+<tr><th><code>AC_RPOSTAN</code></th><th><code>R*</code></th><th>Block anonymous posting</th></tr>
+<table>
+<tr><th><code>AC_REMAIL</code></th><th><code>RE</code></th><th>Block email</th></tr>
+</table>
+<h2>PLANK Integration</h2>
+<p>When PLANK areas map to local message areas (<code>plank_areas.local_area_id</code>), posts may generate PLANK objects for store-and-forward sync. See <a href="networking-plank.html">PLANK Networking</a>.</p>
+<h2>Maintenance</h2>
+<table>
+<tr><th>Tool</th><th>Purpose</th></tr>
+<table>
+<tr><th><code>mutineer-msgpack</code></th><th>Pack/prune old messages</th></tr>
+<table>
+<tr><th><code>mutineer-maint</code></th><th>Database maintenance</th></tr>
+</table>
+<p>In-BBS: <code>maintenance</code> action → message pack options via <code>maint.c</code>.</p>
+<h2>Related Documentation</h2>
+<ul>
+<li><a href="reference/message-commands.html">Reference: Message Commands</a></li>
+<li><a href="reference/database.html">Reference: Database</a></li>
+<li><a href="menus-and-ui.html">Menus and UI</a></li>
+<li><a href="sysop-guide.html">Sysop Guide</a></li>
+</ul></main>
+  <footer class="site-footer">
+    <p>Mutineer BBS — <a href="https://github.com/rickcollette/mutineer">GitHub</a> — MIT License</p>
+  </footer>
+</body>
+</html>
