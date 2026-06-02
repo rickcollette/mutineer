@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Database Schema Reference — Mutineer BBS</title>
+  <link rel="stylesheet" href="../assets/css/site.css">
+</head>
+<body>
+  <header class="site-header">
+    <a href="../index.html" class="logo">MUTINEER BBS</a>
+    <span class="tagline">Documentation</span>
+  </header>
+  <nav class="doc-nav"><a href="../index.html" class="home">← Home</a><a href="../overview.html">Overview</a><a href="../getting-started.html">Getting Started</a><a href="../configuration.html">Configuration</a><a href="../architecture.html">Architecture</a><a href="../menus-and-ui.html">Menus & UI</a><a href="../messages-and-mail.html">Messages & Mail</a><a href="../files-and-protocols.html">Files & Protocols</a><a href="../chat-and-social.html">Chat & Social</a><a href="../doors-and-scripting.html">Doors & Scripting</a><a href="../sysop-guide.html">Sysop Guide</a><a href="../networking-plank.html">PLANK Networking</a><a href="../buccaneer.html">Buccaneer</a><a href="../plugins.html">Plugins</a><a href="../developer-guide.html">Developer Guide</a><a href="../cli-tools.html">CLI Tools</a><a href="../reference/menu-actions.html">Menu Actions</a><a href="../reference/message-commands.html">Message Commands</a><a href="../reference/file-commands.html">File Commands</a><a href="../reference/acs-mci.html">ACS & MCI</a><a href="../reference/database.html">Database Schema</a></nav>
+  <main class="doc-content"><p>&lt;!-- generated-by: gsd-doc-writer --&gt;</p>
+<h1>Database Schema Reference</h1>
+<p>Mutineer BBS uses SQLite with schema defined in <code>sql/schema.sql</code> (core BBS) and <code>sql/plank_schema.sql</code> (PLANK extension). Apply both for full functionality.</p>
+<pre><code class="bash">
+sqlite3 data/mutineer.db &lt; sql/schema.sql
+sqlite3 data/mutineer.db &lt; sql/plank_schema.sql
+</code></pre>
+<p><code>PRAGMA foreign_keys = ON</code> is enabled.</p>
+<h2>Meta</h2>
+<table>
+<tr><th>Table</th><th>Purpose</th></tr>
+<table>
+<tr><th><code>meta</code></th><th>Key/value store for schema version and flags</th></tr>
+</table>
+<h2>Users and Security</h2>
+<table>
+<tr><th>Table</th><th>Purpose</th></tr>
+<table>
+<tr><th><code>security_levels</code></th><th>Level definitions, time limits, ratios, permissions</th></tr>
+<table>
+<tr><th><code>validation_levels</code></th><th>Account validation workflow rules</th></tr>
+<table>
+<tr><th><code>users</code></th><th>User accounts (handle, password hash, profile, stats)</th></tr>
+<table>
+<tr><th><code>access_lists</code></th><th>Named ACS expressions</th></tr>
+<table>
+<tr><th><code>subscription_types</code></th><th>Subscription product definitions</th></tr>
+<table>
+<tr><th><code>user_subscriptions</code></th><th>Active/expired user subscriptions</th></tr>
+<table>
+<tr><th><code>user_votes</code></th><th>Per-user vote answers (topics 1–25)</th></tr>
+</table>
+<h3>users Key Columns</h3>
+<table>
+<tr><th>Column</th><th>Purpose</th></tr>
+<table>
+<tr><th><code>handle</code></th><th>Login name (unique)</th></tr>
+<table>
+<tr><th><code>pw_hash</code></th><th>Password hash (PBKDF2/Argon2)</th></tr>
+<table>
+<tr><th><code>security_level_id</code></th><th>FK to security_levels</th></tr>
+<table>
+<tr><th><code>flags</code></th><th>AR flags bitset (A–Z)</th></tr>
+<table>
+<tr><th><code>ac_flags</code></th><th>Restriction flags</th></tr>
+<table>
+<tr><th><code>status_flags</code></th><th>locked/deleted/expert/ansi/etc.</th></tr>
+<table>
+<tr><th><code>credits</code> / <code>file_points</code></th><th>Economy</th></tr>
+<table>
+<tr><th><code>timebank</code></th><th>Stored minutes</th></tr>
+<table>
+<tr><th><code>logged_on</code> / <code>msg_post</code> / <code>uploads</code> / <code>downloads</code></th><th>Stats</th></tr>
+<table>
+<tr><th><code>expires_at</code></th><th>Account expiration</th></tr>
+<table>
+<tr><th><code>signature</code> / <code>tagline</code></th><th>Message appendages</th></tr>
+</table>
+<h2>Nodes and Sessions</h2>
+<table>
+<tr><th>Table</th><th>Purpose</th></tr>
+<table>
+<tr><th><code>nodes</code></th><th>Active node status (node_num, user_id, status, IP)</th></tr>
+<table>
+<tr><th><code>call_history</code></th><th>Login/logout history with duration</th></tr>
+</table>
+<h2>Conferences</h2>
+<table>
+<tr><th>Table</th><th>Purpose</th></tr>
+<table>
+<tr><th><code>conferences</code></th><th>Conference definitions (key, name, ACS)</th></tr>
+<table>
+<tr><th><code>conference_membership</code></th><th>User ↔ conference joins</th></tr>
+</table>
+<h2>Messages</h2>
+<table>
+<tr><th>Table</th><th>Purpose</th></tr>
+<table>
+<tr><th><code>message_areas</code></th><th>Area definitions with ACS and anon policy</th></tr>
+<table>
+<tr><th><code>messages</code></th><th>Message records (threading, attributes)</th></tr>
+<table>
+<tr><th><code>mail_packets</code></th><th>Generated QWK/Fido mail packets</th></tr>
+<table>
+<tr><th><code>drafts</code></th><th>Auto-saved composition drafts</th></tr>
+<table>
+<tr><th><code>user_msg_scan_areas</code></th><th>Per-user scan toggle (MZ command)</th></tr>
+</table>
+<h3>messages Key Columns</h3>
+<table>
+<tr><th>Column</th><th>Purpose</th></tr>
+<table>
+<tr><th><code>area_id</code></th><th>FK to message_areas</th></tr>
+<table>
+<tr><th><code>reply_to</code> / <code>thread_root</code></th><th>Threading</th></tr>
+<table>
+<tr><th><code>to_user</code></th><th>Private mail recipient</th></tr>
+<table>
+<tr><th><code>attr</code> / <code>net_attr</code></th><th>Local and FidoNet attributes</th></tr>
+<table>
+<tr><th><code>file_attached</code></th><th>Attachment filename</th></tr>
+</table>
+<h2>Files</h2>
+<table>
+<tr><th>Table</th><th>Purpose</th></tr>
+<table>
+<tr><th><code>file_areas</code></th><th>File area definitions</th></tr>
+<table>
+<tr><th><code>files</code></th><th>File records with metadata and hash</th></tr>
+<table>
+<tr><th><code>upload_queue</code></th><th>Pending upload approvals</th></tr>
+<table>
+<tr><th><code>download_queue</code></th><th>Pending download requests</th></tr>
+</table>
+<h2>Voting</h2>
+<table>
+<tr><th>Table</th><th>Purpose</th></tr>
+<table>
+<tr><th><code>votes</code></th><th>Vote topics</th></tr>
+<table>
+<tr><th><code>vote_choices</code></th><th>Answer choices</th></tr>
+<table>
+<tr><th><code>vote_ballots</code></th><th>Cast ballots (one per user per vote)</th></tr>
+</table>
+<h2>System Content</h2>
+<table>
+<tr><th>Table</th><th>Purpose</th></tr>
+<table>
+<tr><th><code>automsg</code></th><th>Single auto-message (id=1)</th></tr>
+<table>
+<tr><th><code>bulletins</code></th><th>Sysop bulletins with ACS</th></tr>
+<table>
+<tr><th><code>oneliners</code></th><th>Public one-liner messages</th></tr>
+<table>
+<tr><th><code>short_messages</code></th><th>Private short messages (SMW)</th></tr>
+</table>
+<h2>Events and Doors</h2>
+<table>
+<tr><th>Table</th><th>Purpose</th></tr>
+<table>
+<tr><th><code>events</code></th><th>Scheduler events (cron, logon, permission)</th></tr>
+<table>
+<tr><th><code>doors</code></th><th>Door program definitions</th></tr>
+<table>
+<tr><th><code>protocols</code></th><th>File transfer protocol definitions</th></tr>
+</table>
+<h2>Statistics</h2>
+<table>
+<tr><th>Table</th><th>Purpose</th></tr>
+<table>
+<tr><th><code>stats</code></th><th>Lifetime counters (singleton id=1)</th></tr>
+<table>
+<tr><th><code>daily_stats</code></th><th>Today&#x27;s counters (singleton)</th></tr>
+<table>
+<tr><th><code>history</code></th><th>Per-day archived stats</th></tr>
+<table>
+<tr><th><code>system_info</code></th><th>BBS metadata (name, totals)</th></tr>
+<table>
+<tr><th><code>logs</code></th><th>Application log entries</th></tr>
+</table>
+<h2>FidoNet</h2>
+<table>
+<tr><th>Table</th><th>Purpose</th></tr>
+<table>
+<tr><th><code>fido_akas</code></th><th>AKA addresses (zone:net/node.point)</th></tr>
+<table>
+<tr><th><code>fido_echolinks</code></th><th>Echo tag ↔ message area links</th></tr>
+<table>
+<tr><th><code>fido_netmail</code></th><th>Outbound netmail queue</th></tr>
+<table>
+<tr><th><code>fido_echomail_queue</code></th><th>Echomail export queue</th></tr>
+</table>
+<h2>QWK Network</h2>
+<table>
+<tr><th>Table</th><th>Purpose</th></tr>
+<table>
+<tr><th><code>qwk_hubs</code></th><th>QWK hub definitions</th></tr>
+<table>
+<tr><th><code>qwk_area_links</code></th><th>Local area ↔ hub conference mapping</th></tr>
+<table>
+<tr><th><code>qwk_packet_queue</code></th><th>Pending QWK/REP packets</th></tr>
+</table>
+<h2>Chat</h2>
+<table>
+<tr><th>Table</th><th>Purpose</th></tr>
+<table>
+<tr><th><code>chat_logs</code></th><th>Structured chat message log</th></tr>
+</table>
+<h2>PLANK Core (<code>sql/plank_schema.sql</code>)</h2>
+<table>
+<tr><th>Table</th><th>Purpose</th></tr>
+<table>
+<tr><th><code>plank_node_identity</code></th><th>Local node ID and keys (singleton)</th></tr>
+<table>
+<tr><th><code>plank_peers</code></th><th>Known peer nodes</th></tr>
+<table>
+<tr><th><code>plank_links</code></th><th>Configured network links</th></tr>
+<table>
+<tr><th><code>plank_link_sessions</code></th><th>Active link sessions</th></tr>
+<table>
+<tr><th><code>plank_link_cursors</code></th><th>Sync cursors per link</th></tr>
+<table>
+<tr><th><code>plank_areas</code></th><th>Network message areas</th></tr>
+<table>
+<tr><th><code>plank_area_policies</code></th><th>Moderation policies</th></tr>
+<table>
+<tr><th><code>plank_subscriptions</code></th><th>Per-link area subscriptions</th></tr>
+<table>
+<tr><th><code>plank_objects</code></th><th>Content-addressed CBOR objects</th></tr>
+<table>
+<tr><th><code>plank_messages</code></th><th>Denormalized message objects</th></tr>
+<table>
+<tr><th><code>plank_attachments</code></th><th>Attachment metadata</th></tr>
+<table>
+<tr><th><code>plank_message_attachments</code></th><th>Message ↔ attachment map</th></tr>
+<table>
+<tr><th><code>plank_journal</code></th><th>Append-only object journal</th></tr>
+<table>
+<tr><th><code>plank_moderation</code></th><th>Moderation events</th></tr>
+<table>
+<tr><th><code>plank_receipts</code></th><th>Delivery acknowledgements</th></tr>
+<table>
+<tr><th><code>plank_import_history</code></th><th>Bundle import dedup</th></tr>
+<table>
+<tr><th><code>plank_dedupe</code></th><th>Object deduplication window</th></tr>
+<table>
+<tr><th><code>plank_deadletters</code></th><th>Failed delivery queue</th></tr>
+<table>
+<tr><th><code>plank_quarantine</code></th><th>Policy-violating objects</th></tr>
+<table>
+<tr><th><code>plank_user_exports</code></th><th>User offline packet exports</th></tr>
+<table>
+<tr><th><code>plank_user_replies</code></th><th>Imported user reply bundles</th></tr>
+<table>
+<tr><th><code>plank_routes</code></th><th>Direct message routing</th></tr>
+<table>
+<tr><th><code>plank_outbound_queue</code></th><th>Pending outbound objects</th></tr>
+<table>
+<tr><th><code>plank_audit</code></th><th>Audit trail</th></tr>
+<table>
+<tr><th><code>plank_config</code></th><th>PLANK key/value settings</th></tr>
+</table>
+<h2>COVE Tables</h2>
+<table>
+<tr><th>Table</th><th>Purpose</th></tr>
+<table>
+<tr><th><code>cove_downstream</code></th><th>Downstream link tracking</th></tr>
+<table>
+<tr><th><code>cove_upstream</code></th><th>Upstream link tracking</th></tr>
+<table>
+<tr><th><code>cove_fanout_queue</code></th><th>Fan-out delivery queue</th></tr>
+</table>
+<h2>Key Indexes</h2>
+<table>
+<tr><th>Index</th><th>Table</th><th>Column(s)</th></tr>
+<table>
+<tr><th><code>idx_users_handle</code></th><th>users</th><th>handle</th></tr>
+<table>
+<tr><th><code>idx_messages_area</code></th><th>messages</th><th>area_id</th></tr>
+<table>
+<tr><th><code>idx_messages_user</code></th><th>messages</th><th>user_id</th></tr>
+<table>
+<tr><th><code>idx_files_area</code></th><th>files</th><th>area_id</th></tr>
+<table>
+<tr><th><code>idx_nodes_status</code></th><th>nodes</th><th>status</th></tr>
+<table>
+<tr><th><code>idx_oneliners_posted</code></th><th>oneliners</th><th>posted_at DESC</th></tr>
+<table>
+<tr><th><code>idx_fido_netmail_status</code></th><th>fido_netmail</th><th>status</th></tr>
+<table>
+<tr><th><code>idx_qwk_packet_queue_status</code></th><th>qwk_packet_queue</th><th>status</th></tr>
+<table>
+<tr><th><code>idx_plank_objects_class</code></th><th>plank_objects</th><th>object_class</th></tr>
+<table>
+<tr><th><code>idx_plank_journal_state</code></th><th>plank_journal</th><th>processing_state</th></tr>
+</table>
+<h2>Schema Application</h2>
+<p><code>mutineer-initbbs</code> applies schema automatically. Manual application:</p>
+<pre><code class="bash">
+sqlite3 data/mutineer.db &lt; sql/schema.sql
+sqlite3 data/mutineer.db &lt; sql/plank_schema.sql
+</code></pre>
+<p>Verify:</p>
+<pre><code class="bash">
+sqlite3 data/mutineer.db &quot;.tables&quot;
+mutineer-maint integrity -v
+</code></pre>
+<h2>Maintenance</h2>
+<table>
+<tr><th>Command</th><th>Effect</th></tr>
+<table>
+<tr><th><code>mutineer-maint vacuum</code></th><th>Reclaim space</th></tr>
+<table>
+<tr><th><code>mutineer-maint reindex</code></th><th>Rebuild indexes</th></tr>
+<table>
+<tr><th><code>mutineer-msgpack</code></th><th>Prune old messages</th></tr>
+<table>
+<tr><th><code>mutineer-filepack</code></th><th>Prune file records</th></tr>
+<table>
+<tr><th><code>mutineer-userpack</code></th><th>Prune inactive users</th></tr>
+</table>
+<h2>Related Documentation</h2>
+<ul>
+<li><a href="../architecture.html">Architecture</a></li>
+<li><a href="../networking-plank.html">PLANK Networking</a></li>
+<li><a href="../messages-and-mail.html">Messages and Mail</a></li>
+<li><a href="../files-and-protocols.html">Files and Protocols</a></li>
+</ul></main>
+  <footer class="site-footer">
+    <p>Mutineer BBS — <a href="https://github.com/rickcollette/mutineer">GitHub</a> — MIT License</p>
+  </footer>
+</body>
+</html>

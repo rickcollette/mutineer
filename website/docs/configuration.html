@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Configuration Reference — Mutineer BBS</title>
+  <link rel="stylesheet" href="assets/css/site.css">
+</head>
+<body>
+  <header class="site-header">
+    <a href="index.html" class="logo">MUTINEER BBS</a>
+    <span class="tagline">Documentation</span>
+  </header>
+  <nav class="doc-nav"><a href="index.html" class="home">← Home</a><a href="overview.html">Overview</a><a href="getting-started.html">Getting Started</a><a href="configuration.html" class="active">Configuration</a><a href="architecture.html">Architecture</a><a href="menus-and-ui.html">Menus & UI</a><a href="messages-and-mail.html">Messages & Mail</a><a href="files-and-protocols.html">Files & Protocols</a><a href="chat-and-social.html">Chat & Social</a><a href="doors-and-scripting.html">Doors & Scripting</a><a href="sysop-guide.html">Sysop Guide</a><a href="networking-plank.html">PLANK Networking</a><a href="buccaneer.html">Buccaneer</a><a href="plugins.html">Plugins</a><a href="developer-guide.html">Developer Guide</a><a href="cli-tools.html">CLI Tools</a><a href="reference/menu-actions.html">Menu Actions</a><a href="reference/message-commands.html">Message Commands</a><a href="reference/file-commands.html">File Commands</a><a href="reference/acs-mci.html">ACS & MCI</a><a href="reference/database.html">Database Schema</a></nav>
+  <main class="doc-content"><p>&lt;!-- generated-by: gsd-doc-writer --&gt;</p>
+<h1>Configuration Reference</h1>
+<p>Mutineer BBS reads a flat key=value configuration file. The canonical struct is <code>BbsConfig</code> in <code>include/bbs_config.h</code>. Loading is handled by <code>cfg_load()</code> in <code>src/config.c</code>, which applies defaults then overrides from the file.</p>
+<p>Default config path: <code>conf/mutineer.conf</code>.</p>
+<h2>File Format</h2>
+<pre><code class="ini">
+# Comments start with #
+key=value
+port=2929
+bbs_name=Mutineer BBS
+</code></pre>
+<ul>
+<li>One setting per line</li>
+<li>Whitespace around keys and values is trimmed</li>
+<li>Unknown keys are silently ignored</li>
+<li>Boolean-like values use <code>0</code> or <code>1</code> (integer)</li>
+</ul>
+<h2>Environment Variables</h2>
+<p>All settings come from the config file. There is no automatic <code>process.env</code> overlay. Pass an alternate path:</p>
+<pre><code class="bash">
+build/mutineer --config /etc/mutineer/mutineer.conf
+</code></pre>
+<h2>Complete Key Reference</h2>
+<p>Keys match <code>BbsConfig</code> fields in <code>include/bbs_config.h</code>. Defaults shown are from <code>cfg_defaults()</code> in <code>src/config.c</code>.</p>
+<h3>Network and Listener</h3>
+<table>
+<tr><th>Key</th><th>Type</th><th>Default</th><th>Required</th><th>Description</th></tr>
+<table>
+<tr><th><code>bind</code></th><th>string</th><th><code>0.0.0.0</code></th><th>No</th><th>Address to bind telnet listener</th></tr>
+<table>
+<tr><th><code>port</code></th><th>int</th><th><code>2929</code></th><th>No</th><th>Telnet listen port</th></tr>
+<table>
+<tr><th><code>idle_timeout_sec</code></th><th>int</th><th><code>600</code></th><th>No</th><th>Seconds before idle disconnect</th></tr>
+</table>
+<h3>Paths</h3>
+<table>
+<tr><th>Key</th><th>Type</th><th>Default</th><th>Required</th><th>Description</th></tr>
+<table>
+<tr><th><code>db_path</code></th><th>string</th><th><code>data/mutineer.db</code></th><th>Yes*</th><th>SQLite database file</th></tr>
+<table>
+<tr><th><code>data_path</code></th><th>string</th><th><code>data</code></th><th>No</th><th>General data directory</th></tr>
+<table>
+<tr><th><code>logs_path</code></th><th>string</th><th><code>logs/mutineer.log</code></th><th>No</th><th>Main log file path</th></tr>
+<table>
+<tr><th><code>art_path</code></th><th>string</th><th><code>art</code></th><th>No</th><th>ANSI/ASCII art directory</th></tr>
+<table>
+<tr><th><code>menu_main</code></th><th>string</th><th><code>menus/main.mnu</code></th><th>Yes*</th><th>Main menu file after login</th></tr>
+<table>
+<tr><th><code>motd</code></th><th>string</th><th><code>art/motd.ans</code></th><th>No</th><th>Message of the day art file</th></tr>
+<table>
+<tr><th><code>doors_path</code></th><th>string</th><th><code>doors</code></th><th>No</th><th>Master door files directory</th></tr>
+<table>
+<tr><th><code>dropfile_path</code></th><th>string</th><th><code>data/dropfiles</code></th><th>No</th><th>Dropfile output directory</th></tr>
+<table>
+<tr><th><code>protocol_path</code></th><th>string</th><th><code>conf/protocols.conf</code></th><th>No</th><th>Transfer protocol definitions</th></tr>
+<table>
+<tr><th><code>chat_log_path</code></th><th>string</th><th>*(empty)*</th><th>No</th><th>Chat log directory; empty disables file logging</th></tr>
+</table>
+<p>\*Startup sanity checks require these paths to exist or be creatable via <code>mutineer-initbbs</code>.</p>
+<h3>BBS Identity</h3>
+<table>
+<tr><th>Key</th><th>Type</th><th>Default</th><th>Required</th><th>Description</th></tr>
+<table>
+<tr><th><code>bbs_name</code></th><th>string</th><th><code>Mutineer BBS</code></th><th>No</th><th>Display name in MCI <code>~BN</code></th></tr>
+<table>
+<tr><th><code>sysop_name</code></th><th>string</th><th><code>Sysop</code></th><th>No</th><th>Sysop name in MCI <code>~SN</code></th></tr>
+</table>
+<h3>Session Limits</h3>
+<table>
+<tr><th>Key</th><th>Type</th><th>Default</th><th>Required</th><th>Description</th></tr>
+<table>
+<tr><th><code>session_time_limit_min</code></th><th>int</th><th><code>60</code></th><th>No</th><th>Default per-call time limit (minutes)</th></tr>
+<table>
+<tr><th><code>max_calls_per_day</code></th><th>int</th><th><code>0</code></th><th>No</th><th>Max logins per user per calendar day; <code>0</code> = unlimited</th></tr>
+<table>
+<tr><th><code>max_page_sysop</code></th><th>int</th><th><code>3</code></th><th>No</th><th>Max sysop page attempts per session; <code>0</code> = unlimited</th></tr>
+</table>
+<h3>WFC Console</h3>
+<table>
+<tr><th>Key</th><th>Type</th><th>Default</th><th>Required</th><th>Description</th></tr>
+<table>
+<tr><th><code>wfc_enabled</code></th><th>int</th><th><code>1</code></th><th>No</th><th>Run local WFC console thread</th></tr>
+<table>
+<tr><th><code>wfc_refresh_ms</code></th><th>int</th><th><code>1000</code></th><th>No</th><th>WFC screen refresh interval (ms)</th></tr>
+<table>
+<tr><th><code>wfc_blank_sec</code></th><th>int</th><th><code>300</code></th><th>No</th><th>Blank screen timeout; <code>0</code> = disabled</th></tr>
+<table>
+<tr><th><code>wfc_node_num</code></th><th>int</th><th><code>1</code></th><th>No</th><th>Local WFC console node number</th></tr>
+<table>
+<tr><th><code>wfc_fg_color</code></th><th>int</th><th><code>11</code></th><th>No</th><th>WFC foreground ANSI color (0–15)</th></tr>
+<table>
+<tr><th><code>wfc_bg_color</code></th><th>int</th><th><code>0</code></th><th>No</th><th>WFC background ANSI color (0–7)</th></tr>
+<table>
+<tr><th><code>wfc_status_idle_char</code></th><th>char</th><th><code>I</code></th><th>No</th><th>Node status char when idle</th></tr>
+<table>
+<tr><th><code>wfc_status_logging_char</code></th><th>char</th><th><code>L</code></th><th>No</th><th>Node status char during login</th></tr>
+<table>
+<tr><th><code>wfc_status_online_char</code></th><th>char</th><th><code>A</code></th><th>No</th><th>Node status char when online</th></tr>
+<table>
+<tr><th><code>wfc_status_chat_char</code></th><th>char</th><th><code>S</code></th><th>No</th><th>Node status char during chat</th></tr>
+</table>
+<h3>Scheduler</h3>
+<table>
+<tr><th>Key</th><th>Type</th><th>Default</th><th>Required</th><th>Description</th></tr>
+<table>
+<tr><th><code>scheduler_enabled</code></th><th>int</th><th><code>1</code></th><th>No</th><th>Run background events thread</th></tr>
+<table>
+<tr><th><code>scheduler_tick_sec</code></th><th>int</th><th><code>30</code></th><th>No</th><th>Scheduler poll interval (seconds)</th></tr>
+</table>
+<h3>Authentication</h3>
+<table>
+<tr><th>Key</th><th>Type</th><th>Default</th><th>Required</th><th>Description</th></tr>
+<table>
+<tr><th><code>login_window_sec</code></th><th>int</th><th><code>120</code></th><th>No</th><th>Login throttle time window (seconds)</th></tr>
+<table>
+<tr><th><code>login_max_attempts</code></th><th>int</th><th><code>5</code></th><th>No</th><th>Max failed attempts per IP/user per window</th></tr>
+<table>
+<tr><th><code>password_upgrade</code></th><th>int</th><th><code>1</code></th><th>No</th><th>Enable Argon2/bcrypt hash migration on login</th></tr>
+<table>
+<tr><th><code>password_expire_days</code></th><th>int</th><th><code>0</code></th><th>No</th><th>Force password change after N days; <code>0</code> = disabled</th></tr>
+</table>
+<h3>Credits and Ratios</h3>
+<table>
+<tr><th>Key</th><th>Type</th><th>Default</th><th>Required</th><th>Description</th></tr>
+<table>
+<tr><th><code>default_credits</code></th><th>int</th><th><code>5000</code></th><th>No</th><th>Starting credits for new users</th></tr>
+<table>
+<tr><th><code>default_file_points</code></th><th>int</th><th><code>0</code></th><th>No</th><th>Starting file points for new users</th></tr>
+</table>
+<h3>Multi-Login and Guest</h3>
+<table>
+<tr><th>Key</th><th>Type</th><th>Default</th><th>Required</th><th>Description</th></tr>
+<table>
+<tr><th><code>allow_multi_login</code></th><th>int</th><th><code>0</code></th><th>No</th><th>Allow duplicate logins (<code>1</code>) or block (<code>0</code>)</th></tr>
+<table>
+<tr><th><code>guest_enabled</code></th><th>int</th><th><code>0</code></th><th>No</th><th>Enable guest account login</th></tr>
+<table>
+<tr><th><code>guest_handle</code></th><th>string</th><th><code>GUEST</code></th><th>No</th><th>Guest account handle</th></tr>
+<table>
+<tr><th><code>guest_level_id</code></th><th>int</th><th><code>1</code></th><th>No</th><th>Security level ID for guests</th></tr>
+</table>
+<h3>Welcome Letter</h3>
+<table>
+<tr><th>Key</th><th>Type</th><th>Default</th><th>Required</th><th>Description</th></tr>
+<table>
+<tr><th><code>welcome_letter_enabled</code></th><th>int</th><th><code>1</code></th><th>No</th><th>Send welcome letter on first login</th></tr>
+<table>
+<tr><th><code>welcome_letter_file</code></th><th>string</th><th><code>art/welcome.txt</code></th><th>No</th><th>Welcome letter text file path</th></tr>
+<table>
+<tr><th><code>welcome_letter_from</code></th><th>string</th><th><code>Sysop</code></th><th>No</th><th>Sender name on welcome letter</th></tr>
+</table>
+<h3>DOSBox / DOS Door Runner</h3>
+<table>
+<tr><th>Key</th><th>Type</th><th>Default</th><th>Required</th><th>Description</th></tr>
+<table>
+<tr><th><code>dosbox_path</code></th><th>string</th><th><code>dosbox</code></th><th>No</th><th>Path to DOSBox binary</th></tr>
+<table>
+<tr><th><code>door_runtime_path</code></th><th>string</th><th><code>data/door_runtime</code></th><th>No</th><th>Base dir for per-launch runtime trees</th></tr>
+<table>
+<tr><th><code>door_copy_mode</code></th><th>string</th><th><code>copy</code></th><th>No</th><th>File copy mode for door launch</th></tr>
+<table>
+<tr><th><code>door_default_timeout_sec</code></th><th>int</th><th><code>300</code></th><th>No</th><th>Door timeout; <code>0</code> = no timeout</th></tr>
+<table>
+<tr><th><code>door_cleanup_on_exit</code></th><th>int</th><th><code>1</code></th><th>No</th><th>Remove runtime tree on successful exit</th></tr>
+<table>
+<tr><th><code>door_keep_failed_runs</code></th><th>int</th><th><code>0</code></th><th>No</th><th>Keep runtime tree on failure for debugging</th></tr>
+</table>
+<h2>Config Keys in mutineer.conf (Not in BbsConfig)</h2>
+<p>The sample <code>conf/mutineer.conf</code> includes plugin settings read by <code>plugin_loader.c</code> (not in <code>BbsConfig</code> struct):</p>
+<table>
+<tr><th>Key</th><th>Example</th><th>Description</th></tr>
+<table>
+<tr><th><code>plugins_enabled</code></th><th><code>true</code></th><th>Enable plugin loading</th></tr>
+<table>
+<tr><th><code>plugins_dir</code></th><th><code>plugins</code></th><th>Directory containing <code>.so</code> plugins</th></tr>
+<table>
+<tr><th><code>plugins_allowlist</code></th><th>*(empty)*</th><th>Comma-separated plugin IDs to allow</th></tr>
+<table>
+<tr><th><code>plugins_denylist</code></th><th>*(empty)*</th><th>Comma-separated plugin IDs to deny</th></tr>
+</table>
+<h2>Required vs Optional</h2>
+<p><strong>Startup will fail without:</strong></p>
+<ul>
+<li>Valid config file loadable by <code>cfg_load()</code></li>
+<li>SQLite database at <code>db_path</code> with applied schema</li>
+<li>Main menu file at <code>menu_main</code></li>
+<li>Paths validated by <code>startup_sanity_check()</code></li>
+</ul>
+<p><strong>Safe to omit (defaults apply):</strong></p>
+<ul>
+<li>All WFC tuning keys</li>
+<li>Guest account settings (disabled by default)</li>
+<li>DOS door settings (only needed for DOSBox doors)</li>
+<li>Chat log path (empty disables logging)</li>
+</ul>
+<h2>Example Production Config</h2>
+<pre><code class="ini">
+bind=0.0.0.0
+port=2929
+db_path=/var/lib/mutineer/mutineer.db
+data_path=/var/lib/mutineer/data
+logs_path=/var/log/mutineer/mutineer.log
+art_path=/opt/mutineer/art
+menu_main=/opt/mutineer/menus/main.mnu
+motd=/opt/mutineer/art/motd.ans
+
+bbs_name=Port Royal BBS
+sysop_name=Blackbeard
+
+session_time_limit_min=90
+idle_timeout_sec=900
+login_window_sec=300
+login_max_attempts=5
+allow_multi_login=0
+password_upgrade=1
+
+wfc_enabled=1
+scheduler_enabled=1
+scheduler_tick_sec=60
+
+doors_path=/opt/mutineer/doors
+dropfile_path=/var/lib/mutineer/dropfiles
+dosbox_path=/usr/bin/dosbox
+door_runtime_path=/var/lib/mutineer/door_runtime
+door_default_timeout_sec=600
+door_cleanup_on_exit=1
+
+plugins_enabled=true
+plugins_dir=/opt/mutineer/plugins
+</code></pre>
+<h2>Per-Environment Overrides</h2>
+<p>Mutineer does not ship <code>.env.development</code> style files. Use separate config files:</p>
+<pre><code class="bash">
+build/mutineer --config conf/mutineer-dev.conf
+build/mutineer --config conf/mutineer-prod.conf
+</code></pre>
+<p>CLI tools accept <code>-c</code> / <code>--config</code> with the same keys.</p>
+<h2>Related Documentation</h2>
+<ul>
+<li><a href="getting-started.html">Getting Started</a> — first-time setup</li>
+<li><a href="sysop-guide.html">Sysop Guide</a> — WFC and scheduler tuning</li>
+<li><a href="doors-and-scripting.html">Doors and Scripting</a> — DOS door settings</li>
+<li><a href="plugins.html">Plugins</a> — plugin configuration</li>
+</ul></main>
+  <footer class="site-footer">
+    <p>Mutineer BBS — <a href="https://github.com/rickcollette/mutineer">GitHub</a> — MIT License</p>
+  </footer>
+</body>
+</html>

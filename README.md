@@ -104,8 +104,8 @@ sysop_name=Sysop
 bbs_name=Mutineer BBS
 ```
 
-See `docs/admin.md` for the full reference including QWK, DOSBox doors, schema
-migration, and all available config keys.
+See [docs/configuration.md](docs/configuration.md) for all config keys and
+[docs/index.md](docs/index.md) for the complete documentation set.
 
 ## DOS Doors (DOSBox)
 
@@ -134,7 +134,11 @@ PLANK (Packet Link for Area Networked Knowledge) is a store-and-forward message
 networking protocol for offline packet exchange between BBS nodes. See
 `docs/PLANK_ADMIN.md` and `docs/networking.md`.
 
+## Documentation
+
+Full documentation: [docs/index.md](docs/index.md)  
+Website: [rickcollette.github.io/mutineer](https://rickcollette.github.io/mutineer/)
+
 ## License
 
-See `AGENT.md` for context on this project. No license file has been added yet —
-add one before publishing.
+Mutineer BBS is released under the [MIT License](LICENSE).

@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Getting Started — Mutineer BBS</title>
+  <link rel="stylesheet" href="assets/css/site.css">
+</head>
+<body>
+  <header class="site-header">
+    <a href="index.html" class="logo">MUTINEER BBS</a>
+    <span class="tagline">Documentation</span>
+  </header>
+  <nav class="doc-nav"><a href="index.html" class="home">← Home</a><a href="overview.html">Overview</a><a href="getting-started.html" class="active">Getting Started</a><a href="configuration.html">Configuration</a><a href="architecture.html">Architecture</a><a href="menus-and-ui.html">Menus & UI</a><a href="messages-and-mail.html">Messages & Mail</a><a href="files-and-protocols.html">Files & Protocols</a><a href="chat-and-social.html">Chat & Social</a><a href="doors-and-scripting.html">Doors & Scripting</a><a href="sysop-guide.html">Sysop Guide</a><a href="networking-plank.html">PLANK Networking</a><a href="buccaneer.html">Buccaneer</a><a href="plugins.html">Plugins</a><a href="developer-guide.html">Developer Guide</a><a href="cli-tools.html">CLI Tools</a><a href="reference/menu-actions.html">Menu Actions</a><a href="reference/message-commands.html">Message Commands</a><a href="reference/file-commands.html">File Commands</a><a href="reference/acs-mci.html">ACS & MCI</a><a href="reference/database.html">Database Schema</a></nav>
+  <main class="doc-content"><p>&lt;!-- generated-by: gsd-doc-writer --&gt;</p>
+<h1>Getting Started</h1>
+<p>This guide walks from a fresh clone to a running Mutineer BBS with passing tests.</p>
+<h2>Prerequisites</h2>
+<table>
+<tr><th>Requirement</th><th>Version</th><th>Notes</th></tr>
+<table>
+<tr><th>Linux</th><th>Any recent distro</th><th>Primary target platform</th></tr>
+<table>
+<tr><th>CMake</th><th>&gt;= 3.16</th><th>Build system</th></tr>
+<table>
+<tr><th>GCC or Clang</th><th>C11 support</th><th><code>-std=c11</code> required</th></tr>
+<table>
+<tr><th>SQLite3 dev</th><th>3.x</th><th><code>libsqlite3-dev</code></th></tr>
+<table>
+<tr><th>OpenSSL dev</th><th>1.1+ or 3.x</th><th><code>libssl-dev</code></th></tr>
+<table>
+<tr><th>pthreads</th><th>—</th><th>Provided by libc on Linux</th></tr>
+<table>
+<tr><th>make / ninja</th><th>—</th><th>CMake generator backend</th></tr>
+</table>
+<p>Optional but recommended:</p>
+<table>
+<tr><th>Package</th><th>Purpose</th></tr>
+<table>
+<tr><th><code>libargon2-dev</code></th><th>Argon2 password upgrade path</th></tr>
+<table>
+<tr><th><code>dosbox</code></th><th>DOS door runner</th></tr>
+<table>
+<tr><th><code>expect</code></th><th>Interactive integration tests</th></tr>
+<table>
+<tr><th><code>libzstd-dev</code></th><th>PLANK bundle compression</th></tr>
+</table>
+<h2>Pre-built releases</h2>
+<p>GitHub Releases provide x86_64 tarballs — no compile step required:</p>
+<table>
+<tr><th>Download</th><th>Target systems</th></tr>
+<table>
+<tr><th><code>*-x86_64-debian.tar.gz</code></th><th><strong>Debian 12+</strong> and <strong>Ubuntu 24.04 LTS+</strong></th></tr>
+<table>
+<tr><th><code>*-x86_64-fedora.tar.gz</code></th><th><strong>Fedora 39+</strong></th></tr>
+<table>
+<tr><th><code>*-x86_64-alpine.tar.gz</code></th><th><strong>Alpine 3.18+</strong></th></tr>
+</table>
+<p>Download from <a href="https://github.com/rickcollette/mutineer/releases">GitHub Releases</a>.</p>
+<pre><code class="bash">
+tar xzf mutineer-v1.0.0-x86_64-debian.tar.gz
+cd mutineer-v1.0.0-x86_64-debian
+./bin/mutineer-initbbs -c conf/mutineer.conf -y
+./mutineer -c conf/mutineer.conf
+telnet localhost 2929
+</code></pre>
+<p>Each archive includes the daemon, CLI tools, PLANK tools, sample plugins, default config/menus/art, and <code>INSTALL.md</code> with runtime dependencies. SHA256 checksums are published alongside each tarball.</p>
+<p>To cut a release as a maintainer: tag <code>v1.0.0</code> and push — GitHub Actions builds all three platforms and publishes assets automatically.</p>
+<h2>Installation Steps</h2>
+<h3>1. Clone the repository</h3>
+<pre><code class="bash">
+git clone &lt;repository-url&gt; mutineer-bbs
+cd mutineer-bbs
+</code></pre>
+<h3>2. Install dependencies</h3>
+<p>Debian/Ubuntu:</p>
+<pre><code class="bash">
+sudo apt-get install cmake build-essential libsqlite3-dev libssl-dev \
+  libargon2-dev dosbox expect
+</code></pre>
+<h3>3. Configure and build</h3>
+<p>Release build (production):</p>
+<pre><code class="bash">
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build
+</code></pre>
+<p>Debug build (development with tests):</p>
+<pre><code class="bash">
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
+cmake --build build
+</code></pre>
+<p>Build only CLI tools:</p>
+<pre><code class="bash">
+cmake --build build --target tools
+</code></pre>
+<p>Build PLANK tools:</p>
+<pre><code class="bash">
+cmake --build build --target plank
+</code></pre>
+<p>Build sample plugins:</p>
+<pre><code class="bash">
+cmake --build build --target plugins
+</code></pre>
+<h3>4. Initialize the BBS</h3>
+<p>Run the initialization utility to create directories, apply the SQLite schema, and seed default data:</p>
+<pre><code class="bash">
+build/mutineer-initbbs -c conf/mutineer.conf -y
+</code></pre>
+<p>Interactive mode (prompts for each missing item):</p>
+<pre><code class="bash">
+build/mutineer-initbbs -c conf/mutineer.conf
+</code></pre>
+<p>Dry run (report only):</p>
+<pre><code class="bash">
+build/mutineer-initbbs -c conf/mutineer.conf -n
+</code></pre>
+<p>The init tool creates:</p>
+<ul>
+<li><code>data/mutineer.db</code> — SQLite database with schema from <code>sql/schema.sql</code></li>
+<li>Required directories (<code>data/</code>, <code>logs/</code>, file area paths, etc.)</li>
+<li>Default security levels, sysop account prompt, sample areas</li>
+</ul>
+<h3>5. First run</h3>
+<p>Start the BBS server:</p>
+<pre><code class="bash">
+build/mutineer -c conf/mutineer.conf
+</code></pre>
+<p>Expected output:</p>
+<pre><code class="">
+mutineer listening on 0.0.0.0:2929
+</code></pre>
+<p>Connect via telnet:</p>
+<pre><code class="bash">
+telnet localhost 2929
+</code></pre>
+<p>Or use a BBS terminal client (SyncTERM, mTelnet, etc.) pointed at port <strong>2929</strong>.</p>
+<h3>6. Run tests</h3>
+<p>Unit and integration tests (excludes slow interactive expect suite):</p>
+<pre><code class="bash">
+ctest --test-dir build --exclude-regex &quot;tools_cli|expect_suite&quot;
+</code></pre>
+<p>Run a specific test binary:</p>
+<pre><code class="bash">
+build/test_acs
+build/test_doors
+build/test_plank_store
+</code></pre>
+<p>Validate all menu files:</p>
+<pre><code class="bash">
+build/mutineer-validate menus
+</code></pre>
+<p>Run interactive expect tests (requires <code>expect</code>):</p>
+<pre><code class="bash">
+ctest --test-dir build -R expect_suite
+</code></pre>
+<h2>Post-Install Checklist</h2>
+<ol>
+<li>Edit <code>conf/mutineer.conf</code> — set <code>bbs_name</code>, <code>sysop_name</code>, paths, limits.</li>
+<li>Customize <code>menus/main.mnu</code> and associated <code>.ans</code>/<code>.asc</code> templates.</li>
+<li>Add art files under <code>art/</code> (MOTD, welcome, error screens).</li>
+<li>Create message and file areas via sysop editors or direct DB seeding.</li>
+<li>Configure doors in the <code>doors</code> table and place door files under <code>doors/</code>.</li>
+<li>Set up cron/scheduler events for maintenance (<code>mutineer-maint</code>, pack tools).</li>
+</ol>
+<h2>Shell Scripts</h2>
+<p>Helper scripts in <code>scripts/</code>:</p>
+<table>
+<tr><th>Script</th><th>Purpose</th></tr>
+<table>
+<tr><th><code>scripts/start</code></th><th>Start BBS in background</th></tr>
+<table>
+<tr><th><code>scripts/stop</code></th><th>Stop running BBS</th></tr>
+<table>
+<tr><th><code>scripts/start-screen</code></th><th>Start in GNU screen session</th></tr>
+<table>
+<tr><th><code>scripts/backup</code></th><th>Database backup helper</th></tr>
+<table>
+<tr><th><code>scripts/watchdog</code></th><th>Restart on failure</th></tr>
+<table>
+<tr><th><code>scripts/bbs-wall</code></th><th>Send wall message to online users</th></tr>
+</table>
+<h2>Common Setup Issues</h2>
+<h3>Database open failed</h3>
+<p><strong>Symptom:</strong> <code>DB open failed: data/mutineer.db</code> on startup.</p>
+<p><strong>Fix:</strong> Run initialization:</p>
+<pre><code class="bash">
+build/mutineer-initbbs -c conf/mutineer.conf -y
+</code></pre>
+<h3>Startup sanity checks failed</h3>
+<p><strong>Symptom:</strong> <code>Startup sanity checks failed. Cannot start BBS with missing required files.</code></p>
+<p><strong>Fix:</strong> Init creates missing paths. Verify <code>menu_main</code>, <code>motd</code>, and <code>art_path</code> files exist. Check <code>conf/mutineer.conf</code> paths match your layout.</p>
+<h3>Port already in use</h3>
+<p><strong>Symptom:</strong> Listener fails to bind port 2929.</p>
+<p><strong>Fix:</strong> Change <code>port=</code> in config or stop the conflicting process:</p>
+<pre><code class="bash">
+ss -tlnp | grep 2929
+</code></pre>
+<h3>Missing SQLite or OpenSSL at link time</h3>
+<p><strong>Symptom:</strong> CMake <code>find_package</code> errors.</p>
+<p><strong>Fix:</strong> Install dev packages:</p>
+<pre><code class="bash">
+sudo apt-get install libsqlite3-dev libssl-dev
+</code></pre>
+<h3>Login throttled during testing</h3>
+<p><strong>Symptom:</strong> Repeated failed logins blocked.</p>
+<p><strong>Fix:</strong> Relax limits in config for development:</p>
+<pre><code class="ini">
+login_window_sec=10
+login_max_attempts=100
+</code></pre>
+<p>The default <code>conf/mutineer.conf</code> already uses relaxed values for testing.</p>
+<h3>Plugins not loading</h3>
+<p><strong>Symptom:</strong> <code>Plugin not found</code> or <code>Plugins are not enabled</code>.</p>
+<p><strong>Fix:</strong> Ensure plugins are built and config enables them:</p>
+<pre><code class="ini">
+plugins_enabled=true
+plugins_dir=plugins
+</code></pre>
+<p>Plugin <code>.so</code> files must be in <code>build/plugins/</code> or the configured directory. Build with <code>cmake --build build --target plugins</code>.</p>
+<h3>DOS doors fail to launch</h3>
+<p><strong>Symptom:</strong> Door exits immediately or DOSBox not found.</p>
+<p><strong>Fix:</strong> Install DOSBox and verify path:</p>
+<pre><code class="ini">
+dosbox_path=dosbox
+door_runtime_path=data/door_runtime
+</code></pre>
+<p>Check door manifest JSON and <code>doors</code> DB record. See <a href="doors-and-scripting.html">Doors and Scripting</a>.</p>
+<h2>Next Steps</h2>
+<ul>
+<li><a href="configuration.html">Configuration</a> — all config keys</li>
+<li><a href="sysop-guide.html">Sysop Guide</a> — WFC, user admin, maintenance</li>
+<li><a href="menus-and-ui.html">Menus and UI</a> — customize menus and templates</li>
+<li><a href="developer-guide.html">Developer Guide</a> — code structure and contributing</li>
+<li><a href="cli-tools.html">CLI Tools</a> — maintenance utilities</li>
+</ul></main>
+  <footer class="site-footer">
+    <p>Mutineer BBS — <a href="https://github.com/rickcollette/mutineer">GitHub</a> — MIT License</p>
+  </footer>
+</body>
+</html>

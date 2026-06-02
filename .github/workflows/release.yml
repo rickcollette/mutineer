@@ -1,0 +1,178 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g. 1.0.0)'
+        required: true
+        default: '0.0.0-test'
+
+permissions:
+  contents: write
+
+env:
+  VERSION: ${{ github.event_name == 'workflow_dispatch' && inputs.version || github.ref_name }}
+
+jobs:
+  # Debian 12 base — binary runs on Debian 12+ and Ubuntu 24.04+
+  build-debian:
+    name: debian / ubuntu 24.04
+    runs-on: ubuntu-latest
+    container:
+      image: debian:bookworm-slim
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            ca-certificates git \
+            build-essential cmake pkg-config \
+            libsqlite3-dev libssl-dev libargon2-dev libzstd-dev
+
+      - name: Build
+        env:
+          SKIP_TESTS: "1"
+        run: ./scripts/ci-build.sh
+
+      - name: Package
+        run: |
+          VERSION="${{ env.VERSION }}" PLATFORM=debian ./scripts/build-release.sh
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-debian
+          path: |
+            dist/releases/*.tar.gz
+            dist/releases/*.sha256
+
+  build-fedora:
+    name: fedora
+    runs-on: ubuntu-latest
+    container:
+      image: fedora:40
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          dnf install -y --setopt=install_weak_deps=False \
+            git gcc gcc-c++ make cmake pkg-config \
+            sqlite-devel openssl-devel libzstd-devel libargon2-devel
+
+      - name: Build
+        env:
+          SKIP_TESTS: "1"
+        run: ./scripts/ci-build.sh
+
+      - name: Package
+        run: |
+          VERSION="${{ env.VERSION }}" PLATFORM=fedora ./scripts/build-release.sh
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-fedora
+          path: |
+            dist/releases/*.tar.gz
+            dist/releases/*.sha256
+
+  build-alpine:
+    name: alpine
+    runs-on: ubuntu-latest
+    container:
+      image: alpine:3.20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          apk add --no-cache \
+            bash \
+            build-base cmake pkgconfig git \
+            sqlite-dev openssl-dev linux-headers \
+            argon2-dev zstd-dev
+
+      - name: Build
+        env:
+          SKIP_TESTS: "1"
+        run: ./scripts/ci-build.sh
+
+      - name: Package
+        run: |
+          VERSION="${{ env.VERSION }}" PLATFORM=alpine ./scripts/build-release.sh
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-alpine
+          path: |
+            dist/releases/*.tar.gz
+            dist/releases/*.sha256
+
+  publish:
+    name: publish GitHub release
+    needs: [build-debian, build-fedora, build-alpine]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: List release files
+        run: find artifacts -type f | sort
+
+      - name: Strip version prefix for tag
+        id: ver
+        run: |
+          V="${{ env.VERSION }}"
+          echo "tag=${V}" >> "$GITHUB_OUTPUT"
+          echo "version=${V#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.ver.outputs.tag }}
+          name: Mutineer BBS ${{ steps.ver.outputs.tag }}
+          generate_release_notes: true
+          body: |
+            ## Downloads
+
+            Choose the tarball for your Linux distribution:
+
+            | File | Target systems |
+            |------|----------------|
+            | `*-debian.tar.gz` | **Debian 12+** and **Ubuntu 24.04 LTS+** |
+            | `*-fedora.tar.gz` | **Fedora 39+** |
+            | `*-alpine.tar.gz` | **Alpine 3.18+** |
+
+            Each archive includes the `mutineer` daemon, maintenance CLI tools, PLANK networking tools, sample plugins, default config/menus/art, and an `INSTALL.md`.
+
+            ### Quick start
+
+            ```bash
+            tar xzf mutineer-*-x86_64-<platform>.tar.gz
+            cd mutineer-*-x86_64-<platform>
+            ./bin/mutineer-initbbs -c conf/mutineer.conf -y
+            ./mutineer -c conf/mutineer.conf
+            telnet localhost 2929
+            ```
+
+            See [INSTALL.md](https://github.com/rickcollette/mutineer/blob/main/docs/getting-started.md) and the [documentation site](https://rickcollette.github.io/mutineer/docs/getting-started.html).
+
+            SHA256 checksums are included (`.sha256` files).
+          files: |
+            artifacts/*.tar.gz
+            artifacts/*.sha256
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

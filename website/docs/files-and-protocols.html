@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Files and Protocols — Mutineer BBS</title>
+  <link rel="stylesheet" href="assets/css/site.css">
+</head>
+<body>
+  <header class="site-header">
+    <a href="index.html" class="logo">MUTINEER BBS</a>
+    <span class="tagline">Documentation</span>
+  </header>
+  <nav class="doc-nav"><a href="index.html" class="home">← Home</a><a href="overview.html">Overview</a><a href="getting-started.html">Getting Started</a><a href="configuration.html">Configuration</a><a href="architecture.html">Architecture</a><a href="menus-and-ui.html">Menus & UI</a><a href="messages-and-mail.html">Messages & Mail</a><a href="files-and-protocols.html" class="active">Files & Protocols</a><a href="chat-and-social.html">Chat & Social</a><a href="doors-and-scripting.html">Doors & Scripting</a><a href="sysop-guide.html">Sysop Guide</a><a href="networking-plank.html">PLANK Networking</a><a href="buccaneer.html">Buccaneer</a><a href="plugins.html">Plugins</a><a href="developer-guide.html">Developer Guide</a><a href="cli-tools.html">CLI Tools</a><a href="reference/menu-actions.html">Menu Actions</a><a href="reference/message-commands.html">Message Commands</a><a href="reference/file-commands.html">File Commands</a><a href="reference/acs-mci.html">ACS & MCI</a><a href="reference/database.html">Database Schema</a></nav>
+  <main class="doc-content"><p>&lt;!-- generated-by: gsd-doc-writer --&gt;</p>
+<h1>Files and Protocols</h1>
+<p>Mutineer BBS manages file areas with upload/download, credit enforcement, batch queues, archive operations, and configurable transfer protocols.</p>
+<h2>File Areas</h2>
+<p>File areas are defined in the <code>file_areas</code> table with filesystem paths under <code>data/</code> or custom locations.</p>
+<h3>Area Fields</h3>
+<table>
+<tr><th>Field</th><th>Purpose</th></tr>
+<table>
+<tr><th><code>name</code></th><th>Display name</th></tr>
+<table>
+<tr><th><code>path</code></th><th>Filesystem directory</th></tr>
+<table>
+<tr><th><code>acs_list</code></th><th>ACS to list area</th></tr>
+<table>
+<tr><th><code>acs_download</code></th><th>ACS to download</th></tr>
+<table>
+<tr><th><code>acs_upload</code></th><th>ACS to upload</th></tr>
+<table>
+<tr><th><code>acs_sysop</code></th><th>ACS for sysop operations</th></tr>
+<table>
+<tr><th><code>password</code></th><th>Optional area password</th></tr>
+<table>
+<tr><th><code>max_files</code></th><th>File limit (0=unlimited)</th></tr>
+<table>
+<tr><th><code>archive_type</code></th><th>Default archive type</th></tr>
+<table>
+<tr><th><code>sort_type</code></th><th>Sort order (0=name, 1=date, 2=size)</th></tr>
+<table>
+<tr><th><code>free_files</code></th><th>Files don&#x27;t cost credits</th></tr>
+<table>
+<tr><th><code>flags</code></th><th>Area flags (see below)</th></tr>
+</table>
+<h3>File Area Flags</h3>
+<table>
+<tr><th>Flag</th><th>Constant</th><th>Effect</th></tr>
+<table>
+<tr><th>CD-ROM</th><th><code>FA_FLAG_CDROM</code></th><th>Read-only area</th></tr>
+<table>
+<tr><th>Free files</th><th><code>FA_FLAG_FREEFILES</code></th><th>All downloads free</th></tr>
+<table>
+<tr><th>No count</th><th><code>FA_FLAG_NOCOUNT</code></th><th>Don&#x27;t count toward ratio</th></tr>
+<table>
+<tr><th>No time</th><th><code>FA_FLAG_NOTIME</code></th><th>No time deducted</th></tr>
+<table>
+<tr><th>Private</th><th><code>FA_FLAG_PRIVATE</code></th><th>Private uploads only</th></tr>
+<table>
+<tr><th>Slow</th><th><code>FA_FLAG_SLOW</code></th><th>Slow media indicator</th></tr>
+</table>
+<h2>File Records</h2>
+<p>Stored in <code>files</code> table with metadata:</p>
+<table>
+<tr><th>Field</th><th>Purpose</th></tr>
+<table>
+<tr><th><code>filename</code></th><th>File name in area directory</th></tr>
+<table>
+<tr><th><code>size_bytes</code></th><th>File size</th></tr>
+<table>
+<tr><th><code>description</code> / <code>extended_desc</code></th><th>Short and long descriptions</th></tr>
+<table>
+<tr><th><code>file_id_diz</code></th><th>FILE_ID.DIZ content</th></tr>
+<table>
+<tr><th><code>sha256</code></th><th>Content hash for duplicate detection</th></tr>
+<table>
+<tr><th><code>file_points</code></th><th>Download cost in file points</th></tr>
+<table>
+<tr><th><code>download_count</code></th><th>Times downloaded</th></tr>
+<table>
+<tr><th><code>owner_credit</code></th><th>Credits to uploader per download</th></tr>
+<table>
+<tr><th><code>flags</code></th><th>File flags (validated, offline, free, etc.)</th></tr>
+</table>
+<h3>File Flags</h3>
+<table>
+<tr><th>Flag</th><th>Constant</th><th>Effect</th></tr>
+<table>
+<tr><th>Not validated</th><th><code>FILE_FLAG_NOTVAL</code></th><th>Awaiting sysop approval</th></tr>
+<table>
+<tr><th>Offline</th><th><code>FILE_FLAG_OFFLINE</code></th><th>Not available for download</th></tr>
+<table>
+<tr><th>Free</th><th><code>FILE_FLAG_FREE</code></th><th>No credit charge</th></tr>
+<table>
+<tr><th>No time</th><th><code>FILE_FLAG_NOTIME</code></th><th>No session time deducted</th></tr>
+</table>
+<h2>File Commands (F*)</h2>
+<p>Dispatched by <code>handle_file_command()</code> in <code>src/file_cmds.c</code>:</p>
+<table>
+<tr><th>Command</th><th>Handler</th><th>Description</th></tr>
+<table>
+<tr><th><code>FA</code></th><th><code>cmd_file_area_change</code></th><th>Change current file area</th></tr>
+<table>
+<tr><th><code>FB</code></th><th><code>cmd_file_batch_download</code></th><th>Download batch queue</th></tr>
+<table>
+<tr><th><code>FC</code></th><th><code>cmd_file_batch_clear</code></th><th>Clear batch queue</th></tr>
+<table>
+<tr><th><code>FD</code></th><th><code>cmd_file_download</code></th><th>Download file by number</th></tr>
+<table>
+<tr><th><code>FE</code></th><th><code>cmd_file_extended</code></th><th>Show extended description</th></tr>
+<table>
+<tr><th><code>FF</code></th><th><code>cmd_file_find</code></th><th>Find files by name/description</th></tr>
+<table>
+<tr><th><code>FG</code></th><th><code>cmd_file_area_list</code></th><th>List file areas</th></tr>
+<table>
+<tr><th><code>FJ</code></th><th><code>cmd_file_batch_upload</code></th><th>Batch upload multiple files</th></tr>
+<table>
+<tr><th><code>FK</code></th><th><code>cmd_file_batch_remove</code></th><th>Remove entry from batch queue</th></tr>
+<table>
+<tr><th><code>FL</code></th><th><code>cmd_file_list</code></th><th>List files in current area</th></tr>
+<table>
+<tr><th><code>FN</code></th><th><code>cmd_file_new_scan</code></th><th>Scan for new files since date</th></tr>
+<table>
+<tr><th><code>FP</code></th><th><code>cmd_file_set_scan_date</code></th><th>Set new-scan cutoff date</th></tr>
+<table>
+<tr><th><code>FQ</code></th><th><code>cmd_file_archive_extract</code></th><th>Extract archive to temp</th></tr>
+<table>
+<tr><th><code>FR</code></th><th><code>cmd_file_raw_dir</code></th><th>Raw directory listing</th></tr>
+<table>
+<tr><th><code>FT</code></th><th><code>cmd_file_archive_test</code></th><th>Test archive integrity</th></tr>
+<table>
+<tr><th><code>FU</code></th><th><code>cmd_file_upload</code></th><th>Upload file</th></tr>
+<table>
+<tr><th><code>FV</code></th><th><code>cmd_file_view_archive</code></th><th>View archive contents</th></tr>
+<table>
+<tr><th><code>FX</code></th><th><code>cmd_file_expert_toggle</code></th><th>Toggle expert mode</th></tr>
+<table>
+<tr><th><code>FZ</code></th><th><code>cmd_file_zippy_search</code></th><th>Fast wildcard search</th></tr>
+</table>
+<p>Full reference: <a href="reference/file-commands.html">File Commands</a>.</p>
+<h2>Download Flow</h2>
+<ol>
+<li>User lists area (<code>FG</code>/<code>FL</code>) — ACS check on <code>acs_list</code></li>
+<li>Select file (<code>FD</code>) — ACS check on <code>acs_download</code></li>
+<li>Credit/ratio enforcement:</li>
+</ol>
+<p>   - Cost = <code>(size_bytes / 1024) + 1</code> credits unless free</p>
+<p>   - Download ratio checked unless <code>AC_FNODLRATIO</code> set</p>
+<p>   - Daily download limits from security level</p>
+<ol>
+<li>Protocol launch or raw send</li>
+<li>Stats updated (<code>downloads</code>, <code>dk</code>, <code>dl_today</code>)</li>
+</ol>
+<p>Named art <code>NOCREDTS</code> displayed when credits insufficient.</p>
+<h2>Upload Flow</h2>
+<ol>
+<li>User enters upload (<code>FU</code>) — ACS check on <code>acs_upload</code></li>
+<li>Protocol receive or path entry</li>
+<li>Description prompt; FILE_ID.DIZ extracted if present</li>
+<li>File copied to area path via <code>file_store_copy()</code></li>
+<li>SHA-256 computed; duplicate check via <code>db_file_exists_hash()</code></li>
+<li>Record inserted; upload stats incremented</li>
+<li>Upload queue entry if validation required</li>
+</ol>
+<h2>Batch Operations</h2>
+<p>Session maintains in-memory batch queue (<code>batch_queue[]</code>, <code>batch_count</code>):</p>
+<table>
+<tr><th>Command</th><th>Action</th></tr>
+<table>
+<tr><th>Queue file</th><th>Select during file browse or <code>FD</code> with batch flag</th></tr>
+<table>
+<tr><th><code>FB</code></th><th>Download all queued files</th></tr>
+<table>
+<tr><th><code>FC</code></th><th>Clear queue</th></tr>
+<table>
+<tr><th><code>FK</code></th><th>Remove specific entry</th></tr>
+</table>
+<p>Menu action <code>batchrun</code> triggers batch download from main menu.</p>
+<h2>Archive Support</h2>
+<p>External tools invoked for archive operations:</p>
+<table>
+<tr><th>Command</th><th>Formats</th></tr>
+<table>
+<tr><th><code>FV</code></th><th>List contents (zip, tar, rar, 7z)</th></tr>
+<table>
+<tr><th><code>FT</code></th><th>Integrity test</th></tr>
+<table>
+<tr><th><code>FQ</code></th><th>Extract to temp directory</th></tr>
+</table>
+<p>Archive type tracked in user <code>def_arc_type</code> and area <code>archive_type</code>.</p>
+<h2>Credits and Ratios</h2>
+<h3>Credits</h3>
+<ul>
+<li>Starting credits: config <code>default_credits</code> (default 5000)</li>
+<li>Download cost: roughly 1 credit per KB</li>
+<li>Uploads may award credits/file points to owner (<code>owner_credit</code>)</li>
+<li>AC flag <code>AC_FNOCREDITS</code> bypasses credit checks</li>
+</ul>
+<h3>Ratios</h3>
+<p>Enforced via ACS terms and security level settings:</p>
+<table>
+<tr><th>Term</th><th>Check</th></tr>
+<table>
+<tr><th><code>DR</code></th><th>Upload/download ratio met</th></tr>
+<table>
+<tr><th><code>Z</code></th><th>Post ratio met (messages area)</th></tr>
+</table>
+<p>Security level fields: <code>download_ratio_num/den</code>, <code>ul_dl_ratio_num/den</code>.</p>
+<p>User toggles expert mode with <code>FX</code> — affects display detail level (<code>STATUS_EXPERT</code>).</p>
+<h2>Transfer Protocols</h2>
+<p>Protocols defined in <code>protocols</code> table and optionally <code>conf/protocols.conf</code>:</p>
+<table>
+<tr><th>Field</th><th>Purpose</th></tr>
+<table>
+<tr><th><code>name</code></th><th>Protocol name (ZModem, YModem, etc.)</th></tr>
+<table>
+<tr><th><code>direction</code></th><th><code>up</code>, <code>down</code>, or <code>both</code></th></tr>
+<table>
+<tr><th><code>command</code></th><th>External program command line</th></tr>
+<table>
+<tr><th><code>active</code></th><th>Enabled flag</th></tr>
+</table>
+<p><code>protocol_launch()</code> in session.c executes the configured protocol with the file path.</p>
+<h2>File Validation</h2>
+<p>Sysop action <code>validatefiles</code> scans file areas for:</p>
+<ul>
+<li>Missing files on disk</li>
+<li>Orphaned disk files not in database</li>
+<li>Invalid descriptions</li>
+<li>Hash mismatches</li>
+</ul>
+<p>CLI: <code>mutineer-validate</code> for menu/template validation (not file areas).</p>
+<h2>Maintenance</h2>
+<table>
+<tr><th>Tool</th><th>Purpose</th></tr>
+<table>
+<tr><th><code>mutineer-filepack</code></th><th>Pack/prune file records</th></tr>
+<table>
+<tr><th><code>mutineer-maint vacuum</code></th><th>Reclaim DB space after pruning</th></tr>
+</table>
+<p>In-BBS: <code>fileadmin</code> action for area management; <code>maintenance</code> for pack operations.</p>
+<h2>Upload/Download Queues</h2>
+<p>Persistent queues for moderated transfers:</p>
+<table>
+<tr><th>Table</th><th>Purpose</th></tr>
+<table>
+<tr><th><code>upload_queue</code></th><th>Pending uploads awaiting approval</th></tr>
+<table>
+<tr><th><code>download_queue</code></th><th>Pending download requests</th></tr>
+</table>
+<h2>Related Documentation</h2>
+<ul>
+<li><a href="reference/file-commands.html">Reference: File Commands</a></li>
+<li><a href="configuration.html">Configuration</a> — paths and credits</li>
+<li><a href="sysop-guide.html">Sysop Guide</a> — file admin</li>
+<li><a href="menus-and-ui.html">Menus and UI</a> — ACS for file areas</li>
+</ul></main>
+  <footer class="site-footer">
+    <p>Mutineer BBS — <a href="https://github.com/rickcollette/mutineer">GitHub</a> — MIT License</p>
+  </footer>
+</body>
+</html>

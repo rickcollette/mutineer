@@ -38,6 +38,7 @@ src/buccaneer/bin/
 
 # Backups
 backups/
+dist/releases/
 
 # OS and editor noise
 .DS_Store

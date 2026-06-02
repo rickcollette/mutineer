@@ -8,9 +8,13 @@ CMAKE     ?= cmake
 CMAKE_BUILD_TYPE ?= Release
 BINARY    := $(BUILD_DIR)/mutineer
 
-TOOLS := mutineer-qwkgen mutineer-msgpack mutineer-userpack mutineer-filepack mutineer-stats mutineer-maint mutineer-initbbs
+TOOLS := mutineer-qwkgen mutineer-msgpack mutineer-userpack mutineer-filepack \
+         mutineer-stats mutineer-maint mutineer-initbbs mutineer-validate \
+         mutineer-netmail-export
 
-.PHONY: all clean dist dist-mutineer dist-buccaneer configure bbs-up bbs-down bbs-status tools
+PLANK_TOOLS := plankd coved plankctl plankpack plank-offline
+
+.PHONY: all clean dist dist-mutineer dist-buccaneer configure bbs-up bbs-down bbs-status tools plank release release-debian release-fedora release-alpine
 
 all: $(BINARY)
 
@@ -23,26 +27,30 @@ $(BINARY): $(BUILD_DIR)/CMakeCache.txt
 tools: $(BUILD_DIR)/CMakeCache.txt
 	@$(CMAKE) --build $(BUILD_DIR) --target tools
 
+plank: $(BUILD_DIR)/CMakeCache.txt
+	@$(CMAKE) --build $(BUILD_DIR) --target plank plugins
+
+release-debian: all tools plank
+	@VERSION=$(or $(VERSION),dev) PLATFORM=debian ./scripts/build-release.sh
+
+release-fedora: all tools plank
+	@VERSION=$(or $(VERSION),dev) PLATFORM=fedora ./scripts/build-release.sh
+
+release-alpine: all tools plank
+	@VERSION=$(or $(VERSION),dev) PLATFORM=alpine ./scripts/build-release.sh
+
+release: release-debian
+
 clean:
 	@rm -rf $(BUILD_DIR) $(DIST_DIR) build_debug
 
 dist: dist-mutineer dist-buccaneer
 
-dist-mutineer: all tools
-	@mkdir -p $(MUTINEER_DIST)
-	@cp $(BINARY) $(MUTINEER_DIST)/
-	@mkdir -p $(MUTINEER_DIST)/bin
-	@for tool in $(TOOLS); do \
-		if [ -f $(BUILD_DIR)/$$tool ]; then cp $(BUILD_DIR)/$$tool $(MUTINEER_DIST)/bin/; fi; \
-	done
-	@mkdir -p $(MUTINEER_DIST)/conf $(MUTINEER_DIST)/art $(MUTINEER_DIST)/menus $(MUTINEER_DIST)/sql $(MUTINEER_DIST)/docs $(MUTINEER_DIST)/logs $(MUTINEER_DIST)/data $(MUTINEER_DIST)/scripts
-	@cp -a conf/ $(MUTINEER_DIST)/
-	@cp -a art/ $(MUTINEER_DIST)/
-	@cp -a menus/ $(MUTINEER_DIST)/
-	@cp -a sql/ $(MUTINEER_DIST)/
-	@cp -a docs/ $(MUTINEER_DIST)/
-	@cp -a scripts/ $(MUTINEER_DIST)/
-	@if [ -f README.md ]; then cp README.md $(MUTINEER_DIST)/; fi
+dist-mutineer: all tools plank
+	@VERSION=$(or $(VERSION),dev) PLATFORM=debian OUTPUT_DIR=$(DIST_DIR) BUILD_DIR=$(BUILD_DIR) ./scripts/build-release.sh
+	@# Legacy layout: symlink dist/mutineer → latest debian package dir for scripts/start
+	@pkg=$$(ls -d $(DIST_DIR)/mutineer-$(or $(VERSION),dev)-x86_64-debian 2>/dev/null | tail -1); \
+	if [ -n "$$pkg" ]; then rm -rf $(MUTINEER_DIST); cp -a "$$pkg" $(MUTINEER_DIST); fi
 	@echo "Mutineer BBS built in $(MUTINEER_DIST)/"
 
 dist-buccaneer:

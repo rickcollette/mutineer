@@ -1,0 +1,28 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake libsqlite3-dev libssl-dev \
+            libargon2-dev libzstd-dev
+
+      - name: Build and test
+        run: ./scripts/ci-build.sh
+
+      - name: Package debian release (smoke test)
+        run: |
+          VERSION=ci-${GITHUB_SHA::7} PLATFORM=debian ./scripts/build-release.sh
+          tar tzf dist/releases/mutineer-ci-*.tar.gz | head -20

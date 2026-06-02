@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Menu Actions Reference — Mutineer BBS</title>
+  <link rel="stylesheet" href="../assets/css/site.css">
+</head>
+<body>
+  <header class="site-header">
+    <a href="../index.html" class="logo">MUTINEER BBS</a>
+    <span class="tagline">Documentation</span>
+  </header>
+  <nav class="doc-nav"><a href="../index.html" class="home">← Home</a><a href="../overview.html">Overview</a><a href="../getting-started.html">Getting Started</a><a href="../configuration.html">Configuration</a><a href="../architecture.html">Architecture</a><a href="../menus-and-ui.html">Menus & UI</a><a href="../messages-and-mail.html">Messages & Mail</a><a href="../files-and-protocols.html">Files & Protocols</a><a href="../chat-and-social.html">Chat & Social</a><a href="../doors-and-scripting.html">Doors & Scripting</a><a href="../sysop-guide.html">Sysop Guide</a><a href="../networking-plank.html">PLANK Networking</a><a href="../buccaneer.html">Buccaneer</a><a href="../plugins.html">Plugins</a><a href="../developer-guide.html">Developer Guide</a><a href="../cli-tools.html">CLI Tools</a><a href="../reference/menu-actions.html">Menu Actions</a><a href="../reference/message-commands.html">Message Commands</a><a href="../reference/file-commands.html">File Commands</a><a href="../reference/acs-mci.html">ACS & MCI</a><a href="../reference/database.html">Database Schema</a></nav>
+  <main class="doc-content"><p>&lt;!-- generated-by: gsd-doc-writer --&gt;</p>
+<h1>Menu Actions Reference</h1>
+<p>All actions dispatched by <code>handle_action()</code> in <code>src/session.c</code>. Menu items specify the action string in the third field of <code>.mnu</code> files.</p>
+<p>Format: <code>KEY|Label|Action|Data|ACS</code></p>
+<h2>General Actions</h2>
+<table>
+<tr><th>Action</th><th>Description</th></tr>
+<table>
+<tr><th><code>who</code></th><th>List online users and node status</th></tr>
+<table>
+<tr><th><code>help</code></th><th>Display basic help text</th></tr>
+<table>
+<tr><th><code>logout</code></th><th>End session (<code>s-&gt;alive = 0</code>)</th></tr>
+<table>
+<tr><th><code>wall</code></th><th>Broadcast wall message to all online users</th></tr>
+<table>
+<tr><th><code>whisper</code></th><th>Send private message to specific node</th></tr>
+<table>
+<tr><th><code>lastcallers</code></th><th>Show recent caller history</th></tr>
+</table>
+<h2>Message and File</h2>
+<table>
+<tr><th>Action</th><th>Description</th></tr>
+<table>
+<tr><th><code>messages</code></th><th>Enter message area browser/post flow</th></tr>
+<table>
+<tr><th><code>files</code></th><th>Enter file area browser/download flow</th></tr>
+<table>
+<tr><th><code>fsedit</code></th><th>Open full-screen editor</th></tr>
+<table>
+<tr><th><code>setsignature</code></th><th>Set user message signature</th></tr>
+<table>
+<tr><th><code>settagline</code></th><th>Set user tagline</th></tr>
+<table>
+<tr><th><code>togglefse</code></th><th>Toggle full-screen editor mode</th></tr>
+</table>
+<h2>Chat and Social</h2>
+<table>
+<tr><th>Action</th><th>Description</th></tr>
+<table>
+<tr><th><code>chat</code></th><th>Enter chat subsystem</th></tr>
+<table>
+<tr><th><code>linechat</code></th><th>Line-oriented chat mode</th></tr>
+<table>
+<tr><th><code>splitchat</code></th><th>Split-screen two-panel chat</th></tr>
+<table>
+<tr><th><code>page</code></th><th>Page sysop with message</th></tr>
+<table>
+<tr><th><code>oneliners</code></th><th>View/post oneliners</th></tr>
+<table>
+<tr><th><code>smw</code></th><th>Short messages waiting</th></tr>
+<table>
+<tr><th><code>bulletins</code></th><th>Display sysop bulletins</th></tr>
+</table>
+<h2>Doors and Plugins</h2>
+<table>
+<tr><th>Action</th><th>Description</th></tr>
+<table>
+<tr><th><code>doors</code></th><th>List and launch doors</th></tr>
+<table>
+<tr><th><code>plugins</code></th><th>List loaded plugins (sysop)</th></tr>
+<table>
+<tr><th><code>plugin:&lt;id&gt;</code></th><th>Run plugin by ID (e.g., <code>plugin:com.mutineer.hello</code>)</th></tr>
+</table>
+<h2>User Features</h2>
+<table>
+<tr><th>Action</th><th>Description</th></tr>
+<table>
+<tr><th><code>vote</code></th><th>Vote booth</th></tr>
+<table>
+<tr><th><code>voteresults</code></th><th>View vote results</th></tr>
+<table>
+<tr><th><code>timebank</code></th><th>Time bank deposit/withdraw</th></tr>
+<table>
+<tr><th><code>pickscheme</code></th><th>Select ANSI color scheme (0–7)</th></tr>
+<table>
+<tr><th><code>subscribe</code></th><th>Purchase/activate subscription</th></tr>
+<table>
+<tr><th><code>setsecurityq</code></th><th>Set security question/answer</th></tr>
+</table>
+<h2>Network Mail</h2>
+<table>
+<tr><th>Action</th><th>Description</th></tr>
+<table>
+<tr><th><code>netmail</code></th><th>QWK/netmail menu</th></tr>
+<table>
+<tr><th><code>fidosend</code></th><th>Send pending FidoNet netmail</th></tr>
+</table>
+<h2>Conferences</h2>
+<table>
+<tr><th>Action</th><th>Description</th></tr>
+<table>
+<tr><th><code>joinconf</code></th><th>Join a conference</th></tr>
+<table>
+<tr><th><code>leaveconf</code></th><th>Leave current conference</th></tr>
+<table>
+<tr><th><code>conflist</code></th><th>List conferences</th></tr>
+</table>
+<h2>File Batch and Archives</h2>
+<table>
+<tr><th>Action</th><th>Description</th></tr>
+<table>
+<tr><th><code>batchrun</code></th><th>Execute file batch download queue</th></tr>
+<table>
+<tr><th><code>setfilescandate</code></th><th>Set new-file scan cutoff date</th></tr>
+<table>
+<tr><th><code>archivetest</code></th><th>Test archive integrity</th></tr>
+<table>
+<tr><th><code>archiveextract</code></th><th>Extract archive contents</th></tr>
+<table>
+<tr><th><code>batchremove</code></th><th>Remove item from batch queue</th></tr>
+<table>
+<tr><th><code>batchupload</code></th><th>Batch upload files</th></tr>
+</table>
+<h2>Sysop Editors</h2>
+<table>
+<tr><th>Action</th><th>Description</th></tr>
+<table>
+<tr><th><code>useredit</code></th><th>User record editor</th></tr>
+<table>
+<tr><th><code>areaadmin</code></th><th>Message area administration</th></tr>
+<table>
+<tr><th><code>fileadmin</code></th><th>File area administration</th></tr>
+<table>
+<tr><th><code>confeditor</code></th><th>Conference editor</th></tr>
+<table>
+<tr><th><code>protocoleditor</code></th><th>Transfer protocol editor</th></tr>
+<table>
+<tr><th><code>menueditor</code></th><th>Menu file editor</th></tr>
+<table>
+<tr><th><code>voteeditor</code></th><th>Vote topic editor</th></tr>
+<table>
+<tr><th><code>eventeditor</code></th><th>Scheduler event editor</th></tr>
+<table>
+<tr><th><code>fidoeditor</code></th><th>FidoNet AKA/echolink editor</th></tr>
+<table>
+<tr><th><code>qwkneteditor</code></th><th>QWK hub/area link editor</th></tr>
+<table>
+<tr><th><code>subscriptioneditor</code></th><th>Subscription type editor</th></tr>
+<table>
+<tr><th><code>validatefiles</code></th><th>Validate file areas vs disk</th></tr>
+</table>
+<h2>Maintenance</h2>
+<table>
+<tr><th>Action</th><th>Description</th></tr>
+<table>
+<tr><th><code>maintenance</code></th><th>Maintenance menu (pack, stats, rebuild)</th></tr>
+</table>
+<h2>Navigation</h2>
+<table>
+<tr><th>Action</th><th>Description</th></tr>
+<table>
+<tr><th><code>menu</code></th><th>Navigate to submenu (data = menu filename)</th></tr>
+</table>
+<p>Example: <code>M|Messages|menu|message.mnu</code></p>
+<h2>Command Passthrough</h2>
+<p>Some menu items pass M*/R*/F* commands via the data field:</p>
+<pre><code class="">
+Z|Toggle Scan Areas|messages|MZ|L10
+</code></pre>
+<p>This invokes message mode with <code>MZ</code> command.</p>
+<h2>Plugin Action Format</h2>
+<pre><code class="">
+plugin:&lt;plugin_id&gt;
+</code></pre>
+<p>Examples from <code>menus/main.mnu</code>:</p>
+<ul>
+<li><code>plugin:com.mutineer.hello</code></li>
+<li><code>plugin:com.mutineer.chat</code></li>
+</ul>
+<h2>ACS Requirements</h2>
+<p>Actions do not enforce ACS themselves — menu items carry ACS in the fourth/fifth field. Additional runtime checks:</p>
+<ul>
+<li>AC restriction flags (e.g., <code>AC_RMSG</code> blocks <code>messages</code>)</li>
+<li>Sysop actions typically require <code>+A</code> AR flag in menu ACS</li>
+<li>Individual editors may check level inside handler</li>
+</ul>
+<h2>Adding New Actions</h2>
+<ol>
+<li>Add <code>else if (!strcmp(action, &quot;myaction&quot;))</code> branch in <code>handle_action()</code></li>
+<li>Implement handler logic</li>
+<li>Add menu item referencing action name</li>
+<li>Update this reference</li>
+</ol>
+<p>Source: <code>src/session.c</code> starting at line 1277.</p>
+<h2>Related Documentation</h2>
+<ul>
+<li><a href="../menus-and-ui.html">Menus and UI</a></li>
+<li><a href="../sysop-guide.html">Sysop Guide</a></li>
+<li><a href="../plugins.html">Plugins</a></li>
+</ul></main>
+  <footer class="site-footer">
+    <p>Mutineer BBS — <a href="https://github.com/rickcollette/mutineer">GitHub</a> — MIT License</p>
+  </footer>
+</body>
+</html>

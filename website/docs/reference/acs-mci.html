@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ACS and MCI Reference — Mutineer BBS</title>
+  <link rel="stylesheet" href="../assets/css/site.css">
+</head>
+<body>
+  <header class="site-header">
+    <a href="../index.html" class="logo">MUTINEER BBS</a>
+    <span class="tagline">Documentation</span>
+  </header>
+  <nav class="doc-nav"><a href="../index.html" class="home">← Home</a><a href="../overview.html">Overview</a><a href="../getting-started.html">Getting Started</a><a href="../configuration.html">Configuration</a><a href="../architecture.html">Architecture</a><a href="../menus-and-ui.html">Menus & UI</a><a href="../messages-and-mail.html">Messages & Mail</a><a href="../files-and-protocols.html">Files & Protocols</a><a href="../chat-and-social.html">Chat & Social</a><a href="../doors-and-scripting.html">Doors & Scripting</a><a href="../sysop-guide.html">Sysop Guide</a><a href="../networking-plank.html">PLANK Networking</a><a href="../buccaneer.html">Buccaneer</a><a href="../plugins.html">Plugins</a><a href="../developer-guide.html">Developer Guide</a><a href="../cli-tools.html">CLI Tools</a><a href="../reference/menu-actions.html">Menu Actions</a><a href="../reference/message-commands.html">Message Commands</a><a href="../reference/file-commands.html">File Commands</a><a href="../reference/acs-mci.html">ACS & MCI</a><a href="../reference/database.html">Database Schema</a></nav>
+  <main class="doc-content"><p>&lt;!-- generated-by: gsd-doc-writer --&gt;</p>
+<h1>ACS and MCI Reference</h1>
+<p>Complete reference for Access Control Strings (ACS) and Menu Code Interface (MCI) tokens. Implemented in <code>src/acs.c</code> and <code>src/mci.c</code>.</p>
+<h2>ACS Expression Syntax</h2>
+<h3>Operators (precedence high to low)</h3>
+<table>
+<tr><th>Operator</th><th>Meaning</th></tr>
+<table>
+<tr><th><code>!</code></th><th>NOT (prefix)</th></tr>
+<table>
+<tr><th><code>&amp;</code></th><th>AND</th></tr>
+<table>
+<tr><th>`\</th><th>`</th><th>OR</th></tr>
+<table>
+<tr><th><code>( )</code></th><th>Grouping</th></tr>
+</table>
+<p>Expressions are case-insensitive. Whitespace is ignored.</p>
+<h3>Standard Terms</h3>
+<table>
+<tr><th>Term</th><th>Description</th><th>Example</th></tr>
+<table>
+<tr><th><code>S#</code></th><th>Security level &gt;= #</th><th><code>S50</code></th></tr>
+<table>
+<tr><th><code>D#</code></th><th>Download security level &gt;= #</th><th><code>D20</code></th></tr>
+<table>
+<tr><th><code>F?</code></th><th>AR flag ? set (A–Z)</th><th><code>FA</code>, <code>FZ</code></th></tr>
+<table>
+<tr><th><code>R?</code></th><th>AC restriction flag ? set</th><th><code>RP</code>, <code>RM</code></th></tr>
+<table>
+<tr><th><code>A#</code></th><th>Age &gt;= # (from birth_date)</th><th><code>A18</code></th></tr>
+<table>
+<tr><th><code>B#</code></th><th>Baud &gt;= # × 100 (always true on telnet)</th><th><code>B96</code></th></tr>
+<table>
+<tr><th><code>C#</code></th><th>Total logons &gt;= #</th><th><code>C10</code></th></tr>
+<table>
+<tr><th><code>C?</code></th><th>In conference ? (A–Z, A=0)</th><th><code>CA</code></th></tr>
+<table>
+<tr><th><code>G?</code></th><th>Gender is ? (M/F)</th><th><code>GM</code></th></tr>
+<table>
+<tr><th><code>H#</code></th><th>Current hour = # (0–23)</th><th><code>H20</code></th></tr>
+<table>
+<tr><th><code>N#</code></th><th>Node number = #</th><th><code>N1</code></th></tr>
+<table>
+<tr><th><code>P#</code></th><th>Credits &gt;= #</th><th><code>P1000</code></th></tr>
+<table>
+<tr><th><code>T#</code></th><th>Time remaining &gt;= # (minutes)</th><th><code>T30</code></th></tr>
+<table>
+<tr><th><code>U#</code></th><th>User number = #</th><th><code>U42</code></th></tr>
+<table>
+<tr><th><code>V</code></th><th>User validated (not expired)</th><th><code>V</code></th></tr>
+<table>
+<tr><th><code>W#</code></th><th>Day of week = # (0=Sun, 6=Sat)</th><th><code>W6</code></th></tr>
+<table>
+<tr><th><code>X#</code></th><th>Days until expiration &lt;= #</th><th><code>X30</code></th></tr>
+<table>
+<tr><th><code>Z</code></th><th>Meets post ratio</th><th><code>Z</code></th></tr>
+<table>
+<tr><th><code>PC</code></th><th>Post/call ratio met</th><th><code>PC</code></th></tr>
+<table>
+<tr><th><code>DR</code></th><th>Download ratio met</th><th><code>DR</code></th></tr>
+<table>
+<tr><th><code>J#</code></th><th>Member of conference # (DB check)</th><th><code>J3</code></th></tr>
+<table>
+<tr><th><code>E#</code></th><th>Active subscription type # (0=any)</th><th><code>E1</code></th></tr>
+</table>
+<h3>Legacy Terms</h3>
+<table>
+<tr><th>Term</th><th>Description</th></tr>
+<table>
+<tr><th><code>SLnn</code></th><th>Security level &gt;= nn</th></tr>
+<table>
+<tr><th><code>Lnn</code></th><th>Security level &gt;= nn (shorthand)</th></tr>
+<table>
+<tr><th><code>+X</code></th><th>AR flag X set</th></tr>
+<table>
+<tr><th><code>ARABC</code></th><th>All listed AR flags set</th></tr>
+<table>
+<tr><th><code>C&gt;=N</code> / <code>C&lt;=N</code> / <code>C=N</code></th><th>Credits comparison</th></tr>
+<table>
+<tr><th><code>T&gt;=N</code> / <code>T&lt;=N</code> / <code>T=N</code></th><th>Time remaining comparison</th></tr>
+<table>
+<tr><th><code>R&gt;=N</code> / <code>R&lt;=N</code> / <code>R=N</code></th><th>Download ratio comparison</th></tr>
+</table>
+<h3>ACS Examples</h3>
+<pre><code class="">
+L10                    Level 10+
++A                     Sysop (AR flag A)
+S50&amp;FA                 Level 50 with flag F
+L20|+B                   Level 20 OR flag B
+!(RP)                  NOT restricted from posting
+S30&amp;DR&amp;V               Level 30, ratio OK, validated
+CA&amp;J2                  In conference A and member of #2
+</code></pre>
+<h2>AC Restriction Flags (R? terms)</h2>
+<p>From <code>include/bbs_flags.h</code>:</p>
+<table>
+<tr><th>ACS</th><th>Flag</th><th>Constant</th><th>Restriction</th></tr>
+<table>
+<tr><th><code>RL</code></th><th>L</th><th><code>AC_RLOGON</code></th><th>Cannot log on</th></tr>
+<table>
+<tr><th><code>RC</code></th><th>C</th><th><code>AC_RCHAT</code></th><th>Cannot chat</th></tr>
+<table>
+<tr><th><code>RV</code></th><th>V</th><th><code>AC_RVALIDATE</code></th><th>Cannot validate</th></tr>
+<table>
+<tr><th><code>RU</code></th><th>U</th><th><code>AC_RUSERLIST</code></th><th>Cannot view user list</th></tr>
+<table>
+<tr><th><code>RA</code></th><th>A</th><th><code>AC_RAMSG</code></th><th>Cannot see auto-message</th></tr>
+<table>
+<tr><th><code>R*</code></th><th>*</th><th><code>AC_RPOSTAN</code></th><th>Cannot post anonymously</th></tr>
+<table>
+<tr><th><code>RP</code></th><th>P</th><th><code>AC_RPOST</code></th><th>Cannot post</th></tr>
+<table>
+<tr><th><code>RE</code></th><th>E</th><th><code>AC_REMAIL</code></th><th>Cannot send email</th></tr>
+<table>
+<tr><th><code>RK</code></th><th>K</th><th><code>AC_RVOTING</code></th><th>Cannot vote</th></tr>
+<table>
+<tr><th><code>RM</code></th><th>M</th><th><code>AC_RMSG</code></th><th>Cannot access messages</th></tr>
+</table>
+<h2>AR Flags (F? and +X terms)</h2>
+<p>AR flags A–Z stored as bitset in <code>users.flags</code>:</p>
+<table>
+<tr><th>ACS</th><th>Bit</th><th>Typical Use</th></tr>
+<table>
+<tr><th><code>FA</code> / <code>+A</code></th><th>A</th><th>Sysop</th></tr>
+<table>
+<tr><th><code>FB</code> / <code>+B</code></th><th>B</th><th>Co-sysop</th></tr>
+<table>
+<tr><th><code>FC</code>–<code>FZ</code></th><th>C–Z</th><th>Custom roles</th></tr>
+</table>
+<h2>MCI Color Tokens</h2>
+<p>User color scheme maps <code>^0</code>–<code>^9</code> to ANSI via scheme table (8 schemes, 0=Mutineer Green default):</p>
+<table>
+<tr><th>Token</th><th>Role</th></tr>
+<table>
+<tr><th><code>^0</code></th><th>Primary accent</th></tr>
+<table>
+<tr><th><code>^1</code></th><th>Secondary</th></tr>
+<table>
+<tr><th><code>^2</code></th><th>Text</th></tr>
+<table>
+<tr><th><code>^3</code></th><th>Dim text</th></tr>
+<table>
+<tr><th><code>^4</code></th><th>Highlight</th></tr>
+<table>
+<tr><th><code>^5</code></th><th>Error/alert</th></tr>
+<table>
+<tr><th><code>^6</code></th><th>Success</th></tr>
+<table>
+<tr><th><code>^7</code></th><th>Label</th></tr>
+<table>
+<tr><th><code>^8</code></th><th>Border</th></tr>
+<table>
+<tr><th><code>^9</code></th><th>Title</th></tr>
+</table>
+<p>Schemes: Mutineer Green, Classic Blue, Amber, Cyan, Red Sunset, Magenta, Monochrome, Bright White.</p>
+<h2>MCI Attribute Tokens</h2>
+<table>
+<tr><th>Token</th><th>Effect</th></tr>
+<table>
+<tr><th><code>~L#</code></th><th>Foreground color (0–15)</th></tr>
+<table>
+<tr><th><code>~B#</code></th><th>Background color (0–7)</th></tr>
+<table>
+<tr><th><code>~K0</code></th><th>Blink off</th></tr>
+<table>
+<tr><th><code>~K1</code></th><th>Blink on</th></tr>
+<table>
+<tr><th><code>~RS</code></th><th>Reset all attributes</th></tr>
+</table>
+<h2>MCI User Tokens (~XX)</h2>
+<table>
+<tr><th>Token</th><th>Value</th></tr>
+<table>
+<tr><th><code>~UN</code></th><th>User handle</th></tr>
+<table>
+<tr><th><code>~RN</code></th><th>Real name</th></tr>
+<table>
+<tr><th><code>~U#</code></th><th>User ID</th></tr>
+<table>
+<tr><th><code>~AG</code></th><th>Age</th></tr>
+<table>
+<tr><th><code>~BD</code></th><th>Birth date</th></tr>
+<table>
+<tr><th><code>~SX</code></th><th>Sex (M/F/U)</th></tr>
+<table>
+<tr><th><code>~CT</code></th><th>City/state</th></tr>
+<table>
+<tr><th><code>~ST</code></th><th>Street</th></tr>
+<table>
+<tr><th><code>~ZP</code></th><th>Zip code</th></tr>
+<table>
+<tr><th><code>~PH</code></th><th>Phone</th></tr>
+<table>
+<tr><th><code>~FO</code></th><th>First on date</th></tr>
+<table>
+<tr><th><code>~LO</code></th><th>Last on date</th></tr>
+<table>
+<tr><th><code>~TT</code></th><th>Total time on (minutes)</th></tr>
+<table>
+<tr><th><code>~TL</code></th><th>Time left (minutes)</th></tr>
+<table>
+<tr><th><code>~TB</code></th><th>Time bank balance</th></tr>
+<table>
+<tr><th><code>~SL</code></th><th>Security level</th></tr>
+<table>
+<tr><th><code>~DL</code></th><th>Downloads count</th></tr>
+<table>
+<tr><th><code>~UL</code></th><th>Uploads count</th></tr>
+<table>
+<tr><th><code>~DK</code></th><th>Download KB</th></tr>
+<table>
+<tr><th><code>~UK</code></th><th>Upload KB</th></tr>
+<table>
+<tr><th><code>~MP</code></th><th>Messages posted</th></tr>
+<table>
+<tr><th><code>~ES</code></th><th>Emails sent</th></tr>
+<table>
+<tr><th><code>~FB</code></th><th>Feedback count</th></tr>
+<table>
+<tr><th><code>~CR</code></th><th>Credits</th></tr>
+<table>
+<tr><th><code>~FP</code></th><th>File points</th></tr>
+<table>
+<tr><th><code>~LG</code></th><th>Total logons</th></tr>
+<table>
+<tr><th><code>~NN</code></th><th>Node number</th></tr>
+<table>
+<tr><th><code>~AN</code></th><th>Current area name</th></tr>
+<table>
+<tr><th><code>~AR</code></th><th>AR flags list</th></tr>
+</table>
+<h2>MCI System Tokens (~XX)</h2>
+<table>
+<tr><th>Token</th><th>Value</th></tr>
+<table>
+<tr><th><code>~BN</code></th><th>BBS name</th></tr>
+<table>
+<tr><th><code>~SN</code></th><th>Sysop name</th></tr>
+<table>
+<tr><th><code>~BP</code></th><th>BBS phone (N/A)</th></tr>
+<table>
+<tr><th><code>~TC</code></th><th>Total calls</th></tr>
+<table>
+<tr><th><code>~NU</code></th><th>Number of users</th></tr>
+<table>
+<tr><th><code>~NF</code></th><th>Number of files</th></tr>
+<table>
+<tr><th><code>~NM</code></th><th>Number of messages</th></tr>
+<table>
+<tr><th><code>~NO</code></th><th>Users online</th></tr>
+<table>
+<tr><th><code>~VR</code></th><th>Version string</th></tr>
+<table>
+<tr><th><code>~DA</code></th><th>Current date (YYYY-MM-DD)</th></tr>
+<table>
+<tr><th><code>~TM</code></th><th>Current time (HH:MM)</th></tr>
+</table>
+<h2>Legacy Percent Tokens (%XX)</h2>
+<table>
+<tr><th>Token</th><th>Value</th></tr>
+<table>
+<tr><th><code>%NL</code></th><th>Newline (consumed, no output)</th></tr>
+<table>
+<tr><th><code>%PE</code></th><th>Pause prompt</th></tr>
+<table>
+<tr><th><code>%UN</code></th><th>User handle</th></tr>
+<table>
+<tr><th><code>%TI</code> / <code>%TL</code></th><th>Time remaining</th></tr>
+<table>
+<tr><th><code>%NN</code></th><th>Node number</th></tr>
+<table>
+<tr><th><code>%DA</code> / <code>%TM</code></th><th>Date/time</th></tr>
+<table>
+<tr><th><code>%PO</code></th><th>Posts count</th></tr>
+<table>
+<tr><th><code>%MT</code></th><th>Total messages</th></tr>
+<table>
+<tr><th><code>%FT</code></th><th>Total files</th></tr>
+<table>
+<tr><th><code>%CR</code></th><th>Credits</th></tr>
+<table>
+<tr><th><code>%FP</code></th><th>File points</th></tr>
+<table>
+<tr><th><code>%SL</code></th><th>Security level</th></tr>
+<table>
+<tr><th><code>%MA</code></th><th>Messages in area</th></tr>
+<table>
+<tr><th><code>%FA</code></th><th>Files in area</th></tr>
+<table>
+<tr><th><code>%NO</code></th><th>Users online</th></tr>
+<table>
+<tr><th><code>%AR</code></th><th>AR flags list</th></tr>
+<table>
+<tr><th>`%?expr{text\</th><th>else}`</th><th>ACS conditional text</th></tr>
+</table>
+<h3>Conditional Example</h3>
+<pre><code class="">
+%?S50{Sysop Area|User Area}
+</code></pre>
+<p>Expands to &quot;Sysop Area&quot; if level &gt;= 50, else &quot;User Area&quot;.</p>
+<h2>Template Usage Example</h2>
+<p><code>menus/main.ans</code>:</p>
+<pre><code class="">
+^9~BN^7 — Main Menu
+^2Logged in as ^0~UN ^2on node ^0~NN
+^3Time left: ^0~TL ^3minutes
+%?+A{^5[SYSOP]^2|}
+</code></pre>
+<h2>Validation</h2>
+<p>Test MCI/ACS in templates:</p>
+<pre><code class="bash">
+build/mutineer-validate menus/main.mnu
+build/test_mci
+build/test_acs
+</code></pre>
+<h2>Related Documentation</h2>
+<ul>
+<li><a href="../menus-and-ui.html">Menus and UI</a></li>
+<li><a href="../configuration.html">Configuration</a></li>
+<li>Source: <code>src/acs.c</code>, <code>src/mci.c</code>, <code>include/bbs_flags.h</code></li>
+</ul></main>
+  <footer class="site-footer">
+    <p>Mutineer BBS — <a href="https://github.com/rickcollette/mutineer">GitHub</a> — MIT License</p>
+  </footer>
+</body>
+</html>
