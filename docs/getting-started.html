@@ -45,6 +45,27 @@
 <table>
 <tr><th><code>libzstd-dev</code></th><th>PLANK bundle compression</th></tr>
 </table>
+<h2>Pre-built releases</h2>
+<p>GitHub Releases provide x86_64 tarballs — no compile step required:</p>
+<table>
+<tr><th>Download</th><th>Target systems</th></tr>
+<table>
+<tr><th><code>*-x86_64-debian.tar.gz</code></th><th><strong>Debian 12+</strong> and <strong>Ubuntu 24.04 LTS+</strong></th></tr>
+<table>
+<tr><th><code>*-x86_64-fedora.tar.gz</code></th><th><strong>Fedora 39+</strong></th></tr>
+<table>
+<tr><th><code>*-x86_64-alpine.tar.gz</code></th><th><strong>Alpine 3.18+</strong></th></tr>
+</table>
+<p>Download from <a href="https://github.com/rickcollette/mutineer/releases">GitHub Releases</a>.</p>
+<pre><code class="bash">
+tar xzf mutineer-v1.0.0-x86_64-debian.tar.gz
+cd mutineer-v1.0.0-x86_64-debian
+./bin/mutineer-initbbs -c conf/mutineer.conf -y
+./mutineer -c conf/mutineer.conf
+telnet localhost 2929
+</code></pre>
+<p>Each archive includes the daemon, CLI tools, PLANK tools, sample plugins, default config/menus/art, and <code>INSTALL.md</code> with runtime dependencies. SHA256 checksums are published alongside each tarball.</p>
+<p>To cut a release as a maintainer: tag <code>v1.0.0</code> and push — GitHub Actions builds all three platforms and publishes assets automatically.</p>
 <h2>Installation Steps</h2>
 <h3>1. Clone the repository</h3>
 <pre><code class="bash">
