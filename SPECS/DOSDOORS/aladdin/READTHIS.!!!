@@ -1,0 +1,21 @@
+                    ***  Quick Install Instructions! ***
+
+Unzip this archive into a temporary directory.
+
+Type SETUP
+
+The door files will be copied to the correct directories, then
+the BRAINSET program will run. You will asked for specific setup info
+for the door.
+
+   * FAILURE TO INSTALL BY THE ABOVE METHOD WILL CAUSE THE DOOR TO FAIL *
+
+       * DO NOT COPY THE FILES YOURSELF, LET THE SETUP.BAT DO IT! *
+
+If you are updating from a previous version, you will be asked if you wish
+to overwrite all or some files. Be sure you do not overwrite customized
+menu screens.
+
+If you get a BAD COMMAND OR FILENAME notice from DOS, this means that
+the BRAINEX DOOR MANAGER was not properly installed.
+

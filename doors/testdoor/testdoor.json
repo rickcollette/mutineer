@@ -1,0 +1,17 @@
+{
+  "runner": "dosbox",
+  "name": "testdoor",
+  "master_dir": "/home/megalith/mutineer-bbs/doors/testdoor",
+  "startup": "TESTDOOR.COM",
+  "dropfile": "DOOR.SYS",
+  "dropfile_dest": "game",
+  "machine": "svga_s3",
+  "memsize": 16,
+  "core": "auto",
+  "cycles": "auto",
+  "serial_telnet": true,
+  "usedtr": false,
+  "timeout_sec": 300,
+  "copy_mode": "copy",
+  "cleanup_on_exit": true
+}

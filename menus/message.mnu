@@ -1,0 +1,10 @@
+# Message menu
+R|Read Messages|messages|L10
+P|Post Message|messages|L10
+M|Mail/Email|messages|L10
+Z|Toggle Scan Areas|messages|MZ|L10
+S|Set Signature|setsignature|L10
+T|Set Tagline|settagline|L10
+F|Toggle Full-Screen Editor|togglefse|L10
+A|Area Admin|areaadmin|+A
+Q|Return|menu|

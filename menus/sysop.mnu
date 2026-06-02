@@ -1,0 +1,12 @@
+# Sysop menu
+U|User Editor|useredit|+A
+M|Maintenance|maintenance|+A
+B|Broadcast|wall|+A
+K|Kick Node|wfc_kick|+A
+C|Conference Editor|confeditor|+A
+X|Protocol Editor|protocoleditor|+A
+E|Menu Editor|menueditor|+A
+7|Validate Files|validatefiles|+A
+V|Vote Editor|voteeditor|+A
+T|Event Editor|eventeditor|+A
+Q|Return|menu|

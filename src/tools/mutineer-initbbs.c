@@ -1,0 +1,667 @@
+/*
+ * mutineer-initbbs - BBS initialization and sanity check utility
+ * 
+ * Usage: mutineer-initbbs [options]
+ * 
+ * Checks for all required BBS files, directories, and database.
+ * Reports what's missing and prompts the user to create each item.
+ * 
+ * Options:
+ *   -c, --config <path>   Path to config file (default: conf/mutineer.conf)
+ *   -y, --yes             Auto-create all missing items without prompting
+ *   -n, --dry-run         Only report what's missing, don't create anything
+ *   -v, --verbose         Verbose output
+ *   -h, --help            Show this help
+ * 
+ * Exit codes:
+ *   0 - All checks passed (or all items created successfully)
+ *   1 - Invalid arguments
+ *   2 - Missing items found (dry-run mode)
+ *   3 - User declined to create required item
+ *   4 - Failed to create item
+ */
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdbool.h>
+#include <getopt.h>
+#include <sys/stat.h>
+#include <errno.h>
+#include <unistd.h>
+
+#include "bbs_db.h"
+#include "bbs_config.h"
+#include "bbs_hash.h"
+
+#define STATUS_OK      "[OK]"
+#define STATUS_MISSING "[MISSING]"
+#define STATUS_CREATED "[CREATED]"
+#define STATUS_SKIPPED "[SKIPPED]"
+#define STATUS_FAILED  "[FAILED]"
+
+typedef struct {
+    bool yes;
+    bool dry_run;
+    bool verbose;
+    const char* config_path;
+} InitOptions;
+
+static void print_usage(const char* prog) {
+    printf("Usage: %s [options]\n\n", prog);
+    printf("BBS initialization and sanity check utility.\n\n");
+    printf("Checks for all required BBS files, directories, and database.\n");
+    printf("Reports what's missing and prompts the user to create each item.\n\n");
+    printf("Options:\n");
+    printf("  -c, --config <path>   Path to config file (default: conf/mutineer.conf)\n");
+    printf("  -y, --yes             Auto-create all missing items without prompting\n");
+    printf("  -n, --dry-run         Only report what's missing, don't create anything\n");
+    printf("  -v, --verbose         Verbose output\n");
+    printf("  -h, --help            Show this help\n");
+    printf("\nExamples:\n");
+    printf("  %s                    # Interactive mode - prompt for each missing item\n", prog);
+    printf("  %s -y                 # Auto-create all missing items\n", prog);
+    printf("  %s -n                 # Dry run - only show what's missing\n", prog);
+    printf("  %s -c /etc/bbs.conf   # Use alternate config file\n", prog);
+    printf("\nExit codes:\n");
+    printf("  0 - All checks passed (or all items created successfully)\n");
+    printf("  1 - Invalid arguments\n");
+    printf("  2 - Missing items found (dry-run mode)\n");
+    printf("  3 - User declined to create required item\n");
+    printf("  4 - Failed to create item\n");
+}
+
+static bool dir_exists(const char* path) {
+    struct stat st;
+    return stat(path, &st) == 0 && S_ISDIR(st.st_mode);
+}
+
+static bool file_exists(const char* path) {
+    struct stat st;
+    return stat(path, &st) == 0 && S_ISREG(st.st_mode);
+}
+
+static bool prompt_yes_no(const char* prompt, bool default_yes) {
+    char buf[16];
+    printf("%s [%s]: ", prompt, default_yes ? "Y/n" : "y/N");
+    fflush(stdout);
+    
+    if (!fgets(buf, sizeof(buf), stdin)) {
+        return default_yes;
+    }
+    
+    if (buf[0] == '\n' || buf[0] == '\0') {
+        return default_yes;
+    }
+    
+    return (buf[0] == 'y' || buf[0] == 'Y');
+}
+
+static bool create_directory(const char* path, const InitOptions* opts) {
+    if (dir_exists(path)) {
+        return true;
+    }
+    
+    if (opts->dry_run) {
+        return false;
+    }
+    
+    if (!opts->yes) {
+        char prompt[512];
+        snprintf(prompt, sizeof(prompt), "Create directory '%s'?", path);
+        if (!prompt_yes_no(prompt, false)) {
+            printf("  %s %s (user declined)\n", STATUS_SKIPPED, path);
+            return false;
+        }
+    }
+    
+    if (mkdir(path, 0755) == 0) {
+        printf("  %s %s\n", STATUS_CREATED, path);
+        return true;
+    } else {
+        printf("  %s %s: %s\n", STATUS_FAILED, path, strerror(errno));
+        return false;
+    }
+}
+
+static bool create_file_with_content(const char* path, const char* content, const InitOptions* opts) {
+    if (file_exists(path)) {
+        return true;
+    }
+    
+    if (opts->dry_run) {
+        return false;
+    }
+    
+    if (!opts->yes) {
+        char prompt[512];
+        snprintf(prompt, sizeof(prompt), "Create file '%s'?", path);
+        if (!prompt_yes_no(prompt, false)) {
+            printf("  %s %s (user declined)\n", STATUS_SKIPPED, path);
+            return false;
+        }
+    }
+    
+    FILE* f = fopen(path, "w");
+    if (!f) {
+        printf("  %s %s: %s\n", STATUS_FAILED, path, strerror(errno));
+        return false;
+    }
+    
+    if (content && *content) {
+        fputs(content, f);
+    }
+    fclose(f);
+    
+    printf("  %s %s\n", STATUS_CREATED, path);
+    return true;
+}
+
+static const char* DEFAULT_CONFIG = 
+    "# Mutineer BBS Configuration\n"
+    "# Generated by mutineer-initbbs\n"
+    "\n"
+    "# Network settings\n"
+    "port=2929\n"
+    "bind=0.0.0.0\n"
+    "\n"
+    "# Paths\n"
+    "db_path=data/mutineer.db\n"
+    "menu_main=menus/main.mnu\n"
+    "data_path=data\n"
+    "logs_path=logs/mutineer.log\n"
+    "art_path=art\n"
+    "doors_path=doors\n"
+    "dropfile_path=data/dropfiles\n"
+    "protocol_path=conf/protocols.conf\n"
+    "\n"
+    "# Display\n"
+    "bbs_name=Mutineer BBS\n"
+    "sysop_name=Sysop\n"
+    "motd=art/motd.ans\n"
+    "\n"
+    "# Session settings\n"
+    "idle_timeout_sec=600\n"
+    "session_time_limit_min=60\n"
+    "\n"
+    "# Login settings\n"
+    "login_window_sec=120\n"
+    "login_max_attempts=5\n"
+    "password_upgrade=1\n"
+    "allow_multi_login=0\n"
+    "\n"
+    "# New user defaults\n"
+    "default_credits=5000\n"
+    "default_file_points=0\n"
+    "\n"
+    "# Welcome letter\n"
+    "welcome_letter_enabled=1\n"
+    "welcome_letter_file=art/welcome.txt\n"
+    "welcome_letter_from=Sysop\n"
+    "\n"
+    "# Guest access\n"
+    "guest_enabled=0\n"
+    "guest_handle=GUEST\n"
+    "guest_level_id=1\n"
+    "\n"
+    "# WFC (Waiting for Caller) console\n"
+    "wfc_enabled=1\n"
+    "wfc_refresh_ms=1000\n"
+    "wfc_blank_sec=300\n"
+    "wfc_fg_color=11\n"
+    "wfc_bg_color=0\n"
+    "wfc_status_idle_char=I\n"
+    "wfc_status_logging_char=L\n"
+    "wfc_status_online_char=A\n"
+    "wfc_status_chat_char=S\n"
+    "\n"
+    "# Scheduler\n"
+    "scheduler_enabled=1\n"
+    "scheduler_tick_sec=30\n";
+
+static const char* DEFAULT_MOTD = 
+    "\x1b[2J\x1b[H"
+    "\x1b[1;36m"
+    "===============================================================================\n"
+    "                         Welcome to Mutineer BBS!\n"
+    "===============================================================================\n"
+    "\x1b[0m\n"
+    "This is the Message of the Day (MOTD).\n"
+    "Edit art/motd.ans to customize this message.\n"
+    "\n"
+    "\x1b[1;33mPress any key to continue...\x1b[0m\n";
+
+static const char* DEFAULT_WELCOME = 
+    "Welcome to Mutineer BBS!\n"
+    "\n"
+    "Thank you for registering. We hope you enjoy your time here.\n"
+    "\n"
+    "If you have any questions, feel free to leave feedback for the SysOp.\n"
+    "\n"
+    "- The Management\n";
+
+static int check_config(const InitOptions* opts, bool* config_exists) {
+    int missing = 0;
+    
+    printf("\nConfiguration:\n");
+    
+    if (file_exists(opts->config_path)) {
+        printf("  %s %s\n", STATUS_OK, opts->config_path);
+        *config_exists = true;
+    } else {
+        printf("  %s %s\n", STATUS_MISSING, opts->config_path);
+        *config_exists = false;
+        missing++;
+        
+        if (!opts->dry_run) {
+            char conf_dir[256];
+            snprintf(conf_dir, sizeof(conf_dir), "%s", opts->config_path);
+            char* slash = strrchr(conf_dir, '/');
+            if (slash) {
+                *slash = '\0';
+                if (!dir_exists(conf_dir)) {
+                    create_directory(conf_dir, opts);
+                }
+            }
+            
+            if (create_file_with_content(opts->config_path, DEFAULT_CONFIG, opts)) {
+                *config_exists = true;
+                missing--;
+            }
+        }
+    }
+    
+    return missing;
+}
+
+static int check_directories(const BbsConfig* cfg, const InitOptions* opts) {
+    int missing = 0;
+    
+    printf("\nDirectories:\n");
+    
+    const char* dirs[] = {
+        cfg->data_path,
+        cfg->art_path,
+        NULL
+    };
+    
+    char logs_dir[256];
+    snprintf(logs_dir, sizeof(logs_dir), "%s", cfg->logs_path);
+    char* logs_slash = strrchr(logs_dir, '/');
+    if (logs_slash) *logs_slash = '\0';
+    
+    char menu_dir[256];
+    snprintf(menu_dir, sizeof(menu_dir), "%s", cfg->menu_main);
+    char* menu_slash = strrchr(menu_dir, '/');
+    if (menu_slash) *menu_slash = '\0';
+    
+    char files_path[512];
+    snprintf(files_path, sizeof(files_path), "%s/files", cfg->data_path);
+    
+    char dropfiles_path[512];
+    snprintf(dropfiles_path, sizeof(dropfiles_path), "%s", cfg->dropfile_path);
+    
+    for (int i = 0; dirs[i]; i++) {
+        if (dir_exists(dirs[i])) {
+            printf("  %s %s\n", STATUS_OK, dirs[i]);
+        } else {
+            printf("  %s %s\n", STATUS_MISSING, dirs[i]);
+            missing++;
+            if (!create_directory(dirs[i], opts)) {
+                if (!opts->dry_run) missing++;
+            } else {
+                missing--;
+            }
+        }
+    }
+    
+    if (dir_exists(logs_dir)) {
+        printf("  %s %s\n", STATUS_OK, logs_dir);
+    } else {
+        printf("  %s %s\n", STATUS_MISSING, logs_dir);
+        missing++;
+        if (!create_directory(logs_dir, opts)) {
+            if (!opts->dry_run) missing++;
+        } else {
+            missing--;
+        }
+    }
+    
+    if (dir_exists(menu_dir)) {
+        printf("  %s %s\n", STATUS_OK, menu_dir);
+    } else {
+        printf("  %s %s\n", STATUS_MISSING, menu_dir);
+        missing++;
+        if (!create_directory(menu_dir, opts)) {
+            if (!opts->dry_run) missing++;
+        } else {
+            missing--;
+        }
+    }
+    
+    if (dir_exists(files_path)) {
+        printf("  %s %s\n", STATUS_OK, files_path);
+    } else {
+        printf("  %s %s\n", STATUS_MISSING, files_path);
+        missing++;
+        if (!create_directory(files_path, opts)) {
+            if (!opts->dry_run) missing++;
+        } else {
+            missing--;
+        }
+    }
+    
+    if (dir_exists(dropfiles_path)) {
+        printf("  %s %s\n", STATUS_OK, dropfiles_path);
+    } else {
+        printf("  %s %s\n", STATUS_MISSING, dropfiles_path);
+        missing++;
+        if (!create_directory(dropfiles_path, opts)) {
+            if (!opts->dry_run) missing++;
+        } else {
+            missing--;
+        }
+    }
+    
+    return missing;
+}
+
+static int check_schema(const InitOptions* opts) {
+    (void)opts;
+    int missing = 0;
+    
+    printf("\nSchema:\n");
+    
+    if (file_exists("sql/schema.sql")) {
+        printf("  %s sql/schema.sql\n", STATUS_OK);
+    } else {
+        printf("  %s sql/schema.sql\n", STATUS_MISSING);
+        printf("         (Cannot auto-create - copy from distribution)\n");
+        missing++;
+    }
+    
+    return missing;
+}
+
+static int check_art_files(const BbsConfig* cfg, const InitOptions* opts) {
+    int missing = 0;
+    
+    printf("\nArt Files:\n");
+    
+    if (file_exists(cfg->motd)) {
+        printf("  %s %s\n", STATUS_OK, cfg->motd);
+    } else {
+        printf("  %s %s\n", STATUS_MISSING, cfg->motd);
+        missing++;
+        if (create_file_with_content(cfg->motd, DEFAULT_MOTD, opts)) {
+            missing--;
+        }
+    }
+    
+    if (file_exists(cfg->welcome_letter_file)) {
+        printf("  %s %s\n", STATUS_OK, cfg->welcome_letter_file);
+    } else {
+        printf("  %s %s\n", STATUS_MISSING, cfg->welcome_letter_file);
+        missing++;
+        if (create_file_with_content(cfg->welcome_letter_file, DEFAULT_WELCOME, opts)) {
+            missing--;
+        }
+    }
+    
+    return missing;
+}
+
+static int check_menu(const BbsConfig* cfg, const InitOptions* opts) {
+    (void)opts;
+    int missing = 0;
+    
+    printf("\nMenus:\n");
+    
+    if (file_exists(cfg->menu_main)) {
+        printf("  %s %s\n", STATUS_OK, cfg->menu_main);
+    } else {
+        printf("  %s %s\n", STATUS_MISSING, cfg->menu_main);
+        printf("         (Cannot auto-create - copy from distribution)\n");
+        missing++;
+    }
+    
+    return missing;
+}
+
+static int check_database(const BbsConfig* cfg, const InitOptions* opts) {
+    int missing = 0;
+    bool db_existed = file_exists(cfg->db_path);
+    
+    printf("\nDatabase:\n");
+    
+    if (db_existed) {
+        printf("  %s %s (exists)\n", STATUS_OK, cfg->db_path);
+    } else {
+        printf("  %s %s\n", STATUS_MISSING, cfg->db_path);
+        missing++;
+        
+        if (opts->dry_run) {
+            return missing;
+        }
+        
+        if (!opts->yes) {
+            char prompt[512];
+            snprintf(prompt, sizeof(prompt), "Create database '%s'?", cfg->db_path);
+            if (!prompt_yes_no(prompt, false)) {
+                printf("  %s %s (user declined)\n", STATUS_SKIPPED, cfg->db_path);
+                return missing;
+            }
+        }
+    }
+    
+    if (opts->dry_run) {
+        return missing;
+    }
+    
+    if (!file_exists("sql/schema.sql")) {
+        printf("  %s Cannot initialize database - sql/schema.sql not found\n", STATUS_FAILED);
+        return missing;
+    }
+    
+    BbsDb* db = db_open(cfg->db_path);
+    if (!db) {
+        printf("  %s Failed to open database: %s\n", STATUS_FAILED, db_last_error(NULL));
+        return missing;
+    }
+    
+    if (!db_existed) {
+        printf("  %s %s\n", STATUS_CREATED, cfg->db_path);
+        missing--;
+    }
+    
+    printf("\nDatabase Schema:\n");
+    
+    bool schema_ok = db_exec(db, "SELECT 1 FROM users LIMIT 1");
+    if (schema_ok) {
+        printf("  %s Schema applied\n", STATUS_OK);
+    } else {
+        printf("  %s Schema not applied\n", STATUS_MISSING);
+        
+        if (!opts->yes && !prompt_yes_no("Apply database schema?", false)) {
+            printf("  %s Schema (user declined)\n", STATUS_SKIPPED);
+            db_close(db);
+            return missing + 1;
+        }
+        
+        if (db_init_schema(db, "sql/schema.sql")) {
+            printf("  %s Schema applied\n", STATUS_CREATED);
+        } else {
+            printf("  %s Schema: %s\n", STATUS_FAILED, db_last_error(db));
+            db_close(db);
+            return missing + 1;
+        }
+    }
+    
+    printf("\nDatabase Seed Data:\n");
+    
+    DbUser sysop;
+    bool sysop_exists = db_user_fetch(db, "sysop", &sysop);
+    
+    if (sysop_exists) {
+        printf("  %s Sysop user exists\n", STATUS_OK);
+    } else {
+        printf("  %s Sysop user\n", STATUS_MISSING);
+        
+        if (!opts->yes && !prompt_yes_no("Create default sysop user (password: mutineer)?", false)) {
+            printf("  %s Sysop user (user declined)\n", STATUS_SKIPPED);
+        } else {
+            char sysop_hash[128];
+            if (pw_hash_make("mutineer", sysop_hash, sizeof(sysop_hash))) {
+                db_seed_defaults(db, sysop_hash);
+                db_exec(db, "UPDATE users SET flags = flags | 1 WHERE handle = 'sysop'");
+                printf("  %s Sysop user (password: mutineer)\n", STATUS_CREATED);
+            } else {
+                printf("  %s Sysop user: failed to hash password\n", STATUS_FAILED);
+            }
+        }
+    }
+    
+    DbMsgArea areas[1];
+    int area_count = db_msg_area_list(db, areas, 1);
+    
+    if (area_count > 0) {
+        printf("  %s Message areas exist (%d)\n", STATUS_OK, area_count);
+    } else {
+        printf("  %s Message areas\n", STATUS_MISSING);
+        
+        if (!opts->yes && !prompt_yes_no("Create default 'General' message area?", false)) {
+            printf("  %s Message areas (user declined)\n", STATUS_SKIPPED);
+        } else {
+            db_msg_area_seed(db, "General");
+            printf("  %s 'General' message area\n", STATUS_CREATED);
+        }
+    }
+    
+    if (!db_exec(db, "SELECT 1 FROM message_areas WHERE name = 'Email' LIMIT 1")) {
+        printf("  %s 'Email' message area\n", STATUS_MISSING);
+        
+        if (!opts->yes && !prompt_yes_no("Create 'Email' message area for private messages?", false)) {
+            printf("  %s 'Email' area (user declined)\n", STATUS_SKIPPED);
+        } else {
+            const char* email_sql = 
+                "INSERT OR IGNORE INTO message_areas (name, acs, acs_read, acs_post, max_msgs, flags) "
+                "VALUES ('Email', 's1', 's1', 's1', 1000, 1)";
+            if (db_exec(db, email_sql)) {
+                printf("  %s 'Email' message area\n", STATUS_CREATED);
+            } else {
+                printf("  %s 'Email' area: %s\n", STATUS_FAILED, db_last_error(db));
+            }
+        }
+    } else {
+        printf("  %s 'Email' message area exists\n", STATUS_OK);
+    }
+    
+    DbFileArea file_areas[1];
+    int file_area_count = db_file_area_list(db, file_areas, 1);
+    
+    if (file_area_count > 0) {
+        printf("  %s File areas exist (%d)\n", STATUS_OK, file_area_count);
+    } else {
+        printf("  %s File areas\n", STATUS_MISSING);
+        
+        if (!opts->yes && !prompt_yes_no("Create default 'General' file area?", false)) {
+            printf("  %s File areas (user declined)\n", STATUS_SKIPPED);
+        } else {
+            char files_path[512];
+            snprintf(files_path, sizeof(files_path), "%s/files/general", cfg->data_path);
+            if (!dir_exists(files_path)) {
+                mkdir(files_path, 0755);
+            }
+            db_file_area_seed(db, "General", files_path);
+            printf("  %s 'General' file area\n", STATUS_CREATED);
+        }
+    }
+    
+    db_exec(db, "INSERT OR IGNORE INTO system_info (id, bbs_name, sysop_name) VALUES (1, 'Mutineer BBS', 'Sysop')");
+    db_exec(db, "INSERT OR IGNORE INTO stats (id) VALUES (1)");
+    db_exec(db, "INSERT OR IGNORE INTO daily_stats (id) VALUES (1)");
+    db_exec(db, "INSERT OR IGNORE INTO automsg (id, msg) VALUES (1, 'Welcome to Mutineer BBS!')");
+    
+    db_close(db);
+    return missing;
+}
+
+int main(int argc, char** argv) {
+    InitOptions opts = {
+        .yes = false,
+        .dry_run = false,
+        .verbose = false,
+        .config_path = "conf/mutineer.conf"
+    };
+    
+    static struct option long_options[] = {
+        {"config",  required_argument, 0, 'c'},
+        {"yes",     no_argument,       0, 'y'},
+        {"dry-run", no_argument,       0, 'n'},
+        {"verbose", no_argument,       0, 'v'},
+        {"help",    no_argument,       0, 'h'},
+        {0, 0, 0, 0}
+    };
+    
+    int opt;
+    while ((opt = getopt_long(argc, argv, "c:ynvh", long_options, NULL)) != -1) {
+        switch (opt) {
+            case 'c': opts.config_path = optarg; break;
+            case 'y': opts.yes = true; break;
+            case 'n': opts.dry_run = true; break;
+            case 'v': opts.verbose = true; break;
+            case 'h':
+                print_usage(argv[0]);
+                return 0;
+            default:
+                print_usage(argv[0]);
+                return 1;
+        }
+    }
+    
+    printf("Mutineer BBS Initialization Check\n");
+    printf("==================================\n");
+    
+    if (opts.dry_run) {
+        printf("(Dry run mode - no changes will be made)\n");
+    } else if (opts.yes) {
+        printf("(Auto-create mode - all missing items will be created)\n");
+    }
+    
+    int total_missing = 0;
+    bool config_exists = false;
+    
+    total_missing += check_config(&opts, &config_exists);
+    
+    BbsConfig cfg;
+    if (config_exists) {
+        if (!cfg_load(opts.config_path, &cfg)) {
+            fprintf(stderr, "\nFailed to load config file: %s\n", opts.config_path);
+            return 4;
+        }
+    } else {
+        cfg_load(opts.config_path, &cfg);
+    }
+    
+    total_missing += check_directories(&cfg, &opts);
+    total_missing += check_schema(&opts);
+    total_missing += check_art_files(&cfg, &opts);
+    total_missing += check_menu(&cfg, &opts);
+    total_missing += check_database(&cfg, &opts);
+    
+    printf("\n==================================\n");
+    
+    if (total_missing == 0) {
+        printf("All checks passed! BBS is ready to run.\n");
+        printf("\nStart the BBS with: ./mutineer\n");
+        return 0;
+    } else if (opts.dry_run) {
+        printf("%d item(s) missing.\n", total_missing);
+        printf("\nRun without --dry-run to create missing items.\n");
+        return 2;
+    } else {
+        printf("%d item(s) still missing or could not be created.\n", total_missing);
+        printf("\nSome items (schema.sql, menu files) must be copied from the distribution.\n");
+        return 3;
+    }
+}

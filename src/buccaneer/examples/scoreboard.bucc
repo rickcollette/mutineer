@@ -1,0 +1,140 @@
+' Scoreboard - Buccaneer Example
+' Demonstrates data storage and retrieval
+
+PROGRAM "High Score Board"
+VERSION "1.0.0"
+AUTHOR "Mutineer BBS"
+DESCRIPTION "A high score tracking door"
+
+CAPABILITY "term.io"
+CAPABILITY "kv.read"
+CAPABILITY "kv.write"
+CAPABILITY "user.read"
+
+DATASET Scores
+    name AS STRING
+    score AS INTEGER
+    date AS DATE
+END DATASET
+
+SUB Main()
+    DIM choice AS STRING
+    DIM running AS BOOLEAN
+    
+    running = TRUE
+    
+    WHILE running
+        TERM.CLS()
+        TERM.PRINTLN("===========================")
+        TERM.PRINTLN("    HIGH SCORE BOARD")
+        TERM.PRINTLN("===========================")
+        TERM.PRINTLN("")
+        TERM.PRINTLN("1. View High Scores")
+        TERM.PRINTLN("2. Add Your Score")
+        TERM.PRINTLN("3. Clear Scores")
+        TERM.PRINTLN("Q. Quit")
+        TERM.PRINTLN("")
+        
+        choice = TERM.INPUT("Your choice: ", 1)
+        
+        SELECT CASE choice
+            CASE "1"
+                CALL ShowScores()
+            CASE "2"
+                CALL AddScore()
+            CASE "3"
+                CALL ClearScores()
+            CASE "Q", "q"
+                running = FALSE
+        END SELECT
+    WEND
+    
+    TERM.PRINTLN("")
+    TERM.PRINTLN("Goodbye!")
+END SUB
+
+SUB ShowScores()
+    TERM.CLS()
+    TERM.PRINTLN("=== HIGH SCORES ===")
+    TERM.PRINTLN("")
+    
+    DIM i AS INTEGER
+    DIM key AS STRING
+    DIM value AS STRING
+    
+    FOR i = 1 TO 10
+        key = "score_" & i
+        value = KV.GET(key, "")
+        
+        IF value <> "" THEN
+            TERM.PRINT(i)
+            TERM.PRINT(". ")
+            TERM.PRINTLN(value)
+        END IF
+    NEXT i
+    
+    TERM.PRINTLN("")
+    TERM.PRINTLN("Press any key to continue...")
+    
+    DIM k AS STRING
+    k = TERM.GETKEY()
+END SUB
+
+SUB AddScore()
+    TERM.CLS()
+    TERM.PRINTLN("=== ADD YOUR SCORE ===")
+    TERM.PRINTLN("")
+    
+    DIM name AS STRING
+    DIM scoreStr AS STRING
+    DIM entry AS STRING
+    
+    name = USER.NAME()
+    
+    TERM.PRINT("Name: ")
+    TERM.PRINTLN(name)
+    
+    scoreStr = TERM.INPUT("Your score: ", 10)
+    
+    entry = name & " - " & scoreStr
+    
+    ' Store in first available slot
+    DIM i AS INTEGER
+    DIM key AS STRING
+    DIM existing AS STRING
+    
+    FOR i = 1 TO 10
+        key = "score_" & i
+        existing = KV.GET(key, "")
+        
+        IF existing = "" THEN
+            KV.SET(key, entry)
+            TERM.PRINTLN("")
+            TERM.PRINTLN("Score saved!")
+            EXIT FOR
+        END IF
+    NEXT i
+    
+    TERM.PRINTLN("")
+    TERM.PRINTLN("Press any key to continue...")
+    
+    DIM k AS STRING
+    k = TERM.GETKEY()
+END SUB
+
+SUB ClearScores()
+    DIM i AS INTEGER
+    DIM key AS STRING
+    
+    FOR i = 1 TO 10
+        key = "score_" & i
+        KV.DELETE(key)
+    NEXT i
+    
+    TERM.PRINTLN("")
+    TERM.PRINTLN("Scores cleared!")
+    TERM.PRINTLN("Press any key to continue...")
+    
+    DIM k AS STRING
+    k = TERM.GETKEY()
+END SUB

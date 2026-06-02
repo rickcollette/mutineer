@@ -1,0 +1,78 @@
+' Number Guessing Game - Buccaneer Example
+' Demonstrates loops, conditionals, and user input
+
+PROGRAM "Guess the Number"
+VERSION "1.0.0"
+AUTHOR "Mutineer BBS"
+DESCRIPTION "A simple number guessing game"
+
+CAPABILITY "term.io"
+
+SUB Main()
+    DIM secretNumber AS INTEGER
+    DIM guess AS INTEGER
+    DIM attempts AS INTEGER
+    DIM maxAttempts AS INTEGER
+    DIM input AS STRING
+    DIM playing AS BOOLEAN
+    
+    secretNumber = 42  ' In a real game, this would be random
+    maxAttempts = 7
+    attempts = 0
+    playing = TRUE
+    
+    TERM.CLS()
+    TERM.PRINTLN("=================================")
+    TERM.PRINTLN("   GUESS THE NUMBER GAME")
+    TERM.PRINTLN("=================================")
+    TERM.PRINTLN("")
+    TERM.PRINTLN("I'm thinking of a number between 1 and 100.")
+    TERM.PRINT("You have ")
+    TERM.PRINT(maxAttempts)
+    TERM.PRINTLN(" attempts to guess it.")
+    TERM.PRINTLN("")
+    
+    WHILE playing AND attempts < maxAttempts
+        attempts = attempts + 1
+        
+        TERM.PRINT("Attempt ")
+        TERM.PRINT(attempts)
+        TERM.PRINT("/")
+        TERM.PRINT(maxAttempts)
+        TERM.PRINT(": ")
+        
+        input = TERM.INPUT("Enter your guess: ", 10)
+        
+        ' Convert string to integer (simplified)
+        guess = 0
+        ' Note: Real implementation would parse the string
+        
+        IF guess = secretNumber THEN
+            TERM.PRINTLN("")
+            TERM.PRINTLN("*** CONGRATULATIONS! ***")
+            TERM.PRINT("You guessed it in ")
+            TERM.PRINT(attempts)
+            TERM.PRINTLN(" attempts!")
+            playing = FALSE
+        ELSEIF guess < secretNumber THEN
+            TERM.PRINTLN("Too low! Try again.")
+        ELSE
+            TERM.PRINTLN("Too high! Try again.")
+        END IF
+        
+        TERM.PRINTLN("")
+    WEND
+    
+    IF playing THEN
+        TERM.PRINTLN("Sorry, you ran out of attempts!")
+        TERM.PRINT("The number was: ")
+        TERM.PRINTLN(secretNumber)
+    END IF
+    
+    TERM.PRINTLN("")
+    TERM.PRINTLN("Thanks for playing!")
+    TERM.PRINTLN("Press any key to exit...")
+    
+    DIM key AS STRING
+    key = TERM.GETKEY()
+END SUB

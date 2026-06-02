@@ -1,0 +1,58 @@
+#!/bin/bash
+# Stop Mutineer BBS gracefully
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+BBS_DIR="$(dirname "$SCRIPT_DIR")/dist"
+PID_FILE="$BBS_DIR/mutineer.pid"
+SCREEN_NAME="mutineer-console"
+
+stopped=0
+
+# Try PID file first
+if [ -f "$PID_FILE" ]; then
+    PID=$(cat "$PID_FILE")
+    if kill -0 "$PID" 2>/dev/null; then
+        echo "Stopping Mutineer (PID $PID)..."
+        kill "$PID"
+        for i in {1..10}; do
+            if ! kill -0 "$PID" 2>/dev/null; then
+                echo "Mutineer stopped"
+                stopped=1
+                break
+            fi
+            sleep 1
+        done
+        if [ $stopped -eq 0 ]; then
+            echo "Process didn't stop gracefully, sending SIGKILL..."
+            kill -9 "$PID" 2>/dev/null || true
+        fi
+    else
+        echo "Stale PID file (process not running)"
+    fi
+    rm -f "$PID_FILE"
+    stopped=1
+fi
+
+# Also kill screen session if exists
+if screen -list | grep -q "$SCREEN_NAME"; then
+    echo "Terminating screen session '$SCREEN_NAME'..."
+    screen -S "$SCREEN_NAME" -X quit 2>/dev/null || true
+    stopped=1
+fi
+
+# Fallback: find by process name
+if [ $stopped -eq 0 ]; then
+    PIDS=$(pgrep -f "mutineer$" 2>/dev/null || true)
+    if [ -n "$PIDS" ]; then
+        echo "Stopping Mutineer processes: $PIDS"
+        kill $PIDS 2>/dev/null || true
+        sleep 2
+        kill -9 $PIDS 2>/dev/null || true
+        stopped=1
+    fi
+fi
+
+if [ $stopped -eq 0 ]; then
+    echo "Mutineer not running"
+fi

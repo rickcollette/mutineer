@@ -1,0 +1,48 @@
+#!/bin/bash
+# Send a wall message to all connected BBS users
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+BBS_DIR="$(dirname "$SCRIPT_DIR")/dist"
+DB_PATH="$BBS_DIR/data/mutineer.db"
+
+if [ $# -eq 0 ]; then
+    echo "Usage: $0 \"MESSAGE\""
+    echo "Sends a message to all connected BBS users"
+    exit 1
+fi
+
+MESSAGE="$*"
+
+# Check if BBS is running
+PID_FILE="$BBS_DIR/mutineer.pid"
+if [ ! -f "$PID_FILE" ] || ! kill -0 "$(cat "$PID_FILE")" 2>/dev/null; then
+    echo "Warning: BBS does not appear to be running"
+fi
+
+# Get list of active sessions from database
+if [ ! -f "$DB_PATH" ]; then
+    echo "Error: Database not found at $DB_PATH"
+    exit 1
+fi
+
+# Check for active nodes
+ACTIVE=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM nodes WHERE status != 'inactive'" 2>/dev/null || echo "0")
+
+if [ "$ACTIVE" = "0" ]; then
+    echo "No active users connected"
+    exit 0
+fi
+
+echo "Sending wall message to $ACTIVE active session(s)..."
+
+# Method 1: Write to a broadcast file that the BBS monitors
+BROADCAST_FILE="$BBS_DIR/data/broadcast.txt"
+echo "[WALL $(date '+%H:%M')] $MESSAGE" >> "$BROADCAST_FILE"
+
+# Method 2: Signal the BBS process to read broadcast file
+if [ -f "$PID_FILE" ]; then
+    kill -USR1 "$(cat "$PID_FILE")" 2>/dev/null || true
+fi
+
+echo "Message sent: $MESSAGE"

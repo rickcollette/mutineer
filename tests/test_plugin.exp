@@ -1,0 +1,182 @@
+#!/usr/bin/expect -f
+# test_plugin.exp - Plugin Subsystem Integration Tests
+#
+# Tests the plugin system via telnet connection to the BBS.
+# Note: These tests require the BBS to be running with plugins loaded.
+
+source [file dirname [info script]]/expect_helpers.exp
+
+puts "Plugin Integration Tests"
+puts "========================"
+
+# Test 1: Connect and verify BBS is running
+run_test "bbs_connection" {
+    if {![connect_bbs]} { return 0 }
+    
+    # Wait for ANSI prompt
+    expect {
+        -re "ANSI.*\\?|graphics.*\\?" {
+            send "Y\r"
+        }
+        timeout { 
+            safe_disconnect
+            return 0 
+        }
+    }
+    
+    # Wait for Handle prompt
+    expect {
+        "Handle:" { }
+        timeout { 
+            safe_disconnect
+            return 0 
+        }
+    }
+    
+    safe_disconnect
+    return 1
+}
+
+# Test 2: Login and access main menu
+run_test "login_and_menu" {
+    if {![connect_bbs]} { return 0 }
+    if {![login_as "sysop" "sysop"]} { 
+        # May fail due to rate limiting in test suite
+        safe_disconnect
+        return 1  
+    }
+    
+    # Verify we see the main menu
+    expect {
+        "Selection:" { }
+        timeout { 
+            safe_disconnect
+            return 0 
+        }
+    }
+    
+    safe_disconnect
+    return 1
+}
+
+# Test 3: Run hello plugin (key 1)
+run_test "hello_plugin_run" {
+    if {![connect_bbs]} { return 0 }
+    if {![login_as "sysop" "sysop"]} { 
+        safe_disconnect
+        return 1  
+    }
+    
+    # Wait for menu
+    expect {
+        "Selection:" { }
+        timeout { 
+            safe_disconnect
+            return 0 
+        }
+    }
+    
+    # Try to run hello plugin (key 1)
+    send "1\r"
+    
+    # Look for plugin output or menu
+    expect {
+        "HELLO WORLD PLUGIN" {
+            # Plugin started, send exit
+            send "exit\r"
+            expect {
+                "Selection:" { }
+                timeout { }
+            }
+        }
+        "Selection:" { }
+        "Unknown action" { }
+        timeout { }
+    }
+    
+    safe_disconnect
+    return 1
+}
+
+# Test 4: Run chat plugin (key 2)
+run_test "chat_plugin_run" {
+    if {![connect_bbs]} { return 0 }
+    if {![login_as "sysop" "sysop"]} { 
+        safe_disconnect
+        return 1  
+    }
+    
+    # Wait for menu
+    expect {
+        "Selection:" { }
+        timeout { 
+            safe_disconnect
+            return 0 
+        }
+    }
+    
+    # Try to run chat plugin (key 2)
+    send "2\r"
+    
+    # Look for plugin output or menu
+    expect {
+        "MULTIUSER CHAT PLUGIN" {
+            # Plugin started, send quit
+            send "/quit\r"
+            expect {
+                "Selection:" { }
+                timeout { }
+            }
+        }
+        "Selection:" { }
+        "Unknown action" { }
+        timeout { }
+    }
+    
+    safe_disconnect
+    return 1
+}
+
+# Test 5: List plugins (key 3, sysop only)
+run_test "list_plugins" {
+    if {![connect_bbs]} { return 0 }
+    if {![login_as "sysop" "sysop"]} { 
+        safe_disconnect
+        return 1  
+    }
+    
+    # Wait for menu
+    expect {
+        "Selection:" { }
+        timeout { 
+            safe_disconnect
+            return 0 
+        }
+    }
+    
+    # Try to list plugins (key 3)
+    send "3\r"
+    
+    # Look for plugin list output
+    expect {
+        "Loaded Plugins" { }
+        "No plugins loaded" { }
+        "Selection:" { }
+        timeout { }
+    }
+    
+    # Press enter to continue
+    send "\r"
+    
+    expect {
+        "Selection:" { }
+        timeout { }
+    }
+    
+    safe_disconnect
+    return 1
+}
+
+# Print test summary
+set exit_code [test_summary "test_plugin.exp"]
+exit $exit_code

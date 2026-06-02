@@ -1,0 +1,9 @@
+[2J[H[1;31m
+  +------------------------------------------+
+  | INSUFFICIENT CREDITS                     |
+  +------------------------------------------+
+[0m[32m
+  You do not have enough credits for that operation.
+  
+  Current credits: %PC
+[0m

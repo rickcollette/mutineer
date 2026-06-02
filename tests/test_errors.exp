@@ -1,0 +1,235 @@
+#!/usr/bin/expect -f
+# Error handling tests for Mutineer BBS
+
+set script_dir [file dirname [info script]]
+source "$script_dir/expect_helpers.exp"
+
+puts ""
+puts "=== Error Handling Tests ==="
+puts ""
+
+# Test 1: Invalid menu selection
+run_test "invalid_menu_selection" {
+    if {![connect_bbs]} { return 0 }
+    if {![login_as "sysop" "mutineer"]} { return 0 }
+    
+    # Send an invalid menu key
+    send "Z\r"
+    
+    expect {
+        -re "Unknown|Invalid|not recognized" { }
+        "Selection:" { }
+        timeout { return 0 }
+    }
+    
+    # Should still be at main menu
+    expect {
+        "Selection:" { }
+        timeout { }
+    }
+    
+    send "Q\r"
+    expect {
+        eof { }
+        timeout { }
+    }
+    return 1
+}
+
+# Test 2: Invalid area number
+run_test "invalid_area_number" {
+    if {![connect_bbs]} { return 0 }
+    if {![login_as "sysop" "mutineer"]} { return 0 }
+    
+    send "M\r"
+    
+    expect {
+        -re "Choose area|Area" { }
+        timeout { return 0 }
+    }
+    
+    # Enter invalid area number
+    send "999\r"
+    
+    expect {
+        -re "Invalid|not found|No such" { }
+        -re "Choose area|Area" { }
+        timeout { return 0 }
+    }
+    
+    send "Q\r"
+    expect {
+        "Selection:" { }
+        timeout { }
+    }
+    send "Q\r"
+    expect {
+        eof { }
+        timeout { }
+    }
+    return 1
+}
+
+# Test 3: Non-numeric input where number expected
+run_test "non_numeric_input" {
+    if {![connect_bbs]} { return 0 }
+    if {![login_as "sysop" "mutineer"]} { return 0 }
+    
+    send "M\r"
+    
+    expect {
+        -re "Choose area|Area" { }
+        timeout { return 0 }
+    }
+    
+    # Enter non-numeric input
+    send "abc\r"
+    
+    expect {
+        -re "Invalid|not found|Choose area|Area|\\?" { }
+        timeout { return 0 }
+    }
+    
+    send "Q\r"
+    expect {
+        "Selection:" { }
+        timeout { }
+    }
+    send "Q\r"
+    expect {
+        eof { }
+        timeout { }
+    }
+    return 1
+}
+
+# Test 4: Empty input handling
+run_test "empty_input" {
+    if {![connect_bbs]} { return 0 }
+    if {![login_as "sysop" "mutineer"]} { return 0 }
+    
+    send "M\r"
+    
+    expect {
+        -re "Choose area|Area" { }
+        timeout { return 0 }
+    }
+    
+    # Send empty input
+    send "\r"
+    
+    expect {
+        -re "Choose area|Area|Selection:|Invalid" { }
+        timeout { return 0 }
+    }
+    
+    send "Q\r"
+    expect {
+        "Selection:" { }
+        timeout { }
+    }
+    send "Q\r"
+    expect {
+        eof { }
+        timeout { }
+    }
+    return 1
+}
+
+# Test 5: Access denied for regular user (admin functions)
+run_test "access_denied_regular_user" {
+    if {![connect_bbs]} { return 0 }
+    
+    # Create and login as regular user
+    set testuser [unique_user]
+    if {![register_user $testuser "testpass"]} { return 0 }
+    
+    # For a regular user, admin menu items like [E] User Editor should not be visible
+    # The menu shown to regular users should NOT contain [E], [P], [O], [N], [A], [R], [D]
+    # We verify by trying to access user editor - should get "Invalid selection" or similar
+    send "E\r"
+    
+    expect {
+        -re "denied|Access|restricted|Invalid" { }
+        -re "User handle:|Edit user" {
+            # Should not get here as regular user
+            send "\r"
+            expect {
+                "Selection:" { }
+                timeout { }
+            }
+            send "Q\r"
+            expect {
+                eof { }
+                timeout { }
+            }
+            return 0
+        }
+        "Selection:" { }
+        eof {
+            # Connection closed - might be expected behavior
+            return 1
+        }
+        timeout { return 0 }
+    }
+    
+    # Try to quit cleanly
+    expect {
+        "Selection:" { }
+        eof { 
+            return 1
+        }
+        timeout { }
+    }
+    
+    send "Q\r"
+    expect {
+        eof { }
+        timeout { }
+    }
+    return 1
+}
+
+# Test 6: Request non-existent message
+run_test "nonexistent_message" {
+    if {![connect_bbs]} { return 0 }
+    if {![login_as "sysop" "mutineer"]} { return 0 }
+    
+    send "M\r"
+    
+    expect {
+        -re "Choose area|Area" { }
+        timeout { return 0 }
+    }
+    
+    send "1\r"
+    
+    expect {
+        -re "Select msg|Threaded|messages|No messages" { }
+        timeout { return 0 }
+    }
+    
+    # Try to read non-existent message
+    send "99999\r"
+    
+    expect {
+        -re "not found|Invalid|No such|Select msg|\\?" { }
+        timeout { return 0 }
+    }
+    
+    send "Q\r"
+    expect {
+        "Selection:" { }
+        timeout { }
+    }
+    send "Q\r"
+    expect {
+        eof { }
+        timeout { }
+    }
+    return 1
+}
+
+# Print summary and exit
+set exit_code [test_summary "test_errors.exp"]
+exit $exit_code

@@ -1,0 +1,30 @@
+' Hello World - Basic Buccaneer Example
+' Demonstrates basic terminal output
+
+PROGRAM "Hello World"
+VERSION "1.0.0"
+AUTHOR "Mutineer BBS"
+DESCRIPTION "A simple hello world door program"
+
+CAPABILITY "term.io"
+CAPABILITY "user.read"
+
+SUB Main()
+    TERM.CLS()
+    TERM.PRINTLN("================================")
+    TERM.PRINTLN("  Welcome to Buccaneer!")
+    TERM.PRINTLN("================================")
+    TERM.PRINTLN("")
+    
+    DIM userName AS STRING
+    userName = USER.NAME()
+    
+    TERM.PRINT("Hello, ")
+    TERM.PRINT(userName)
+    TERM.PRINTLN("!")
+    TERM.PRINTLN("")
+    TERM.PRINTLN("Press any key to exit...")
+    
+    DIM key AS STRING
+    key = TERM.GETKEY()
+END SUB

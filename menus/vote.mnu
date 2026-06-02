@@ -1,0 +1,4 @@
+# Vote Booth menu
+V|Cast Vote|vote|L10
+R|View Results|voteresults|L10
+Q|Return|menu|

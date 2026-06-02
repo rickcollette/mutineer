@@ -1,0 +1,348 @@
+/*
+ * test_plugin.c - Plugin Subsystem Unit Tests
+ *
+ * Tests the plugin loader, registry, and host API functionality.
+ */
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <dlfcn.h>
+#include <pthread.h>
+#include <unistd.h>
+#include <sys/stat.h>
+#include "bbs_plugin_api.h"
+#include "bbs_plugin_loader.h"
+#include "bbs_plugin_registry.h"
+
+#define TEST_ASSERT(cond, msg) do { \
+  if (!(cond)) { fprintf(stderr, "FAIL: %s\n", msg); return 1; } \
+} while(0)
+
+/* Test ABI constants */
+static int test_abi_constants(void) {
+  TEST_ASSERT(BBS_PLUGIN_ABI_VERSION == 0x00010000u, "ABI version should be 1.0");
+  TEST_ASSERT(BBS_PLUGIN_MAGIC == 0x4250534Fu, "Magic should be 'BPSO'");
+  
+  TEST_ASSERT(BBS_OK == 0, "BBS_OK should be 0");
+  TEST_ASSERT(BBS_EINVAL < 0, "Error codes should be negative");
+  TEST_ASSERT(BBS_EUNSUPPORTED < 0, "Error codes should be negative");
+  TEST_ASSERT(BBS_EIO < 0, "Error codes should be negative");
+  
+  TEST_ASSERT(BBS_CAP_NONE == 0, "CAP_NONE should be 0");
+  TEST_ASSERT(BBS_CAP_INTERACTIVE == 1, "CAP_INTERACTIVE should be 1");
+  TEST_ASSERT(BBS_CAP_COMMANDS == 2, "CAP_COMMANDS should be 2");
+  TEST_ASSERT(BBS_CAP_BACKGROUND == 4, "CAP_BACKGROUND should be 4");
+  
+  return 0;
+}
+
+/* Test struct sizes for ABI compatibility */
+static int test_struct_sizes(void) {
+  TEST_ASSERT(sizeof(bbs_host_api_t) > 0, "host_api should have size");
+  TEST_ASSERT(sizeof(bbs_plugin_desc_t) > 0, "plugin_desc should have size");
+  TEST_ASSERT(sizeof(bbs_plugin_instance_vtbl_t) > 0, "instance_vtbl should have size");
+  TEST_ASSERT(sizeof(bbs_io_t) > 0, "io should have size");
+  TEST_ASSERT(sizeof(bbs_sched_t) > 0, "sched should have size");
+  TEST_ASSERT(sizeof(bbs_event_t) > 0, "event should have size");
+  TEST_ASSERT(sizeof(bbs_command_def_t) > 0, "command_def should have size");
+  
+  return 0;
+}
+
+/* Test registry initialization */
+static int test_registry_init(void) {
+  plugin_registry_init();
+  
+  TEST_ASSERT(plugin_registry_count() == 0, "Registry should start empty");
+  TEST_ASSERT(!plugin_registry_has_instances(), "No instances initially");
+  TEST_ASSERT(plugin_registry_find("nonexistent") == NULL, "Find should return NULL for missing");
+  
+  plugin_registry_shutdown();
+  return 0;
+}
+
+/* Test registry add/find/remove */
+static int test_registry_operations(void) {
+  plugin_registry_init();
+  
+  bbs_plugin_desc_t desc1 = {
+    .abi_version = BBS_PLUGIN_ABI_VERSION,
+    .size = sizeof(bbs_plugin_desc_t),
+    .magic = BBS_PLUGIN_MAGIC,
+    .id = "test.plugin.one",
+    .name = "Test Plugin One",
+    .version = "1.0.0",
+    .author = "Test",
+    .description = "Test plugin",
+    .caps = BBS_CAP_INTERACTIVE
+  };
+  
+  bbs_plugin_desc_t desc2 = {
+    .abi_version = BBS_PLUGIN_ABI_VERSION,
+    .size = sizeof(bbs_plugin_desc_t),
+    .magic = BBS_PLUGIN_MAGIC,
+    .id = "test.plugin.two",
+    .name = "Test Plugin Two",
+    .version = "2.0.0",
+    .author = "Test",
+    .description = "Another test plugin",
+    .caps = BBS_CAP_COMMANDS
+  };
+  
+  /* Add plugins */
+  TEST_ASSERT(plugin_registry_add(&desc1, NULL, "test1.so"), "Add plugin 1 should succeed");
+  TEST_ASSERT(plugin_registry_add(&desc2, NULL, "test2.so"), "Add plugin 2 should succeed");
+  TEST_ASSERT(plugin_registry_count() == 2, "Should have 2 plugins");
+  
+  /* Duplicate add should fail */
+  TEST_ASSERT(!plugin_registry_add(&desc1, NULL, "test1.so"), "Duplicate add should fail");
+  
+  /* Find plugins */
+  plugin_entry_t* e1 = plugin_registry_find("test.plugin.one");
+  TEST_ASSERT(e1 != NULL, "Find plugin 1 should succeed");
+  TEST_ASSERT(strcmp(e1->desc.name, "Test Plugin One") == 0, "Name should match");
+  
+  plugin_entry_t* e2 = plugin_registry_find("test.plugin.two");
+  TEST_ASSERT(e2 != NULL, "Find plugin 2 should succeed");
+  TEST_ASSERT(strcmp(e2->desc.version, "2.0.0") == 0, "Version should match");
+  
+  /* Remove plugin */
+  TEST_ASSERT(plugin_registry_remove("test.plugin.one"), "Remove should succeed");
+  TEST_ASSERT(plugin_registry_find("test.plugin.one") == NULL, "Removed plugin should not be found");
+  TEST_ASSERT(plugin_registry_count() == 1, "Should have 1 plugin after remove");
+  
+  plugin_registry_shutdown();
+  return 0;
+}
+
+/* Test instance counting */
+static int test_instance_counting(void) {
+  plugin_registry_init();
+  
+  bbs_plugin_desc_t desc = {
+    .abi_version = BBS_PLUGIN_ABI_VERSION,
+    .size = sizeof(bbs_plugin_desc_t),
+    .magic = BBS_PLUGIN_MAGIC,
+    .id = "test.instance",
+    .name = "Instance Test",
+    .version = "1.0.0"
+  };
+  
+  TEST_ASSERT(plugin_registry_add(&desc, NULL, "test.so"), "Add should succeed");
+  TEST_ASSERT(plugin_registry_instance_count("test.instance") == 0, "Initial count should be 0");
+  TEST_ASSERT(!plugin_registry_has_instances(), "No instances initially");
+  
+  /* Increment */
+  plugin_registry_instance_inc("test.instance");
+  TEST_ASSERT(plugin_registry_instance_count("test.instance") == 1, "Count should be 1");
+  TEST_ASSERT(plugin_registry_has_instances(), "Should have instances");
+  
+  plugin_registry_instance_inc("test.instance");
+  TEST_ASSERT(plugin_registry_instance_count("test.instance") == 2, "Count should be 2");
+  
+  /* Decrement */
+  plugin_registry_instance_dec("test.instance");
+  TEST_ASSERT(plugin_registry_instance_count("test.instance") == 1, "Count should be 1");
+  
+  plugin_registry_instance_dec("test.instance");
+  TEST_ASSERT(plugin_registry_instance_count("test.instance") == 0, "Count should be 0");
+  TEST_ASSERT(!plugin_registry_has_instances(), "No instances after decrement");
+  
+  /* Decrement below 0 should not go negative */
+  plugin_registry_instance_dec("test.instance");
+  TEST_ASSERT(plugin_registry_instance_count("test.instance") == 0, "Count should stay at 0");
+  
+  plugin_registry_shutdown();
+  return 0;
+}
+
+/* Test registry list */
+static int test_registry_list(void) {
+  plugin_registry_init();
+  
+  bbs_plugin_desc_t desc = {
+    .abi_version = BBS_PLUGIN_ABI_VERSION,
+    .size = sizeof(bbs_plugin_desc_t),
+    .magic = BBS_PLUGIN_MAGIC,
+    .id = "test.list",
+    .name = "List Test",
+    .version = "1.0.0",
+    .description = "Testing list output"
+  };
+  
+  plugin_registry_add(&desc, NULL, "test.so");
+  
+  char buf[1024];
+  size_t n = plugin_registry_list(buf, sizeof(buf));
+  
+  TEST_ASSERT(n > 0, "List should return data");
+  TEST_ASSERT(strstr(buf, "test.list") != NULL, "List should contain plugin ID");
+  TEST_ASSERT(strstr(buf, "List Test") != NULL, "List should contain plugin name");
+  TEST_ASSERT(strstr(buf, "1.0.0") != NULL, "List should contain version");
+  
+  plugin_registry_shutdown();
+  return 0;
+}
+
+/* Test loading actual plugin */
+static int test_plugin_load(void) {
+  /* Check if hello.so exists in build/plugins */
+  const char* plugin_path = "build/plugins/hello.so";
+  
+  if (access(plugin_path, F_OK) != 0) {
+    printf("  (skipping - hello.so not built yet)\n");
+    return 0;
+  }
+  
+  void* handle = dlopen(plugin_path, RTLD_NOW | RTLD_LOCAL);
+  TEST_ASSERT(handle != NULL, "dlopen should succeed");
+  
+  bbs_plugin_query_fn query = (bbs_plugin_query_fn)dlsym(handle, "bbs_plugin_query");
+  TEST_ASSERT(query != NULL, "dlsym should find bbs_plugin_query");
+  
+  bbs_plugin_desc_t desc;
+  memset(&desc, 0, sizeof(desc));
+  
+  /* Create a minimal host API for testing */
+  bbs_host_api_t host = {
+    .abi_version = BBS_PLUGIN_ABI_VERSION,
+    .size = sizeof(bbs_host_api_t),
+    .magic = BBS_PLUGIN_MAGIC
+  };
+  
+  bbs_rc_t rc = query(BBS_PLUGIN_ABI_VERSION, &host, &desc);
+  TEST_ASSERT(rc == BBS_OK, "query should succeed");
+  TEST_ASSERT(desc.magic == BBS_PLUGIN_MAGIC, "magic should match");
+  TEST_ASSERT(desc.abi_version == BBS_PLUGIN_ABI_VERSION, "ABI version should match");
+  TEST_ASSERT(strcmp(desc.id, "com.mutineer.hello") == 0, "ID should be com.mutineer.hello");
+  TEST_ASSERT(desc.caps & BBS_CAP_INTERACTIVE, "Should have interactive capability");
+  TEST_ASSERT(desc.init != NULL, "Should have init function");
+  TEST_ASSERT(desc.create_instance != NULL, "Should have create_instance function");
+  
+  dlclose(handle);
+  return 0;
+}
+
+/* Test ABI version mismatch */
+static int test_abi_mismatch(void) {
+  const char* plugin_path = "build/plugins/hello.so";
+  
+  if (access(plugin_path, F_OK) != 0) {
+    printf("  (skipping - hello.so not built yet)\n");
+    return 0;
+  }
+  
+  void* handle = dlopen(plugin_path, RTLD_NOW | RTLD_LOCAL);
+  TEST_ASSERT(handle != NULL, "dlopen should succeed");
+  
+  bbs_plugin_query_fn query = (bbs_plugin_query_fn)dlsym(handle, "bbs_plugin_query");
+  TEST_ASSERT(query != NULL, "dlsym should find bbs_plugin_query");
+  
+  bbs_plugin_desc_t desc;
+  memset(&desc, 0, sizeof(desc));
+  
+  bbs_host_api_t host = {
+    .abi_version = BBS_PLUGIN_ABI_VERSION,
+    .size = sizeof(bbs_host_api_t),
+    .magic = BBS_PLUGIN_MAGIC
+  };
+  
+  /* Test with wrong major version */
+  uint32_t wrong_version = 0x00020000u;  /* v2.0 */
+  bbs_rc_t rc = query(wrong_version, &host, &desc);
+  TEST_ASSERT(rc == BBS_EUNSUPPORTED, "Should reject wrong ABI version");
+  
+  dlclose(handle);
+  return 0;
+}
+
+/* Test concurrent registry access */
+static void* thread_inc_dec(void* arg) {
+  const char* id = (const char*)arg;
+  for (int i = 0; i < 1000; i++) {
+    plugin_registry_instance_inc(id);
+    plugin_registry_instance_dec(id);
+  }
+  return NULL;
+}
+
+static int test_concurrent_registry(void) {
+  plugin_registry_init();
+  
+  bbs_plugin_desc_t desc = {
+    .abi_version = BBS_PLUGIN_ABI_VERSION,
+    .size = sizeof(bbs_plugin_desc_t),
+    .magic = BBS_PLUGIN_MAGIC,
+    .id = "test.concurrent",
+    .name = "Concurrent Test"
+  };
+  
+  plugin_registry_add(&desc, NULL, "test.so");
+  
+  pthread_t threads[4];
+  for (int i = 0; i < 4; i++) {
+    pthread_create(&threads[i], NULL, thread_inc_dec, (void*)"test.concurrent");
+  }
+  
+  for (int i = 0; i < 4; i++) {
+    pthread_join(threads[i], NULL);
+  }
+  
+  /* After all increments and decrements, count should be 0 */
+  TEST_ASSERT(plugin_registry_instance_count("test.concurrent") == 0, 
+              "Count should be 0 after concurrent inc/dec");
+  
+  plugin_registry_shutdown();
+  return 0;
+}
+
+/* Test plugin loader (requires plugins directory) */
+static int test_loader_init(void) {
+  /* Create a temporary plugins directory */
+  mkdir("test_plugins", 0755);
+  
+  /* Initialize with no plugins */
+  plugin_registry_init();
+  
+  TEST_ASSERT(!plugin_loader_enabled(), "Loader should not be enabled before init");
+  
+  /* Note: Full loader test requires actual .so files */
+  
+  plugin_registry_shutdown();
+  rmdir("test_plugins");
+  return 0;
+}
+
+int main(void) {
+  int failures = 0;
+  int total = 0;
+  
+  printf("Running plugin subsystem tests...\n\n");
+  
+#define RUN_TEST(name) do { \
+    total++; \
+    printf("  %s... ", #name); \
+    fflush(stdout); \
+    if (name() == 0) { \
+        printf("PASS\n"); \
+    } else { \
+        printf("FAIL\n"); \
+        failures++; \
+    } \
+} while(0)
+  
+  RUN_TEST(test_abi_constants);
+  RUN_TEST(test_struct_sizes);
+  RUN_TEST(test_registry_init);
+  RUN_TEST(test_registry_operations);
+  RUN_TEST(test_instance_counting);
+  RUN_TEST(test_registry_list);
+  RUN_TEST(test_plugin_load);
+  RUN_TEST(test_abi_mismatch);
+  RUN_TEST(test_concurrent_registry);
+  RUN_TEST(test_loader_init);
+  
+  printf("\n%d/%d tests passed\n", total - failures, total);
+  return failures > 0 ? 1 : 0;
+}

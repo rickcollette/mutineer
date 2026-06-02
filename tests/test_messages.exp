@@ -1,0 +1,233 @@
+#!/usr/bin/expect -f
+# Message system tests for Mutineer BBS
+
+set script_dir [file dirname [info script]]
+source "$script_dir/expect_helpers.exp"
+
+puts ""
+puts "=== Message System Tests ==="
+puts ""
+
+# Test 1: Access message menu
+run_test "access_messages" {
+    if {![connect_bbs]} { return 0 }
+    if {![login_as "sysop" "mutineer"]} { return 0 }
+    
+    send "M\r"
+    
+    expect {
+        -re "Message Areas:|Choose area|Area" { }
+        "restricted" { 
+            send "Q\r"
+            expect {
+                eof { }
+                timeout { }
+            }
+            return 0 
+        }
+        timeout { return 0 }
+    }
+    
+    # Return to main menu
+    send "Q\r"
+    expect {
+        "Selection:" { }
+        timeout { }
+    }
+    
+    send "Q\r"
+    expect {
+        eof { }
+        timeout { }
+    }
+    return 1
+}
+
+# Test 2: List message areas
+run_test "list_message_areas" {
+    if {![connect_bbs]} { return 0 }
+    if {![login_as "sysop" "mutineer"]} { return 0 }
+    
+    send "M\r"
+    
+    expect {
+        -re {General|Message Areas:|\[.+\]} { }
+        timeout { return 0 }
+    }
+    
+    send "Q\r"
+    expect {
+        "Selection:" { }
+        timeout { }
+    }
+    send "Q\r"
+    expect {
+        eof { }
+        timeout { }
+    }
+    return 1
+}
+
+# Test 3: Select a message area
+run_test "select_message_area" {
+    if {![connect_bbs]} { return 0 }
+    if {![login_as "sysop" "mutineer"]} { return 0 }
+    
+    send "M\r"
+    
+    expect {
+        -re "Choose area|Area number|\\?" { }
+        timeout { return 0 }
+    }
+    
+    # Try to select area 1
+    send "1\r"
+    
+    expect {
+        -re "messages:|Threaded|Select msg|No messages|area" { }
+        "Invalid" { }
+        timeout { return 0 }
+    }
+    
+    send "Q\r"
+    expect {
+        "Selection:" { }
+        timeout { }
+    }
+    send "Q\r"
+    expect {
+        eof { }
+        timeout { }
+    }
+    return 1
+}
+
+# Test 4: Post a new message
+run_test "post_message" {
+    if {![connect_bbs]} { return 0 }
+    if {![login_as "sysop" "mutineer"]} { return 0 }
+    
+    send "M\r"
+    
+    expect {
+        -re "Choose area|Area" { }
+        timeout { return 0 }
+    }
+    
+    send "1\r"
+    
+    # Wait for message selection prompt
+    expect {
+        -re {Select msg.*:} { }
+        timeout { return 0 }
+    }
+    
+    # Skip message selection (blank)
+    send "\r"
+    
+    # Wait for the action menu
+    expect {
+        -re {\(N\)ew post.*:} { }
+        timeout { return 0 }
+    }
+    
+    send "N\r"
+    
+    expect {
+        "Subject:" { }
+        -re "restricted|denied" { 
+            send "Q\r"
+            expect {
+                "Selection:" { }
+                timeout { }
+            }
+            send "Q\r"
+            expect {
+                eof { }
+                timeout { }
+            }
+            return 0 
+        }
+        timeout { return 0 }
+    }
+    
+    set subject "Test message [clock seconds]"
+    send "$subject\r"
+    
+    expect {
+        -re "Body:|Message:" { }
+        timeout { return 0 }
+    }
+    
+    send "This is a test message body.\r"
+    
+    expect {
+        -re "Posted|saved|success" { }
+        -re {\(N\)ew post.*:} { }
+        timeout { return 0 }
+    }
+    
+    send "Q\r"
+    expect {
+        "Selection:" { }
+        timeout { }
+    }
+    send "Q\r"
+    expect {
+        eof { }
+        timeout { }
+    }
+    return 1
+}
+
+# Test 5: Read a message
+run_test "read_message" {
+    if {![connect_bbs]} { return 0 }
+    if {![login_as "sysop" "mutineer"]} { return 0 }
+    
+    send "M\r"
+    
+    expect {
+        -re "Choose area|Area" { }
+        timeout { return 0 }
+    }
+    
+    send "1\r"
+    
+    expect {
+        -re "Select msg|Threaded|messages" { }
+        timeout { return 0 }
+    }
+    
+    # Try to read message 1
+    send "1\r"
+    
+    expect {
+        -re "Subject:|From:|Body:|message|Not found|No messages" { }
+        timeout { return 0 }
+    }
+    
+    # Press enter to continue if needed
+    send "\r"
+    
+    expect {
+        -re "Selection:|\\(N\\)ew|Select msg|\\?" { }
+        timeout { }
+    }
+    
+    send "Q\r"
+    expect {
+        "Selection:" { }
+        timeout { }
+    }
+    send "Q\r"
+    expect {
+        eof { }
+        timeout { }
+    }
+    return 1
+}
+
+# Print summary and exit
+set exit_code [test_summary "test_messages.exp"]
+exit $exit_code

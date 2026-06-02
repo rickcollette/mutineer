@@ -1,0 +1,129 @@
+/*
+ * bucc_bbs.h - Buccaneer BBS integration API
+ *
+ * Part of the Buccaneer language implementation for Mutineer BBS.
+ * Provides the C embedding API for running doors within Mutineer.
+ */
+
+#ifndef BUCC_BBS_H
+#define BUCC_BBS_H
+
+#include "bucc_vm.h"
+#include "bucc_module.h"
+#include "bucc_host.h"
+#include "bucc_package.h"
+#include <stdint.h>
+#include <stdbool.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+typedef enum bucc_door_status {
+    DOOR_OK = 0,
+    DOOR_ERROR_LOAD,
+    DOOR_ERROR_MANIFEST,
+    DOOR_ERROR_SECURITY,
+    DOOR_ERROR_CAPABILITY,
+    DOOR_ERROR_RUNTIME,
+    DOOR_ERROR_TIMEOUT,
+    DOOR_CHAIN_REQUESTED
+} bucc_door_status_t;
+
+typedef struct bucc_door_result {
+    bucc_door_status_t  status;
+    char*               error_message;
+    char*               chain_target;
+    bucc_value_t        chain_args;
+    int                 exit_code;
+    uint32_t            instructions_executed;
+    uint32_t            host_calls_made;
+} bucc_door_result_t;
+
+typedef struct bucc_session_info {
+    int64_t     user_id;
+    const char* user_name;
+    const char* user_alias;
+    int         user_security;
+    int         time_remaining;
+    int         node_number;
+    bool        ansi_enabled;
+    int         term_width;
+    int         term_height;
+} bucc_session_info_t;
+
+typedef struct bucc_door_runner {
+    bucc_door_manifest_t*   manifest;
+    bucc_module_t*          module;
+    bucc_vm_t*              vm;
+    bucc_host_context_t*    host_ctx;
+    bucc_session_info_t     session;
+    
+    bucc_limits_t           limits;
+    uint64_t                allowed_capabilities;
+    
+    bool                    running;
+    bool                    debug;
+} bucc_door_runner_t;
+
+bucc_door_runner_t* bucc_door_runner_new(void);
+void bucc_door_runner_free(bucc_door_runner_t* runner);
+
+bucc_door_status_t bucc_door_load(bucc_door_runner_t* runner, 
+                                  const char* manifest_path);
+
+bucc_door_status_t bucc_door_load_module(bucc_door_runner_t* runner,
+                                         const char* module_path);
+
+void bucc_door_set_session(bucc_door_runner_t* runner,
+                          const bucc_session_info_t* session);
+
+void bucc_door_set_term_api(bucc_door_runner_t* runner, bucc_term_api_t* api);
+void bucc_door_set_user_api(bucc_door_runner_t* runner, bucc_user_api_t* api);
+void bucc_door_set_data_api(bucc_door_runner_t* runner, bucc_data_api_t* api);
+void bucc_door_set_kv_api(bucc_door_runner_t* runner, bucc_kv_api_t* api);
+void bucc_door_set_text_api(bucc_door_runner_t* runner, bucc_text_api_t* api);
+void bucc_door_set_bbs_api(bucc_door_runner_t* runner, bucc_bbs_api_t* api);
+
+void bucc_door_set_limits(bucc_door_runner_t* runner, const bucc_limits_t* limits);
+
+void bucc_door_set_capability(bucc_door_runner_t* runner, const char* cap, bool allowed);
+
+bucc_door_result_t bucc_door_run(bucc_door_runner_t* runner);
+
+void bucc_door_stop(bucc_door_runner_t* runner);
+
+bucc_door_result_t bucc_door_run_simple(const char* path,
+                                        bucc_term_api_t* term,
+                                        void* term_ctx,
+                                        const bucc_session_info_t* session);
+
+const char* bucc_door_status_string(bucc_door_status_t status);
+
+#define BUCC_CAP_TERM_OUTPUT    (1ULL << 0)
+#define BUCC_CAP_TERM_INPUT     (1ULL << 1)
+#define BUCC_CAP_TERM_QUERY     (1ULL << 2)
+#define BUCC_CAP_USER_READ      (1ULL << 3)
+#define BUCC_CAP_DATA_READ      (1ULL << 4)
+#define BUCC_CAP_DATA_WRITE     (1ULL << 5)
+#define BUCC_CAP_KV_READ        (1ULL << 6)
+#define BUCC_CAP_KV_WRITE       (1ULL << 7)
+#define BUCC_CAP_TEXT_READ      (1ULL << 8)
+#define BUCC_CAP_TEXT_WRITE     (1ULL << 9)
+#define BUCC_CAP_BBS_MESSAGE    (1ULL << 10)
+#define BUCC_CAP_BBS_QUERY      (1ULL << 11)
+#define BUCC_CAP_SHARED_READ    (1ULL << 12)
+#define BUCC_CAP_SHARED_WRITE   (1ULL << 13)
+#define BUCC_CAP_SESSION_READ   (1ULL << 14)
+#define BUCC_CAP_SESSION_WRITE  (1ULL << 15)
+#define BUCC_CAP_DOOR_CHAIN     (1ULL << 16)
+
+#define BUCC_CAP_ALL            0xFFFFFFFFFFFFFFFFULL
+#define BUCC_CAP_SAFE           (BUCC_CAP_TERM_OUTPUT | BUCC_CAP_TERM_INPUT | \
+                                 BUCC_CAP_TERM_QUERY | BUCC_CAP_USER_READ)
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* BUCC_BBS_H */

@@ -1,0 +1,20 @@
+#!/bin/bash
+# Start Mutineer BBS in foreground (for systemd or direct use)
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+BBS_DIR="$(dirname "$SCRIPT_DIR")/dist"
+PID_FILE="$BBS_DIR/mutineer.pid"
+
+if [ -f "$PID_FILE" ] && kill -0 "$(cat "$PID_FILE")" 2>/dev/null; then
+    echo "Mutineer already running (PID $(cat "$PID_FILE"))"
+    exit 1
+fi
+
+if [ ! -x "$BBS_DIR/mutineer" ]; then
+    echo "Error: $BBS_DIR/mutineer not found. Run 'make dist' first."
+    exit 1
+fi
+
+cd "$BBS_DIR"
+exec ./mutineer

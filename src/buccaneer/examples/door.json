@@ -1,0 +1,20 @@
+{
+    "name": "hello-world",
+    "version": "1.0.0",
+    "author": "Mutineer BBS",
+    "description": "A simple hello world door program",
+    "license": "MIT",
+    "entry": "hello.bc",
+    "capabilities": [
+        "term.output",
+        "term.input",
+        "user.read"
+    ],
+    "min_security": 10,
+    "max_time": 5,
+    "allow_chain": false,
+    "config": {
+        "welcome_message": "Welcome to the Hello World door!",
+        "show_user_info": true
+    }
+}

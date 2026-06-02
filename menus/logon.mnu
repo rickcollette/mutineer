@@ -1,0 +1,5 @@
+# Logon menu (pre-auth)
+W|Welcome Screen|display_welcome|
+N|New User Signup|newuser|
+L|Login|login|
+Q|Quit|quit|

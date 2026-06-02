@@ -1,0 +1,122 @@
+
+                              Aladdin Adventure
+                      (C) Copyright 1992 by Stanley Sheff
+                        Support BBS: The Brainex System
+                               (310) 275-2344
+                               (310) 273-5234
+
+   Welcome to the Aladdin.  A weird and fantastic text adventure.
+   The door works with GAP, PCBoard, Wildcat, Spitfire, WWIV, and RBBS, 
+   as well as any BBS that generates a DOOR.SYS file when running a door.
+
+   Aladdin requires the Brainex Door Manager (BRAINEX.ZIP) available
+   from The Brainex System at the number listed at the end of this file.
+    
+
+    Aladdin Files
+    ---------------------
+    ALADDIN.EXE    <------------------ Aladdin Program
+    ALADDIN.DOC    <------------------ Sysop's Information
+    REGISTER.DOC   <------------------ Registration information
+    UPGRADE.DOC    <------------------ Upgrade news
+    SETUP.BAT      <------------------ Setup batch file
+    FILE_ID.DIZ    <------------------ Short File Description
+   
+   All of these files should be in this ZIP, if they are not, don't
+   take a chance! Call The Brainex System and get a good copy or view the 
+   file on a few local boards to see if you can find a complete copy.
+
+   The setup of Aladdin is simple, all you need to do is type:
+   
+   INSTALL
+
+   ALADDIN.EXE will be copied to your BRAINEX directory, and
+   ALADDIN.DOC will be copied to the BRAINEX\ALADDIN directory.
+   Saved game data will be placed in BRAINEX\ALADDIN. (Registered Version)
+
+   Once you have set up Aladdin, you must then create a a batch 
+   file to call the door. A batch file for a GAP BBS might look like this:
+   
+     @ECHO OFF
+     ALADDIN
+
+
+   You will also need to modify your doors menu files and the data
+   file that tells the BBS what your doors are and the security
+   level needed to access them. For GAP, these are respectively:
+   
+       DOORM
+       DOORMG
+       DOORS.DAT
+
+   Please refer to your BBS documentation for details on 
+   setting up these files.
+
+   If you are running multi-nodes, simply use the NODE= command to
+   indicate the node in use.
+
+   ALADDIN NODE=2
+
+                                    
+   The following sysop functions are available while awaiting
+   keyboard input :
+
+    F5       - Shell to DOS.
+    F8       - Twit user and return to BBS.
+    F10      - Initiate chat with user.
+    CF10     - Answer user page bell.
+    Home     - Main user stats.
+    End      - Displays sysop keys available.
+    PgDn     - Secondary user stats.
+    Up Arrow - Increase user's time remaining by 5 minutes.
+    Dn Arrow - Decrease user's time remaining by 5 minutes.
+
+   One of the nicer features about using the TWIT key, is the user
+   is not told that "the sysop wants them to return to the BBS".
+   Instead, a very plain and simple message of "returning you to the
+   BBS" is displayed.  This way, the user is given no indication
+   that the sysop is hovering about.
+
+   When using the F5 shell to DOS key, to return to the door
+   program, simply type EXIT at the DOS command prompt. It is not
+   necessary to change directories back to the door directory.
+   Aladdin is smart enough to know which drive and directory the
+   door program is in and will reset the defaults upon return from
+   DOS.
+
+   The Up and Down Arrow keys increase and decrease the user's time
+   respectively by 5 minutes for each press of the key. There is no
+   indication of what is occurring (except by the fact the user's
+   time remaining will change), so the sysop should try not to have
+   a lead finger. The increase or decrease is effective only while
+   the user is in Aladdin.
+
+                               --  --  --
+
+   This version of Aladdin is a DEMO. The SAVE and LOAD feature 
+   works only in the registered version.
+
+   It will become full featured upon registration. This door is released 
+   "As Is" and there is *NO* warranty or guarantee that it will work for 
+   you and not cause any problems. You have chosen to use this door, YOU 
+   are responsible for any unfortunate problems that may develop from its 
+   use or misuse. I will gladly listen to any suggestions or problems you 
+   may have, and I will do my best to fix whatever needs to be fixed. 
+   I can not be held responsible for any problems you may have, whether 
+   directly or indirectly due to the use of the door.
+   
+   Please read REGISTER.DOC for information on how you can register
+   your copy of Aladdin. 
+
+
+   For complete support, contact me on The Brainex System.
+   Your questions will be quickly and cheerfully answered!
+
+
+   *** CLUE: To get started, GET LAMP, then LIGHT LAMP.
+
+   Have Fun!
+   Stanley Sheff
+   The Brainex System
+   310-275-2344 HST
+   310-273-5234 v.32bis/v.42bis

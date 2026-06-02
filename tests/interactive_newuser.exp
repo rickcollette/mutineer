@@ -1,0 +1,18 @@
+#!/usr/bin/expect -f
+# New user flow
+set timeout 10
+set host "127.0.0.1"
+set port 2929
+set user "tester[clock seconds]"
+spawn telnet $host $port
+expect "Handle:"
+send "$user\r"
+expect "New user?"
+send "Y\r"
+expect "Choose password:"
+send "pass\r"
+expect "Subject:"
+send "\r"
+expect "Selection:"
+send "Q\r"
+expect eof

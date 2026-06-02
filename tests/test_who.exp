@@ -1,0 +1,88 @@
+#!/usr/bin/expect -f
+# Who's online tests for Mutineer BBS
+
+set script_dir [file dirname [info script]]
+source "$script_dir/expect_helpers.exp"
+
+puts ""
+puts "=== Who's Online Tests ==="
+puts ""
+
+# Test 1: View who's online
+run_test "view_whos_online" {
+    if {![connect_bbs]} { return 0 }
+    if {![login_as "sysop" "mutineer"]} { return 0 }
+    
+    send "W\r"
+    
+    expect {
+        -re "Online|Node|Users|Handle|sysop" { }
+        "restricted" {
+            send "Q\r"
+            expect {
+                eof { }
+                timeout { }
+            }
+            return 0
+        }
+        timeout { return 0 }
+    }
+    
+    # Press enter to continue if needed
+    expect {
+        "Selection:" { }
+        -re "Press|continue|\\?" {
+            send "\r"
+            expect {
+                "Selection:" { }
+                timeout { }
+            }
+        }
+        timeout { }
+    }
+    
+    send "Q\r"
+    expect {
+        eof { }
+        timeout { }
+    }
+    return 1
+}
+
+# Test 2: Verify self appears in who list
+run_test "self_in_who_list" {
+    if {![connect_bbs]} { return 0 }
+    if {![login_as "sysop" "mutineer"]} { return 0 }
+    
+    send "W\r"
+    
+    set found_self 0
+    expect {
+        "sysop" { set found_self 1 }
+        timeout { return 0 }
+    }
+    
+    # Press enter to continue if needed
+    expect {
+        "Selection:" { }
+        -re "Press|continue|\\?" {
+            send "\r"
+            expect {
+                "Selection:" { }
+                timeout { }
+            }
+        }
+        timeout { }
+    }
+    
+    send "Q\r"
+    expect {
+        eof { }
+        timeout { }
+    }
+    return $found_self
+}
+
+# Print summary and exit
+set exit_code [test_summary "test_who.exp"]
+exit $exit_code

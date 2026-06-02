@@ -1,0 +1,53 @@
+#!/usr/bin/expect -f
+# Test multi-login prevention
+
+source [file dirname [info script]]/expect_helpers.exp
+
+set timeout 10
+
+# First, login with sysop
+spawn nc localhost 2929
+expect "ANSI graphics"
+send "y\r"
+expect "Handle:"
+send "sysop\r"
+expect "Password:"
+send "mutineer\r"
+expect "Menu"
+
+# Keep first session alive
+set session1 $spawn_id
+
+# Now try to login again with same user
+spawn nc localhost 2929
+expect "ANSI graphics"
+send "y\r"
+expect "Handle:"
+send "sysop\r"
+expect "Password:"
+send "mutineer\r"
+
+# Should get multi-login rejection
+expect {
+    "already logged in" {
+        puts "\n\[PASS\] Multi-login correctly blocked"
+    }
+    "Menu" {
+        puts "\n\[FAIL\] Multi-login was allowed"
+        exit 1
+    }
+    timeout {
+        puts "\n\[FAIL\] Timeout waiting for multi-login response"
+        exit 1
+    }
+}
+
+expect "Goodbye"
+
+# Close first session
+set spawn_id $session1
+send "Q\r"
+expect eof
+
+puts "\n\[PASS\] Multi-login prevention test passed"
+exit 0

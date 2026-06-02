@@ -1,0 +1,62 @@
+# Build output
+build/
+build_debug/
+dist/
+
+# CMake artifacts (generated inside build dirs, not the root Makefile)
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+CTestTestfile.cmake
+
+# Compiled objects and archives
+*.o
+*.a
+*.so
+*.so.*
+
+# Test / coverage artifacts
+Testing/
+*.gcov
+*.gcda
+*.gcno
+
+# Runtime data — never commit live state
+data/mutineer.db
+data/mutineer.db-journal
+data/mutineer.db-wal
+data/mutineer.db-shm
+data/dropfiles/
+data/door_runtime/
+logs/*.log
+*.log
+*.pid
+
+# Buccaneer toolchain build artifacts (root-owned by Docker)
+src/buccaneer/build/
+src/buccaneer/bin/
+
+# Backups
+backups/
+
+# OS and editor noise
+.DS_Store
+.DS_Store?
+Thumbs.db
+*.swp
+*.swo
+*~
+*.orig
+*.bak
+.vscode/
+.idea/
+*.sublime-workspace
+
+# Sensitive config overrides — use conf/mutineer.conf.example instead
+# (conf/mutineer.conf is intentionally committed as a default example)
+
+# Pre-compiled test binaries in buccaneer tests dir
+src/buccaneer/tests/test_lexer
+src/buccaneer/tests/test_parser
+src/buccaneer/tests/test_package
+src/buccaneer/tests/test_value

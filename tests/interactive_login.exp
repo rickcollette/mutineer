@@ -1,0 +1,13 @@
+#!/usr/bin/expect -f
+# Simple interactive login test (telnet)
+set timeout 10
+set host "127.0.0.1"
+set port 2929
+spawn telnet $host $port
+expect "Handle:"
+send "sysop\r"
+expect "Password:"
+send "mutineer\r"
+expect "Selection:"
+send "Q\r"
+expect eof

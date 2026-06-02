@@ -1,0 +1,73 @@
+#!/bin/bash
+# Backup Mutineer BBS data
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+BBS_DIR="$(dirname "$SCRIPT_DIR")/dist"
+BACKUP_DIR="$(dirname "$SCRIPT_DIR")/backups"
+TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+BACKUP_NAME="mutineer_backup_$TIMESTAMP"
+
+mkdir -p "$BACKUP_DIR"
+
+echo "Creating backup: $BACKUP_NAME"
+
+# Create backup directory structure
+BACKUP_PATH="$BACKUP_DIR/$BACKUP_NAME"
+mkdir -p "$BACKUP_PATH"
+
+# Backup database (with integrity check)
+if [ -f "$BBS_DIR/data/mutineer.db" ]; then
+    echo "  - Database..."
+    sqlite3 "$BBS_DIR/data/mutineer.db" ".backup '$BACKUP_PATH/mutineer.db'"
+fi
+
+# Backup configuration
+if [ -d "$BBS_DIR/conf" ]; then
+    echo "  - Configuration..."
+    cp -a "$BBS_DIR/conf" "$BACKUP_PATH/"
+fi
+
+# Backup art files
+if [ -d "$BBS_DIR/art" ]; then
+    echo "  - Art files..."
+    cp -a "$BBS_DIR/art" "$BACKUP_PATH/"
+fi
+
+# Backup menus
+if [ -d "$BBS_DIR/menus" ]; then
+    echo "  - Menus..."
+    cp -a "$BBS_DIR/menus" "$BACKUP_PATH/"
+fi
+
+# Backup data directory (excluding database, already backed up)
+if [ -d "$BBS_DIR/data" ]; then
+    echo "  - Data files..."
+    mkdir -p "$BACKUP_PATH/data"
+    find "$BBS_DIR/data" -maxdepth 1 -type f ! -name "*.db" -exec cp {} "$BACKUP_PATH/data/" \; 2>/dev/null || true
+    # Copy subdirectories (file areas, etc)
+    find "$BBS_DIR/data" -mindepth 1 -maxdepth 1 -type d -exec cp -a {} "$BACKUP_PATH/data/" \; 2>/dev/null || true
+fi
+
+# Backup logs (last 7 days only)
+if [ -d "$BBS_DIR/logs" ]; then
+    echo "  - Recent logs..."
+    mkdir -p "$BACKUP_PATH/logs"
+    find "$BBS_DIR/logs" -type f -mtime -7 -exec cp {} "$BACKUP_PATH/logs/" \; 2>/dev/null || true
+fi
+
+# Create compressed archive
+echo "Compressing..."
+cd "$BACKUP_DIR"
+tar -czf "$BACKUP_NAME.tar.gz" "$BACKUP_NAME"
+rm -rf "$BACKUP_NAME"
+
+# Calculate size
+SIZE=$(du -h "$BACKUP_DIR/$BACKUP_NAME.tar.gz" | cut -f1)
+echo "Backup complete: $BACKUP_DIR/$BACKUP_NAME.tar.gz ($SIZE)"
+
+# Cleanup old backups (keep last 10)
+echo "Cleaning old backups (keeping last 10)..."
+ls -t "$BACKUP_DIR"/mutineer_backup_*.tar.gz 2>/dev/null | tail -n +11 | xargs rm -f 2>/dev/null || true
+
+echo "Done"

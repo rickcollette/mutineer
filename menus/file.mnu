@@ -1,0 +1,19 @@
+# File menu
+L|List Files|files|L10
+D|Download|files|L10
+U|Upload|files|L10
+N|New Files Scan|FN|L10
+P|Set Scan Date|setfilescandate|L10
+F|Find File|FF|L10
+E|Extended Info|FE|L10
+V|View Archive|FV|L10
+T|Test Archive|archivetest|L10
+X|Extract Archive|archiveextract|L10
+B|Batch Download|FB|L10
+J|Batch Upload|batchupload|L10
+K|Batch Remove Entry|batchremove|L10
+C|Clear Batch Queue|FC|L10
+R|Raw Directory|FR|L10
+Z|Zippy Search|FZ|L10
+A|File Admin|fileadmin|+A
+Q|Return|menu|

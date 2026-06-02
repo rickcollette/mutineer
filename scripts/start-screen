@@ -1,0 +1,23 @@
+#!/bin/bash
+# Start Mutineer BBS in a screen session with WFC console
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+BBS_DIR="$(dirname "$SCRIPT_DIR")/dist"
+SCREEN_NAME="mutineer-console"
+
+if screen -list | grep -q "$SCREEN_NAME"; then
+    echo "Screen session '$SCREEN_NAME' already exists"
+    echo "Attach with: screen -r $SCREEN_NAME"
+    exit 1
+fi
+
+if [ ! -x "$BBS_DIR/mutineer" ]; then
+    echo "Error: $BBS_DIR/mutineer not found. Run 'make dist' first."
+    exit 1
+fi
+
+cd "$BBS_DIR"
+screen -dmS "$SCREEN_NAME" ./mutineer
+echo "Mutineer started in screen session '$SCREEN_NAME'"
+echo "Attach with: screen -r $SCREEN_NAME"

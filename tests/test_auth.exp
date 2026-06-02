@@ -1,0 +1,251 @@
+#!/usr/bin/expect -f
+# Authentication tests for Mutineer BBS
+
+set script_dir [file dirname [info script]]
+source "$script_dir/expect_helpers.exp"
+
+puts ""
+puts "=== Authentication Tests ==="
+puts ""
+
+# Test 1: Successful login as sysop
+run_test "login_success" {
+    if {![connect_bbs]} { return 0 }
+    
+    # Handle ANSI prompt first if present
+    expect {
+        -re "ANSI.*\\?|graphics.*\\?" {
+            send "Y\r"
+        }
+        "Handle:" { }
+        timeout { return 0 }
+    }
+    
+    expect {
+        "Handle:" { }
+        timeout { return 0 }
+    }
+    send "sysop\r"
+    
+    expect {
+        "Password:" { }
+        timeout { return 0 }
+    }
+    send "mutineer\r"
+    
+    expect {
+        "Selection:" { }
+        timeout { return 0 }
+    }
+    
+    send "Q\r"
+    expect {
+        eof { }
+        timeout { }
+    }
+    return 1
+}
+
+# Test 2: Failed login with wrong password
+run_test "login_failure" {
+    if {![connect_bbs]} { return 0 }
+    
+    # Handle ANSI prompt first if present
+    expect {
+        -re "ANSI.*\\?|graphics.*\\?" {
+            send "Y\r"
+        }
+        "Handle:" { }
+        timeout { return 0 }
+    }
+    
+    expect {
+        "Handle:" { }
+        timeout { return 0 }
+    }
+    send "sysop\r"
+    
+    expect {
+        "Password:" { }
+        timeout { return 0 }
+    }
+    send "wrongpassword\r"
+    
+    set result 0
+    expect {
+        -re "Invalid password|Wrong password|denied" { 
+            set result 1
+        }
+        "Selection:" { 
+            send "Q\r"
+            set result 0
+        }
+        timeout { set result 0 }
+    }
+    
+    # If we got invalid password, test passed - return immediately
+    # The BBS closes connection after invalid password, so don't try more expects
+    if {$result == 1} {
+        catch {
+            expect {
+                eof { }
+                -re "Forgot.*password.*\\?" { send "N\r"; expect { eof {} timeout {} } }
+                timeout { }
+            }
+        }
+        return 1
+    }
+    
+    # Handle password recovery prompt if shown (only if we didn't get invalid password)
+    catch {
+        expect {
+            -re "Forgot.*password.*\\?" {
+                send "N\r"
+            }
+            "Handle:" { }
+            eof { }
+            timeout { }
+        }
+    }
+    
+    catch {
+        expect {
+            eof { }
+            "Handle:" { }
+            timeout { }
+        }
+    }
+    
+    return $result
+}
+
+# Test 3: New user registration
+run_test "new_user_registration" {
+    if {![connect_bbs]} { return 0 }
+    
+    set newuser [unique_user]
+    
+    # Handle ANSI prompt first if present
+    expect {
+        -re "ANSI.*\\?|graphics.*\\?" {
+            send "Y\r"
+        }
+        "Handle:" { }
+        timeout { return 0 }
+    }
+    
+    expect {
+        "Handle:" { }
+        timeout { return 0 }
+    }
+    send "$newuser\r"
+    
+    expect {
+        "New user?" { }
+        "Password:" {
+            # User already exists (unlikely with unique name)
+            return 0
+        }
+        timeout { return 0 }
+    }
+    send "Y\r"
+    
+    expect {
+        -re "Choose password:|password:" { }
+        timeout { return 0 }
+    }
+    send "testpass123\r"
+    
+    # Handle confirm password prompt
+    expect {
+        -re "Confirm password:|Confirm:" { }
+        timeout { return 0 }
+    }
+    send "testpass123\r"
+    
+    # Handle registration prompts - use a loop with counter
+    set got_menu 0
+    for {set i 0} {$i < 20} {incr i} {
+        expect {
+            "Selection:" { 
+                set got_menu 1
+                break
+            }
+            -re "City.*State|State.*Region|City/State" {
+                send "Test City, TS\r"
+            }
+            -re "Email.*address|Email:" {
+                send "test@example.com\r"
+            }
+            -re "Real name:" {
+                send "Test User\r"
+            }
+            -re "Social.*link|social" {
+                send "\r"
+            }
+            -re "SysOp|Message to|optional" {
+                send "\r"
+            }
+            -re "Subject:" {
+                send "\r"
+            }
+            timeout { 
+                break
+            }
+        }
+    }
+    
+    if {!$got_menu} { 
+        return 0 
+    }
+    
+    send "Q\r"
+    expect {
+        eof { }
+        timeout { }
+    }
+    return 1
+}
+
+# Test 4: Decline new user registration
+run_test "decline_new_user" {
+    if {![connect_bbs]} { return 0 }
+    
+    set newuser "decline[clock seconds]"
+    
+    # Handle ANSI prompt first if present
+    expect {
+        -re "ANSI.*\\?|graphics.*\\?" {
+            send "Y\r"
+        }
+        "Handle:" { }
+        timeout { return 0 }
+    }
+    
+    expect {
+        "Handle:" { }
+        timeout { return 0 }
+    }
+    send "$newuser\r"
+    
+    expect {
+        "New user?" { }
+        timeout { return 0 }
+    }
+    send "N\r"
+    
+    # Should get handle prompt again or disconnect
+    set result 0
+    expect {
+        "Handle:" { set result 1 }
+        "Goodbye" { set result 1 }
+        eof { set result 1 }
+        timeout { set result 0 }
+    }
+    
+    return $result
+}
+
+# Print summary and exit
+set exit_code [test_summary "test_auth.exp"]
+exit $exit_code

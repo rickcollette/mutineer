@@ -1,0 +1,124 @@
+#!/usr/bin/expect -f
+# Voting tests for Mutineer BBS
+
+set script_dir [file dirname [info script]]
+source "$script_dir/expect_helpers.exp"
+
+puts ""
+puts "=== Voting Tests ==="
+puts ""
+
+# Test 1: Access voting menu
+run_test "access_voting" {
+    if {![connect_bbs]} { return 0 }
+    if {![login_as "sysop" "mutineer"]} { return 0 }
+    
+    send "V\r"
+    
+    expect {
+        -re "Vote|Poll|Question|No.*votes|topics" { }
+        "restricted" {
+            send "Q\r"
+            expect eof
+            return 0
+        }
+        timeout { return 0 }
+    }
+    
+    # May already be back at menu
+    expect {
+        "Selection:" { }
+        timeout { }
+    }
+    
+    send "Q\r"
+    expect {
+        eof { }
+        timeout { }
+    }
+    catch { close }
+    catch { wait }
+    return 1
+}
+
+# Test 2: View vote topics
+run_test "view_vote_topics" {
+    if {![connect_bbs]} { return 0 }
+    if {![login_as "sysop" "mutineer"]} { return 0 }
+    
+    send "V\r"
+    
+    expect {
+        -re {Vote|Poll|Question|No.*votes|topics|\[.+\]} { }
+        timeout { return 0 }
+    }
+    
+    # May already be back at menu if no votes
+    expect {
+        "Selection:" { }
+        -re {No.*votes|Select|Choose|\?} { }
+        timeout { }
+    }
+    
+    send "Q\r"
+    expect {
+        eof { }
+        timeout { }
+    }
+    catch { close }
+    catch { wait }
+    return 1
+}
+
+# Test 3: Try to vote (may fail if no polls exist)
+run_test "cast_vote" {
+    if {![connect_bbs]} { return 0 }
+    if {![login_as "sysop" "mutineer"]} { return 0 }
+    
+    send "V\r"
+    
+    expect {
+        -re "Vote|Poll|Question|No.*votes" { }
+        timeout { return 0 }
+    }
+    
+    # If no votes, we'll be back at menu already
+    expect {
+        "Selection:" {
+            # No votes available, test passes
+            send "Q\r"
+            expect {
+                eof { }
+                timeout { }
+            }
+            catch { close }
+            catch { wait }
+            return 1
+        }
+        -re {Select.*:|Choose.*:|\?} {
+            # Try to select poll 1
+            send "1\r"
+        }
+        timeout { }
+    }
+    
+    # If we got options, try to vote
+    expect {
+        -re "Option|Choice|Invalid|not found|already voted|Results" { }
+        "Selection:" { }
+        timeout { }
+    }
+    
+    send "Q\r"
+    expect {
+        eof { }
+        timeout { }
+    }
+    catch { close }
+    catch { wait }
+    return 1
+}
+
+# Print summary and exit
+set exit_code [test_summary "test_vote.exp"]
+exit $exit_code

@@ -1,0 +1,236 @@
+#!/usr/bin/expect -f
+# Sysop/Admin function tests for Mutineer BBS
+
+set script_dir [file dirname [info script]]
+source "$script_dir/expect_helpers.exp"
+
+puts ""
+puts "=== Admin Function Tests ==="
+puts ""
+
+# Test 1: Access user editor (sysop only)
+run_test "user_editor_access" {
+    if {![connect_bbs]} { return 0 }
+    if {![login_as "sysop" "mutineer"]} { return 0 }
+    
+    send "E\r"
+    
+    expect {
+        -re "User handle:|Edit user" { }
+        "denied" {
+            send "Q\r"
+            expect {
+                eof { }
+                timeout { }
+            }
+            return 0
+        }
+        timeout { return 0 }
+    }
+    
+    # Cancel without editing
+    send "\r"
+    
+    expect {
+        "Selection:" { }
+        -re "not found|Invalid" {
+            expect {
+                "Selection:" { }
+                timeout { }
+            }
+        }
+        timeout { return 0 }
+    }
+    
+    send "Q\r"
+    expect {
+        eof { }
+        timeout { }
+    }
+    return 1
+}
+
+# Test 2: View user in editor
+run_test "user_editor_view" {
+    if {![connect_bbs]} { return 0 }
+    if {![login_as "sysop" "mutineer"]} { return 0 }
+    
+    send "E\r"
+    
+    expect {
+        -re "User handle:|Edit user" { }
+        timeout { return 0 }
+    }
+    
+    send "sysop\r"
+    
+    # Should see user fields
+    expect {
+        -re "Handle:|Level:|Real name:|Email:" { }
+        "not found" {
+            expect {
+                "Selection:" { }
+                timeout { }
+            }
+            send "Q\r"
+            expect {
+                eof { }
+                timeout { }
+            }
+            return 0
+        }
+        timeout { return 0 }
+    }
+    
+    # Skip through prompts without changing
+    for {set i 0} {$i < 20} {incr i} {
+        expect {
+            -re "Save changes|\\(Y/N\\)" {
+                send "N\r"
+                break
+            }
+            -re ":|\\?" {
+                send "\r"
+            }
+            "Selection:" { break }
+            timeout { break }
+        }
+    }
+    
+    expect {
+        "Selection:" { }
+        timeout { }
+    }
+    
+    send "Q\r"
+    expect {
+        eof { }
+        timeout { }
+    }
+    return 1
+}
+
+# Test 3: Area admin access
+run_test "area_admin_access" {
+    if {![connect_bbs]} { return 0 }
+    if {![login_as "sysop" "mutineer"]} { return 0 }
+    
+    send "A\r"
+    
+    expect {
+        -re "Add.*Delete.*ACS|Area admin|\\(1\\)|\\(2\\)|\\(3\\)" { }
+        "denied" {
+            send "Q\r"
+            expect {
+                eof { }
+                timeout { }
+            }
+            return 0
+        }
+        timeout { return 0 }
+    }
+    
+    # Cancel
+    send "Q\r"
+    
+    expect {
+        "Selection:" { }
+        timeout { return 0 }
+    }
+    
+    send "Q\r"
+    expect {
+        eof { }
+        timeout { }
+    }
+    return 1
+}
+
+# Test 4: File admin access
+run_test "file_admin_access" {
+    if {![connect_bbs]} { return 0 }
+    if {![login_as "sysop" "mutineer"]} { return 0 }
+    
+    send "R\r"
+    
+    expect {
+        -re "Add.*Delete.*ACS|File admin|\\(1\\)|\\(2\\)|\\(3\\)" { }
+        "denied" {
+            send "Q\r"
+            expect {
+                eof { }
+                timeout { }
+            }
+            return 0
+        }
+        timeout { return 0 }
+    }
+    
+    # Cancel
+    send "Q\r"
+    
+    expect {
+        "Selection:" { }
+        timeout { return 0 }
+    }
+    
+    send "Q\r"
+    expect {
+        eof { }
+        timeout { }
+    }
+    return 1
+}
+
+# Test 5: Maintenance menu access
+run_test "maintenance_access" {
+    if {![connect_bbs]} { return 0 }
+    if {![login_as "sysop" "mutineer"]} { return 0 }
+    
+    send "D\r"
+    
+    expect {
+        -re "Purge|VACUUM|maintenance|days" { }
+        "denied" {
+            send "Q\r"
+            expect {
+                eof { }
+                timeout { }
+            }
+            return 0
+        }
+        timeout { return 0 }
+    }
+    
+    # Cancel by entering 0 or pressing enter
+    send "0\r"
+    
+    expect {
+        -re "Purge|days|\\?" {
+            send "0\r"
+            exp_continue
+        }
+        -re "\\(Y/N\\)" {
+            send "N\r"
+            exp_continue
+        }
+        "Selection:" { }
+        timeout { }
+    }
+    
+    expect {
+        "Selection:" { }
+        timeout { }
+    }
+    
+    send "Q\r"
+    expect {
+        eof { }
+        timeout { }
+    }
+    return 1
+}
+
+# Print summary and exit
+set exit_code [test_summary "test_admin.exp"]
+exit $exit_code

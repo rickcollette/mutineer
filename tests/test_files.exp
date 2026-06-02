@@ -1,0 +1,179 @@
+#!/usr/bin/expect -f
+# File system tests for Mutineer BBS
+
+set script_dir [file dirname [info script]]
+source "$script_dir/expect_helpers.exp"
+
+puts ""
+puts "=== File System Tests ==="
+puts ""
+
+# Test 1: Access file menu
+run_test "access_files" {
+    if {![connect_bbs]} { return 0 }
+    if {![login_as "sysop" "mutineer"]} { return 0 }
+    
+    send "F\r"
+    
+    expect {
+        -re "File Areas:|Choose area|Area|Files" { }
+        "restricted" { 
+            send "Q\r"
+            expect {
+                eof { }
+                timeout { }
+            }
+            return 0 
+        }
+        timeout { return 0 }
+    }
+    
+    # Return to main menu
+    send "Q\r"
+    expect {
+        "Selection:" { }
+        timeout { }
+    }
+    
+    send "Q\r"
+    expect {
+        eof { }
+        timeout { }
+    }
+    return 1
+}
+
+# Test 2: List file areas
+run_test "list_file_areas" {
+    if {![connect_bbs]} { return 0 }
+    if {![login_as "sysop" "mutineer"]} { return 0 }
+    
+    send "F\r"
+    
+    expect {
+        -re {File Areas:|\[.+\]} { }
+        timeout { return 0 }
+    }
+    
+    send "Q\r"
+    expect {
+        "Selection:" { }
+        timeout { }
+    }
+    send "Q\r"
+    expect {
+        eof { }
+        timeout { }
+    }
+    return 1
+}
+
+# Test 3: Select a file area
+run_test "select_file_area" {
+    if {![connect_bbs]} { return 0 }
+    if {![login_as "sysop" "mutineer"]} { return 0 }
+    
+    send "F\r"
+    
+    expect {
+        -re "Choose area|Area number|\\?" { }
+        timeout { return 0 }
+    }
+    
+    # Try to select area 1
+    send "1\r"
+    
+    expect {
+        -re "Files:|No files|Download|batch|area|Invalid" { }
+        timeout { return 0 }
+    }
+    
+    send "Q\r"
+    expect {
+        "Selection:" { }
+        timeout { }
+    }
+    send "Q\r"
+    expect {
+        eof { }
+        timeout { }
+    }
+    return 1
+}
+
+# Test 4: View file list
+run_test "view_file_list" {
+    if {![connect_bbs]} { return 0 }
+    if {![login_as "sysop" "mutineer"]} { return 0 }
+    
+    send "F\r"
+    
+    expect {
+        -re "Choose area|Area" { }
+        timeout { return 0 }
+    }
+    
+    send "1\r"
+    
+    # Should see file listing or "no files" message
+    expect {
+        -re "Files:|No files|#.*filename|Download|batch" { }
+        timeout { return 0 }
+    }
+    
+    send "Q\r"
+    expect {
+        "Selection:" { }
+        timeout { }
+    }
+    send "Q\r"
+    expect {
+        eof { }
+        timeout { }
+    }
+    return 1
+}
+
+# Test 5: Batch queue operations (add to queue)
+run_test "batch_queue" {
+    if {![connect_bbs]} { return 0 }
+    if {![login_as "sysop" "mutineer"]} { return 0 }
+    
+    send "F\r"
+    
+    expect {
+        -re "Choose area|Area" { }
+        timeout { return 0 }
+    }
+    
+    send "1\r"
+    
+    expect {
+        -re "batch queue|Download|Files:|No files" { }
+        timeout { return 0 }
+    }
+    
+    # Try to add file 1 to batch (may fail if no files exist)
+    send "1\r"
+    
+    expect {
+        -re "Queued|added|batch|No file|Invalid|Download" { }
+        timeout { }
+    }
+    
+    send "Q\r"
+    expect {
+        "Selection:" { }
+        timeout { }
+    }
+    send "Q\r"
+    expect {
+        eof { }
+        timeout { }
+    }
+    return 1
+}
+
+# Print summary and exit
+set exit_code [test_summary "test_files.exp"]
+exit $exit_code

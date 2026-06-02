@@ -1,0 +1,15 @@
+[1;31m
+╔══════════════════════════════════════════════════════════════════╗
+║                     [1;33mMULTIPLE LOGIN DETECTED[1;31m                      ║
+╠══════════════════════════════════════════════════════════════════╣
+║                                                                  ║
+║  [1;37mYour account is already logged in from another location.[1;31m        ║
+║                                                                  ║
+║  [1;36mFor security reasons, multiple simultaneous logins are[1;31m          ║
+║  [1;36mnot permitted on this system.[1;31m                                   ║
+║                                                                  ║
+║  [1;33mPlease log off from your other session first, or contact[1;31m        ║
+║  [1;33mthe SysOp if you believe this is an error.[1;31m                      ║
+║                                                                  ║
+╚══════════════════════════════════════════════════════════════════╝
+[0m

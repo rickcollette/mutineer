@@ -1,0 +1,55 @@
+# Mutineer BBS Crontab Entries
+# Install with: crontab -e (then paste relevant lines)
+# Or: cat scripts/crontabs >> /tmp/cron.txt && crontab /tmp/cron.txt
+#
+# Adjust paths as needed - these assume BBS is installed at /home/megalith/mutineer
+
+# ============================================================================
+# BACKUP SCHEDULE
+# ============================================================================
+
+# Daily backup at 4:00 AM
+0 4 * * * /home/megalith/mutineer/scripts/backup >> /home/megalith/mutineer/dist/logs/backup.log 2>&1
+
+# Weekly full backup on Sunday at 3:00 AM (with extra retention)
+0 3 * * 0 BACKUP_KEEP=30 /home/megalith/mutineer/scripts/backup >> /home/megalith/mutineer/dist/logs/backup.log 2>&1
+
+# ============================================================================
+# MAINTENANCE
+# ============================================================================
+
+# Check for updates weekly on Monday at 5:00 AM (check only, no auto-install)
+0 5 * * 1 /home/megalith/mutineer/scripts/update-version check >> /home/megalith/mutineer/dist/logs/update.log 2>&1
+
+# Rotate logs monthly (keep last 12 months)
+0 0 1 * * find /home/megalith/mutineer/dist/logs -name "*.log" -mtime +365 -delete
+
+# Clean old backup files (keep last 30 days)
+0 0 * * * find /home/megalith/mutineer/backups -name "*.tar.gz" -mtime +30 -delete
+
+# ============================================================================
+# MONITORING
+# ============================================================================
+
+# Check if BBS is running every 5 minutes, restart if down
+*/5 * * * * /home/megalith/mutineer/scripts/watchdog >> /home/megalith/mutineer/dist/logs/watchdog.log 2>&1
+
+# ============================================================================
+# SCHEDULED EVENTS (examples)
+# ============================================================================
+
+# Daily reset message at midnight
+#0 0 * * * /home/megalith/mutineer/scripts/bbs-wall "Daily stats have been reset. New day begins!"
+
+# Weekend announcement
+#0 18 * * 5 /home/megalith/mutineer/scripts/bbs-wall "Happy Friday! Weekend events starting soon!"
+
+# Maintenance window warning (Sunday 2:45 AM, 15 min before backup)
+#45 2 * * 0 /home/megalith/mutineer/scripts/bbs-wall "System maintenance in 15 minutes. Please save your work."
+
+# ============================================================================
+# STARTUP (for systems without systemd)
+# ============================================================================
+
+# Start BBS on reboot
+@reboot sleep 30 && /home/megalith/mutineer/scripts/start-screen >> /home/megalith/mutineer/dist/logs/startup.log 2>&1

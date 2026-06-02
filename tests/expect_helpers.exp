@@ -1,0 +1,452 @@
+#!/usr/bin/expect -f
+# Shared helper library for Mutineer BBS expect tests
+# Source this file at the beginning of each test script
+
+# Default configuration
+set default_host "127.0.0.1"
+set default_port 2929
+set default_timeout 30
+
+# Test state tracking
+set test_count 0
+set test_passed 0
+set test_failed 0
+set current_test ""
+set current_spawn_id ""
+
+# Safely disconnect from BBS - handles already closed connections
+proc safe_disconnect {} {
+    global spawn_id current_spawn_id
+    
+    # Try to quit cleanly first
+    catch {
+        send "Q\r"
+        expect {
+            eof { }
+            "Selection:" {
+                send "Q\r"
+                expect eof
+            }
+            timeout { }
+        }
+    }
+    
+    catch { close }
+    catch { wait }
+    set current_spawn_id ""
+}
+
+# Connect to the BBS via telnet
+proc connect_bbs {{host ""} {port ""}} {
+    global default_host default_port default_timeout spawn_id current_spawn_id
+    
+    if {$host eq ""} { set host $default_host }
+    if {$port eq ""} { set port $default_port }
+    
+    set timeout $default_timeout
+    
+    # Clean up any existing connection
+    if {$current_spawn_id ne ""} {
+        catch { close -i $current_spawn_id }
+        catch { wait -i $current_spawn_id }
+        set current_spawn_id ""
+        set spawn_id ""
+    }
+    
+    spawn telnet $host $port
+    set current_spawn_id $spawn_id
+    
+    # Wait for initial connection
+    expect {
+        -re "Connected to" { }
+        -re "Connection refused" {
+            puts "ERROR: Connection refused to $host:$port"
+            catch { close -i $spawn_id }
+            catch { wait -i $spawn_id }
+            set current_spawn_id ""
+            set spawn_id ""
+            return 0
+        }
+        timeout {
+            puts "ERROR: Connection timeout to $host:$port"
+            catch { close -i $spawn_id }
+            catch { wait -i $spawn_id }
+            set current_spawn_id ""
+            set spawn_id ""
+            return 0
+        }
+    }
+    return 1
+}
+
+# Disconnect from BBS
+proc disconnect_bbs {} {
+    safe_disconnect
+}
+
+# Handle ANSI graphics prompt if present
+proc handle_ansi_prompt {} {
+    global spawn_id default_timeout
+    set timeout $default_timeout
+    
+    expect {
+        -re "ANSI.*\\?|graphics.*\\?" {
+            send "Y\r"
+            return 1
+        }
+        "Handle:" {
+            return 1
+        }
+        timeout {
+            return 0
+        }
+    }
+    return 1
+}
+
+# Login as existing user
+proc login_as {handle password} {
+    global spawn_id default_timeout
+    set timeout $default_timeout
+    
+    # Handle ANSI prompt first if present
+    expect {
+        -re "ANSI.*\\?|graphics.*\\?" {
+            send "Y\r"
+        }
+        "Handle:" { }
+        timeout {
+            puts "ERROR: Did not receive Handle prompt"
+            return 0
+        }
+    }
+    
+    # Now wait for Handle prompt if we answered ANSI
+    expect {
+        "Handle:" { }
+        timeout {
+            puts "ERROR: Did not receive Handle prompt after ANSI"
+            return 0
+        }
+    }
+    send "$handle\r"
+    
+    expect {
+        "Password:" { }
+        "New user?" {
+            puts "ERROR: User $handle does not exist"
+            return 0
+        }
+        timeout {
+            puts "ERROR: Did not receive Password prompt"
+            return 0
+        }
+    }
+    send "$password\r"
+    
+    expect {
+        "Selection:" { return 1 }
+        "Invalid password" {
+            puts "ERROR: Invalid password for $handle"
+            return 0
+        }
+        "Too many attempts" {
+            puts "ERROR: Too many login attempts"
+            return 0
+        }
+        timeout {
+            puts "ERROR: Login timeout"
+            return 0
+        }
+    }
+    return 1
+}
+
+# Register a new user
+proc register_user {handle password} {
+    global spawn_id default_timeout
+    set timeout $default_timeout
+    
+    # Handle ANSI prompt first if present
+    expect {
+        -re "ANSI.*\\?|graphics.*\\?" {
+            send "Y\r"
+        }
+        "Handle:" { }
+        timeout {
+            puts "ERROR: Did not receive Handle prompt"
+            return 0
+        }
+    }
+    
+    # Now wait for Handle prompt if we answered ANSI
+    expect {
+        "Handle:" { }
+        timeout {
+            puts "ERROR: Did not receive Handle prompt after ANSI"
+            return 0
+        }
+    }
+    send "$handle\r"
+    
+    expect {
+        "New user?" { }
+        "Password:" {
+            puts "ERROR: User $handle already exists"
+            return 0
+        }
+        timeout {
+            puts "ERROR: Did not receive New user prompt"
+            return 0
+        }
+    }
+    send "Y\r"
+    
+    expect {
+        -re "Choose password:|password:" { }
+        timeout {
+            puts "ERROR: Did not receive password prompt"
+            return 0
+        }
+    }
+    send "$password\r"
+    
+    # Handle confirm password prompt
+    expect {
+        -re "Confirm password:|Confirm:" { }
+        timeout {
+            puts "ERROR: Did not receive confirm password prompt"
+            return 0
+        }
+    }
+    send "$password\r"
+    
+    # Skip through any additional prompts until main menu
+    # Use a loop with a counter to prevent infinite loops
+    for {set i 0} {$i < 20} {incr i} {
+        expect {
+            "Selection:" { return 1 }
+            -re "City.*State|State.*Region|City/State" {
+                send "Test City, TS\r"
+            }
+            -re "Email.*address|Email:" {
+                send "test@example.com\r"
+            }
+            -re "Real name:" {
+                send "Test User\r"
+            }
+            -re "Social.*link|social" {
+                send "\r"
+            }
+            -re "SysOp|Message to|optional" {
+                send "\r"
+            }
+            -re "Subject:" {
+                send "\r"
+            }
+            timeout {
+                puts "ERROR: Registration timeout at step $i"
+                return 0
+            }
+        }
+    }
+    return 0
+}
+
+# Navigate to main menu (useful after sub-menus)
+proc goto_main_menu {} {
+    global spawn_id default_timeout
+    set timeout $default_timeout
+    
+    # Keep sending Q until we get to main Selection prompt
+    for {set i 0} {$i < 5} {incr i} {
+        send "Q\r"
+        expect {
+            "Selection:" { return 1 }
+            -re "\\(Y/N\\)|\\?" {
+                send "N\r"
+                exp_continue
+            }
+            eof { return 0 }
+            timeout { }
+        }
+    }
+    return 0
+}
+
+# Select a menu item by key
+proc select_menu_item {key} {
+    global spawn_id default_timeout
+    set timeout $default_timeout
+    
+    send "$key\r"
+    return 1
+}
+
+# Quit the BBS cleanly
+proc quit_bbs {} {
+    global spawn_id default_timeout
+    set timeout $default_timeout
+    
+    send "Q\r"
+    expect {
+        eof { return 1 }
+        "Selection:" {
+            # Still in a sub-menu, try again
+            send "Q\r"
+            exp_continue
+        }
+        timeout { return 0 }
+    }
+    return 1
+}
+
+# Expect a specific prompt pattern
+proc expect_prompt {pattern {timeout_val ""}} {
+    global spawn_id default_timeout
+    if {$timeout_val eq ""} { set timeout_val $default_timeout }
+    set timeout $timeout_val
+    
+    expect {
+        -re $pattern { return 1 }
+        timeout {
+            puts "ERROR: Timeout waiting for pattern: $pattern"
+            return 0
+        }
+    }
+    return 1
+}
+
+# Expect text to appear (non-blocking check)
+proc expect_text {pattern} {
+    global spawn_id default_timeout
+    set timeout $default_timeout
+    
+    expect {
+        -re $pattern { return 1 }
+        timeout { return 0 }
+    }
+    return 0
+}
+
+# Send text and expect a response
+proc send_expect {text pattern {timeout_val ""}} {
+    global spawn_id default_timeout
+    if {$timeout_val eq ""} { set timeout_val $default_timeout }
+    set timeout $timeout_val
+    
+    send "$text\r"
+    expect {
+        -re $pattern { return 1 }
+        timeout {
+            puts "ERROR: Timeout after sending '$text', waiting for: $pattern"
+            return 0
+        }
+    }
+    return 1
+}
+
+# Assert that output contains a string
+proc assert_contains {output needle} {
+    if {[string first $needle $output] >= 0} {
+        return 1
+    }
+    puts "ASSERT FAILED: Output does not contain '$needle'"
+    return 0
+}
+
+# Mark test as started
+proc test_start {name} {
+    global test_count current_test
+    incr test_count
+    set current_test $name
+    puts "  Running: $name"
+}
+
+# Mark test as passed
+proc test_pass {name} {
+    global test_passed
+    incr test_passed
+    puts "  PASS: $name"
+}
+
+# Mark test as failed
+proc test_fail {name reason} {
+    global test_failed
+    incr test_failed
+    puts "  FAIL: $name - $reason"
+}
+
+# Run a test with automatic pass/fail based on return value
+proc run_test {name body} {
+    global current_test current_spawn_id spawn_id
+    test_start $name
+    
+    # Prepend global spawn_id declaration to ensure it's accessible in test body
+    set full_body "global spawn_id current_spawn_id\n$body"
+    set code [catch {uplevel 1 $full_body} result options]
+    
+    # Always clean up connection after test
+    if {$current_spawn_id ne ""} {
+        catch { close -i $current_spawn_id }
+        catch { wait -i $current_spawn_id }
+        set current_spawn_id ""
+        set spawn_id ""
+        # Allow OS to fully reap the process before next spawn
+        after 100
+    }
+    
+    # code 0 = normal return, code 2 = return statement
+    if {$code == 0 || $code == 2} {
+        if {$result eq "1" || $result eq "true"} {
+            test_pass $name
+            return 1
+        } else {
+            test_fail $name "Test returned false ($result)"
+            return 0
+        }
+    } else {
+        # code 1 = error
+        test_fail $name "Error: $result"
+        return 0
+    }
+}
+
+# Print test summary and return exit code
+proc test_summary {script_name} {
+    global test_count test_passed test_failed
+    
+    puts ""
+    puts "=== $script_name Results ==="
+    puts "Passed: $test_passed/$test_count"
+    puts "Failed: $test_failed/$test_count"
+    
+    if {$test_failed > 0} {
+        return 1
+    }
+    return 0
+}
+
+# Generate unique username for tests
+proc unique_user {} {
+    return "test[clock seconds][pid]"
+}
+
+# Sleep for specified milliseconds
+proc msleep {ms} {
+    after $ms
+}
+
+# Wait for port to be available
+proc wait_for_port {host port {max_attempts 30}} {
+    for {set i 0} {$i < $max_attempts} {incr i} {
+        if {![catch {socket $host $port} sock]} {
+            close $sock
+            return 1
+        }
+        after 1000
+    }
+    return 0
+}
+
+puts "Expect helpers loaded"

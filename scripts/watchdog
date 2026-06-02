@@ -1,0 +1,52 @@
+#!/bin/bash
+# Watchdog - restart BBS if it's not running
+# Designed to be called from cron
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+BBS_DIR="$(dirname "$SCRIPT_DIR")/dist"
+PID_FILE="$BBS_DIR/mutineer.pid"
+PORT=2929
+
+# Check if process is running
+is_running() {
+    if [ -f "$PID_FILE" ] && kill -0 "$(cat "$PID_FILE")" 2>/dev/null; then
+        return 0
+    fi
+    return 1
+}
+
+# Check if port is listening
+is_listening() {
+    if command -v ss &>/dev/null; then
+        ss -tln | grep -q ":$PORT "
+    elif command -v netstat &>/dev/null; then
+        netstat -tln | grep -q ":$PORT "
+    else
+        return 0  # Can't check, assume OK
+    fi
+}
+
+if is_running && is_listening; then
+    exit 0
+fi
+
+# BBS is down, attempt restart
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] BBS not running, attempting restart..."
+
+# Clean up stale PID file
+rm -f "$PID_FILE"
+
+# Kill any orphaned screen sessions
+screen -ls | grep mutineer-console | cut -d. -f1 | xargs -r kill 2>/dev/null || true
+
+# Start fresh
+"$SCRIPT_DIR/start-screen"
+
+sleep 5
+
+if is_running && is_listening; then
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] BBS restarted successfully"
+else
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: Failed to restart BBS"
+    exit 1
+fi
