@@ -299,6 +299,53 @@ static bucc_symbol_t* lookup_symbol(bucc_emitter_t* emit, const char* name) {
     return bucc_scope_lookup(emit->sem->current_scope, name);
 }
 
+static bool resolve_on_call_base(bucc_emitter_t* emit, bucc_node_t* stmt,
+                                 uint16_t* base_out, uint8_t* count_out) {
+    if (!emit || !stmt || !base_out || !count_out) return false;
+    size_t count = stmt->data.on_call.targets.count;
+    if (count == 0 || count > UINT8_MAX) {
+        bucc_diag_error(emit->diag, stmt->span, BUCC_ERR_ARITY_MISMATCH,
+                        "ON CALL requires 1 to 255 targets");
+        return false;
+    }
+
+    uint32_t ids[UINT8_MAX];
+    for (size_t i = 0; i < count; i++) {
+        bucc_node_t* target = stmt->data.on_call.targets.items[i];
+        if (!target || target->kind != NODE_EXPR_IDENT) {
+            bucc_diag_error(emit->diag, stmt->span, BUCC_ERR_UNDEFINED_SYM,
+                            "ON CALL target must be a procedure name");
+            return false;
+        }
+        bucc_symbol_t* sym = lookup_symbol(emit, target->data.ident.name);
+        if (!sym || (sym->kind != SYM_PROCEDURE && sym->kind != SYM_FUNCTION)) {
+            bucc_diag_error(emit->diag, target->span, BUCC_ERR_UNDEFINED_SYM,
+                            "ON CALL target '%s' is not a procedure",
+                            target->data.ident.name ? target->data.ident.name : "");
+            return false;
+        }
+        ids[i] = sym->slot;
+    }
+
+    uint32_t base = ids[0];
+    for (size_t i = 1; i < count; i++) {
+        if (ids[i] != base + i) {
+            bucc_diag_error(emit->diag, stmt->span, BUCC_ERR_INVALID_HANDLER,
+                            "ON CALL targets must be contiguous procedures in declaration order");
+            return false;
+        }
+    }
+    if (base > UINT16_MAX) {
+        bucc_diag_error(emit->diag, stmt->span, BUCC_ERR_INVALID_HANDLER,
+                        "ON CALL target base is out of bytecode range");
+        return false;
+    }
+
+    *base_out = (uint16_t)base;
+    *count_out = (uint8_t)count;
+    return true;
+}
+
 static void emit_expr(bucc_emitter_t* emit, bucc_node_t* expr) {
     if (!emit || !expr) return;
     
@@ -613,6 +660,15 @@ static void emit_stmt(bucc_emitter_t* emit, bucc_node_t* stmt) {
                         bucc_emit_op(emit, OP_EQ);
                         bucc_emit_jump(emit, OP_JMP_TRUE, case_body);
                     }
+                    for (size_t j = 0; j < case_node->data.case_clause.range_lows.count &&
+                                       j < case_node->data.case_clause.range_highs.count; j++) {
+                        bucc_emit_op(emit, OP_DUP);
+                        emit_expr(emit, case_node->data.case_clause.range_lows.items[j]);
+                        emit_expr(emit, case_node->data.case_clause.range_highs.items[j]);
+                        bucc_emit_op_u16(emit, OP_RANGE_TEST, 0);
+                        bucc_emit_byte(emit, 0);
+                        bucc_emit_jump(emit, OP_JMP_TRUE, case_body);
+                    }
                     bucc_emit_jump(emit, OP_JMP, next_case);
                     
                     bucc_emit_label_here(emit, case_body);
@@ -789,9 +845,14 @@ static void emit_stmt(bucc_emitter_t* emit, bucc_node_t* stmt) {
         }
         
         case NODE_STMT_ON_CALL: {
+            uint16_t base = 0;
+            uint8_t count = 0;
+            if (!resolve_on_call_base(emit, stmt, &base, &count)) {
+                break;
+            }
             emit_expr(emit, stmt->data.on_call.selector);
-            bucc_emit_op_u16(emit, OP_DISPATCH_CALL, 0);
-            bucc_emit_byte(emit, (uint8_t)stmt->data.on_call.targets.count);
+            bucc_emit_op_u16(emit, OP_DISPATCH_CALL, base);
+            bucc_emit_byte(emit, count);
             break;
         }
         

@@ -214,6 +214,8 @@ static const char* DEFAULT_CONFIG =
     "wfc_status_logging_char=L\n"
     "wfc_status_online_char=A\n"
     "wfc_status_chat_char=S\n"
+    "wfc_shell_enabled=0\n"
+    "wfc_shell_command=\n"
     "\n"
     "# Scheduler\n"
     "scheduler_enabled=1\n"

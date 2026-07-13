@@ -128,6 +128,8 @@ void bucc_node_free(bucc_node_t* node) {
             
         case NODE_STMT_CASE:
             free_node_list_contents(&node->data.case_clause.values);
+            free_node_list_contents(&node->data.case_clause.range_lows);
+            free_node_list_contents(&node->data.case_clause.range_highs);
             bucc_node_free(node->data.case_clause.body);
             break;
             
@@ -436,6 +438,8 @@ bucc_node_t* bucc_ast_stmt_case(bucc_source_span_t span, bucc_node_t* body, bool
     bucc_node_t* node = bucc_node_new(NODE_STMT_CASE, span);
     if (!node) return NULL;
     bucc_node_list_init(&node->data.case_clause.values);
+    bucc_node_list_init(&node->data.case_clause.range_lows);
+    bucc_node_list_init(&node->data.case_clause.range_highs);
     node->data.case_clause.body = body;
     node->data.case_clause.is_else = is_else;
     return node;

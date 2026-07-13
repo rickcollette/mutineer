@@ -84,6 +84,12 @@ void bucc_door_set_data_api(bucc_door_runner_t* runner, bucc_data_api_t* api);
 void bucc_door_set_kv_api(bucc_door_runner_t* runner, bucc_kv_api_t* api);
 void bucc_door_set_text_api(bucc_door_runner_t* runner, bucc_text_api_t* api);
 void bucc_door_set_bbs_api(bucc_door_runner_t* runner, bucc_bbs_api_t* api);
+void bucc_door_set_term_api_ex(bucc_door_runner_t* runner, bucc_term_api_t* api, void* ctx);
+void bucc_door_set_user_api_ex(bucc_door_runner_t* runner, bucc_user_api_t* api, void* ctx);
+void bucc_door_set_data_api_ex(bucc_door_runner_t* runner, bucc_data_api_t* api, void* ctx);
+void bucc_door_set_kv_api_ex(bucc_door_runner_t* runner, bucc_kv_api_t* api, void* ctx);
+void bucc_door_set_text_api_ex(bucc_door_runner_t* runner, bucc_text_api_t* api, void* ctx);
+void bucc_door_set_bbs_api_ex(bucc_door_runner_t* runner, bucc_bbs_api_t* api, void* ctx);
 
 void bucc_door_set_limits(bucc_door_runner_t* runner, const bucc_limits_t* limits);
 

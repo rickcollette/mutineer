@@ -27,6 +27,41 @@ static void rm_rf(const char *path) {
   (void)system(cmd);
 }
 
+static char* read_source_file(const char* path) {
+  FILE* f = fopen(path, "rb");
+  if (!f) return NULL;
+  fseek(f, 0, SEEK_END);
+  long n = ftell(f);
+  fseek(f, 0, SEEK_SET);
+  char* buf = calloc(1, (size_t)n + 1);
+  if (!buf) {
+    fclose(f);
+    return NULL;
+  }
+  fread(buf, 1, (size_t)n, f);
+  fclose(f);
+  return buf;
+}
+
+static void test_upload_protocol_only_flow(void) {
+  printf("\n[upload: protocol-only flow]\n");
+  char* src = read_source_file("src/file_cmds.c");
+  CHECK(src != NULL, "file_cmds source readable");
+  if (!src) return;
+  char* fn = strstr(src, "void cmd_file_upload");
+  char* proto_list = strstr(fn ? fn : src, "db_protocols_list(s->db, protos, 4, \"up\")");
+  char* no_proto = strstr(fn ? fn : src, "No upload protocols configured. Upload unavailable.");
+  char* filename_prompt = strstr(fn ? fn : src, "Filename: ");
+  CHECK(proto_list && filename_prompt && proto_list < filename_prompt,
+        "upload checks configured protocols before filename prompt");
+  CHECK(no_proto != NULL, "upload reports unavailable when no upload protocol exists");
+  CHECK(strstr(fn ? fn : src, "server-local") == NULL &&
+        strstr(fn ? fn : src, "server local") == NULL &&
+        strstr(fn ? fn : src, "Source path") == NULL,
+        "upload flow does not ask for a server-local source path");
+  free(src);
+}
+
 /* =========================================================================
  * Test: extension detection via command-line archive tools
  * ========================================================================= */
@@ -261,6 +296,7 @@ int main(void) {
   test_archive_test_zip();
   test_archive_test_tar();
   test_archive_extract_zip();
+  test_upload_protocol_only_flow();
   test_archive_extract_tgz();
 
   printf("\n=== Results: %d passed, %d failed ===\n", g_pass, g_fail);

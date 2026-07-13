@@ -220,6 +220,8 @@ struct bucc_node {
         
         struct {
             bucc_node_list_t values;
+            bucc_node_list_t range_lows;
+            bucc_node_list_t range_highs;
             bucc_node_t*     body;
             bool             is_else;
         } case_clause;

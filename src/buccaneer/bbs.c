@@ -106,33 +106,57 @@ void bucc_door_set_session(bucc_door_runner_t* runner,
 }
 
 void bucc_door_set_term_api(bucc_door_runner_t* runner, bucc_term_api_t* api) {
-    if (!runner || !runner->host_ctx) return;
-    bucc_host_set_term_api(runner->host_ctx, api, runner->host_ctx->session_ctx);
+    bucc_door_set_term_api_ex(runner, api, runner && runner->host_ctx ? runner->host_ctx->session_ctx : NULL);
 }
 
 void bucc_door_set_user_api(bucc_door_runner_t* runner, bucc_user_api_t* api) {
-    if (!runner || !runner->host_ctx) return;
-    bucc_host_set_user_api(runner->host_ctx, api, runner->host_ctx->user_ctx);
+    bucc_door_set_user_api_ex(runner, api, runner && runner->host_ctx ? runner->host_ctx->user_ctx : NULL);
 }
 
 void bucc_door_set_data_api(bucc_door_runner_t* runner, bucc_data_api_t* api) {
-    if (!runner || !runner->host_ctx) return;
-    bucc_host_set_data_api(runner->host_ctx, api, runner->host_ctx->data_ctx);
+    bucc_door_set_data_api_ex(runner, api, runner && runner->host_ctx ? runner->host_ctx->data_ctx : NULL);
 }
 
 void bucc_door_set_kv_api(bucc_door_runner_t* runner, bucc_kv_api_t* api) {
-    if (!runner || !runner->host_ctx) return;
-    bucc_host_set_kv_api(runner->host_ctx, api, runner->host_ctx->kv_ctx);
+    bucc_door_set_kv_api_ex(runner, api, runner && runner->host_ctx ? runner->host_ctx->kv_ctx : NULL);
 }
 
 void bucc_door_set_text_api(bucc_door_runner_t* runner, bucc_text_api_t* api) {
-    if (!runner || !runner->host_ctx) return;
-    bucc_host_set_text_api(runner->host_ctx, api, runner->host_ctx->text_ctx);
+    bucc_door_set_text_api_ex(runner, api, runner && runner->host_ctx ? runner->host_ctx->text_ctx : NULL);
 }
 
 void bucc_door_set_bbs_api(bucc_door_runner_t* runner, bucc_bbs_api_t* api) {
+    bucc_door_set_bbs_api_ex(runner, api, runner && runner->host_ctx ? runner->host_ctx->bbs_ctx : NULL);
+}
+
+void bucc_door_set_term_api_ex(bucc_door_runner_t* runner, bucc_term_api_t* api, void* ctx) {
     if (!runner || !runner->host_ctx) return;
-    bucc_host_set_bbs_api(runner->host_ctx, api, runner->host_ctx->bbs_ctx);
+    bucc_host_set_term_api(runner->host_ctx, api, ctx);
+}
+
+void bucc_door_set_user_api_ex(bucc_door_runner_t* runner, bucc_user_api_t* api, void* ctx) {
+    if (!runner || !runner->host_ctx) return;
+    bucc_host_set_user_api(runner->host_ctx, api, ctx);
+}
+
+void bucc_door_set_data_api_ex(bucc_door_runner_t* runner, bucc_data_api_t* api, void* ctx) {
+    if (!runner || !runner->host_ctx) return;
+    bucc_host_set_data_api(runner->host_ctx, api, ctx);
+}
+
+void bucc_door_set_kv_api_ex(bucc_door_runner_t* runner, bucc_kv_api_t* api, void* ctx) {
+    if (!runner || !runner->host_ctx) return;
+    bucc_host_set_kv_api(runner->host_ctx, api, ctx);
+}
+
+void bucc_door_set_text_api_ex(bucc_door_runner_t* runner, bucc_text_api_t* api, void* ctx) {
+    if (!runner || !runner->host_ctx) return;
+    bucc_host_set_text_api(runner->host_ctx, api, ctx);
+}
+
+void bucc_door_set_bbs_api_ex(bucc_door_runner_t* runner, bucc_bbs_api_t* api, void* ctx) {
+    if (!runner || !runner->host_ctx) return;
+    bucc_host_set_bbs_api(runner->host_ctx, api, ctx);
 }
 
 void bucc_door_set_limits(bucc_door_runner_t* runner, const bucc_limits_t* limits) {

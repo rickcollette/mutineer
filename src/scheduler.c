@@ -17,9 +17,14 @@ extern volatile sig_atomic_t g_stop;
 typedef struct {
   BbsConfig cfg;
   BbsDb* db;
+  volatile sig_atomic_t stop;
   int warned_ids[64];
   char warned_next[64][32];
 } SchedCtx;
+
+static pthread_t g_sched_thread;
+static SchedCtx* g_sched_ctx = NULL;
+static pthread_mutex_t g_sched_mu = PTHREAD_MUTEX_INITIALIZER;
 
 static int parse_day_of_week(const char* day) {
   if (!day) return -1;
@@ -149,7 +154,7 @@ static void warning_mark_sent(SchedCtx* ctx, const DbEvent* ev) {
 
 static void* sched_thread(void* arg) {
   SchedCtx* ctx = (SchedCtx*)arg;
-  while (!g_stop) {
+  while (!g_stop && !ctx->stop) {
     time_t now = time(NULL);
     DbEvent evs[32];
     int count = db_events_list(ctx->db, evs, 32);
@@ -188,23 +193,44 @@ static void* sched_thread(void* arg) {
         run_event(ctx->db, evs[i].id, evs[i].command, evs[i].name);
       }
     }
-    sleep(ctx->cfg.scheduler_tick_sec > 0 ? ctx->cfg.scheduler_tick_sec : 30);
+    int ticks = ctx->cfg.scheduler_tick_sec > 0 ? ctx->cfg.scheduler_tick_sec : 30;
+    for (int i = 0; i < ticks && !g_stop && !ctx->stop; i++) sleep(1);
   }
-  free(ctx);
   return NULL;
 }
 
 void scheduler_start(const BbsConfig* cfg, BbsDb* db) {
   if (!cfg || !db || !cfg->scheduler_enabled) return;
+  pthread_mutex_lock(&g_sched_mu);
+  if (g_sched_ctx) {
+    pthread_mutex_unlock(&g_sched_mu);
+    return;
+  }
   SchedCtx* ctx = (SchedCtx*)calloc(1, sizeof(SchedCtx));
   ctx->cfg = *cfg;
   ctx->db = db;
-  pthread_t th;
-  if (pthread_create(&th, NULL, sched_thread, ctx) == 0) {
-    pthread_detach(th);
+  if (pthread_create(&g_sched_thread, NULL, sched_thread, ctx) == 0) {
+    g_sched_ctx = ctx;
   } else {
     free(ctx);
   }
+  pthread_mutex_unlock(&g_sched_mu);
+}
+
+void scheduler_stop(void) {
+  pthread_mutex_lock(&g_sched_mu);
+  SchedCtx* ctx = g_sched_ctx;
+  pthread_t th = g_sched_thread;
+  if (ctx) ctx->stop = 1;
+  pthread_mutex_unlock(&g_sched_mu);
+  if (ctx) pthread_join(th, NULL);
+  pthread_mutex_lock(&g_sched_mu);
+  if (g_sched_ctx == ctx) {
+    free(g_sched_ctx);
+    g_sched_ctx = NULL;
+    memset(&g_sched_thread, 0, sizeof(g_sched_thread));
+  }
+  pthread_mutex_unlock(&g_sched_mu);
 }
 
 void scheduler_run_logon_events(Session* s) {

@@ -30,6 +30,7 @@
 #include <getopt.h>
 #include <time.h>
 #include <sys/stat.h>
+#include <errno.h>
 
 #include "bbs_db.h"
 #include "bbs_config.h"
@@ -102,6 +103,46 @@ static int cmd_integrity(BbsDb* db, bool verbose) {
     return 0;
 }
 
+static bool sqlite_quote_string(const char* in, char* out, size_t cap) {
+    if (!in || !out || cap < 3) return false;
+    size_t o = 0;
+    out[o++] = '\'';
+    for (const char* p = in; *p; p++) {
+        if (o + 3 >= cap) return false;
+        if (*p == '\'') out[o++] = '\'';
+        out[o++] = *p;
+    }
+    out[o++] = '\'';
+    out[o] = '\0';
+    return true;
+}
+
+static bool copy_file_plain(const char* src, const char* dst) {
+    FILE* in = fopen(src, "rb");
+    if (!in) return false;
+    FILE* out = fopen(dst, "wb");
+    if (!out) {
+        fclose(in);
+        return false;
+    }
+    char buf[65536];
+    bool ok = true;
+    while (!feof(in)) {
+        size_t n = fread(buf, 1, sizeof(buf), in);
+        if (n > 0 && fwrite(buf, 1, n, out) != n) {
+            ok = false;
+            break;
+        }
+        if (ferror(in)) {
+            ok = false;
+            break;
+        }
+    }
+    if (fclose(out) != 0) ok = false;
+    fclose(in);
+    return ok;
+}
+
 static int cmd_backup(BbsDb* db, const char* db_path, const char* output_path, bool verbose) {
     char backup_path[512];
     
@@ -117,13 +158,20 @@ static int cmd_backup(BbsDb* db, const char* db_path, const char* output_path, b
     
     if (verbose) printf("Creating backup: %s\n", backup_path);
     
-    char sql[1024];
-    snprintf(sql, sizeof(sql), "VACUUM INTO '%s'", backup_path);
+    char quoted[1024];
+    char sql[1200];
+    if (!sqlite_quote_string(backup_path, quoted, sizeof(quoted))) {
+        fprintf(stderr, "Backup path too long\n");
+        return 3;
+    }
+    snprintf(sql, sizeof(sql), "VACUUM INTO %s", quoted);
     
     if (!db_exec(db, sql)) {
-        snprintf(sql, sizeof(sql), "cp '%s' '%s'", db_path, backup_path);
-        if (system(sql) != 0) {
-            fprintf(stderr, "Backup failed\n");
+        if (verbose) {
+            fprintf(stderr, "VACUUM INTO failed, falling back to plain file copy: %s\n", db_last_error(db));
+        }
+        if (!copy_file_plain(db_path, backup_path)) {
+            fprintf(stderr, "Backup failed: %s\n", strerror(errno));
             return 3;
         }
     }

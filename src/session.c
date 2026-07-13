@@ -597,6 +597,176 @@ static bool send_named_art(Session *s, const char *name)
   return false;
 }
 
+static bool resolve_start_menu_path(const Session *s, char *out, size_t cap)
+{
+  if (!s || !out || cap == 0)
+    return false;
+  out[0] = '\0';
+  if (s->user.user_start_menu > 0)
+  {
+    char candidate[256];
+    snprintf(candidate, sizeof(candidate), "menus/menu%d.mnu", s->user.user_start_menu);
+    if (access(candidate, R_OK) == 0)
+    {
+      snprintf(out, cap, "%s", candidate);
+      return true;
+    }
+    snprintf(candidate, sizeof(candidate), "menus/%d.mnu", s->user.user_start_menu);
+    if (access(candidate, R_OK) == 0)
+    {
+      snprintf(out, cap, "%s", candidate);
+      return true;
+    }
+  }
+  snprintf(out, cap, "%s", s->cfg.menu_main);
+  return out[0] != '\0';
+}
+
+static bool parse_strict_int(const char *text, int min_value, int max_value, int *out)
+{
+  if (!text || !text[0] || !out)
+    return false;
+  char *end = NULL;
+  long v = strtol(text, &end, 10);
+  if (!end || *end != '\0' || v < min_value || v > max_value)
+    return false;
+  *out = (int)v;
+  return true;
+}
+
+static bool cfg_edit_set_value(BbsConfig *cfg, const char *key, const char *value, char *err, size_t errcap)
+{
+  int n = 0;
+  if (!cfg || !key || !value)
+    return false;
+  if (!strcmp(key, "bbs_name"))
+    snprintf(cfg->bbs_name, sizeof(cfg->bbs_name), "%s", value);
+  else if (!strcmp(key, "sysop_name"))
+    snprintf(cfg->sysop_name, sizeof(cfg->sysop_name), "%s", value);
+  else if (!strcmp(key, "bind"))
+    snprintf(cfg->bind, sizeof(cfg->bind), "%s", value);
+  else if (!strcmp(key, "port"))
+  {
+    if (!parse_strict_int(value, 1, 65535, &n)) goto bad_int;
+    cfg->port = n;
+  }
+  else if (!strcmp(key, "menu_main"))
+    snprintf(cfg->menu_main, sizeof(cfg->menu_main), "%s", value);
+  else if (!strcmp(key, "data_path"))
+    snprintf(cfg->data_path, sizeof(cfg->data_path), "%s", value);
+  else if (!strcmp(key, "logs_path"))
+    snprintf(cfg->logs_path, sizeof(cfg->logs_path), "%s", value);
+  else if (!strcmp(key, "idle_timeout_sec"))
+  {
+    if (!parse_strict_int(value, 1, 86400, &n)) goto bad_int;
+    cfg->idle_timeout_sec = n;
+  }
+  else if (!strcmp(key, "session_time_limit_min"))
+  {
+    if (!parse_strict_int(value, 0, 1440, &n)) goto bad_int;
+    cfg->session_time_limit_min = n;
+  }
+  else if (!strcmp(key, "scheduler_enabled"))
+  {
+    if (!parse_strict_int(value, 0, 1, &n)) goto bad_bool;
+    cfg->scheduler_enabled = n;
+  }
+  else if (!strcmp(key, "scheduler_tick_sec"))
+  {
+    if (!parse_strict_int(value, 1, 86400, &n)) goto bad_int;
+    cfg->scheduler_tick_sec = n;
+  }
+  else if (!strcmp(key, "guest_enabled"))
+  {
+    if (!parse_strict_int(value, 0, 1, &n)) goto bad_bool;
+    cfg->guest_enabled = n;
+  }
+  else if (!strcmp(key, "guest_handle"))
+    snprintf(cfg->guest_handle, sizeof(cfg->guest_handle), "%s", value);
+  else if (!strcmp(key, "wfc_enabled"))
+  {
+    if (!parse_strict_int(value, 0, 1, &n)) goto bad_bool;
+    cfg->wfc_enabled = n;
+  }
+  else if (!strcmp(key, "wfc_shell_enabled"))
+  {
+    if (!parse_strict_int(value, 0, 1, &n)) goto bad_bool;
+    cfg->wfc_shell_enabled = n;
+  }
+  else if (!strcmp(key, "wfc_shell_command"))
+    snprintf(cfg->wfc_shell_command, sizeof(cfg->wfc_shell_command), "%s", value);
+  else if (!strcmp(key, "max_calls_per_day"))
+  {
+    if (!parse_strict_int(value, 0, 10000, &n)) goto bad_int;
+    cfg->max_calls_per_day = n;
+  }
+  else
+  {
+    if (err) snprintf(err, errcap, "unsupported config key");
+    return false;
+  }
+  return true;
+bad_int:
+  if (err) snprintf(err, errcap, "expected numeric value in range");
+  return false;
+bad_bool:
+  if (err) snprintf(err, errcap, "expected 0 or 1");
+  return false;
+}
+
+static void cmd_config_editor(Session *s)
+{
+  if (!acs_allows(s, "+A"))
+  {
+    send_str(s, "\r\nAccess denied.\r\n");
+    return;
+  }
+  if (!s->cfg.source_path[0])
+  {
+    send_str(s, "\r\nConfig source path is unknown; cannot save.\r\n");
+    return;
+  }
+
+  send_str(s, "\r\n\x1b[1;36mConfig Editor\x1b[0m\r\n");
+  send_str(s, "Editable keys: bbs_name sysop_name bind port menu_main data_path logs_path\r\n");
+  send_str(s, "idle_timeout_sec session_time_limit_min scheduler_enabled scheduler_tick_sec\r\n");
+  send_str(s, "guest_enabled guest_handle wfc_enabled wfc_shell_enabled wfc_shell_command max_calls_per_day\r\n");
+  char key[64] = {0};
+  char value[256] = {0};
+  if (prompt_line(s, "Key (blank to cancel): ", key, sizeof(key)) <= 0 || !key[0])
+    return;
+  if (prompt_line(s, "New value: ", value, sizeof(value)) < 0)
+    return;
+
+  BbsConfig next = s->cfg;
+  char err[128] = {0};
+  if (!cfg_edit_set_value(&next, key, value, err, sizeof(err)))
+  {
+    send_str(s, "\r\nInvalid value: ");
+    send_str(s, err[0] ? err : "rejected");
+    send_str(s, "\r\n");
+    log_audit(s->user.handle, "config_edit_rejected", key);
+    return;
+  }
+  if (!cfg_save(next.source_path, &next))
+  {
+    send_str(s, "\r\nConfig save failed.\r\n");
+    log_audit(s->user.handle, "config_edit_failed", key);
+    return;
+  }
+  if (cfg_load(next.source_path, &s->cfg))
+  {
+    send_str(s, "\r\nConfig saved and reloaded.\r\n");
+    log_audit(s->user.handle, "config_edit_saved", key);
+  }
+  else
+  {
+    s->cfg = next;
+    send_str(s, "\r\nConfig saved, but reload failed; active session kept edited values.\r\n");
+    log_audit(s->user.handle, "config_edit_reload_failed", key);
+  }
+}
+
 /* Parse escape sequence into an F-key number (1-12). Returns 0 if not an F-key. */
 static int parse_fkey(const uint8_t *line, int len)
 {
@@ -874,6 +1044,12 @@ static int authenticate(Session *s, DbUser *user_out)
   }
   log_info("auth: handle=%s", handle);
 
+  if (login_throttled(&s->cfg, s->ip, handle))
+  {
+    send_str(s, "\r\nToo many attempts. Please wait and try again.\r\n");
+    return -1;
+  }
+
   /* Check for guest login */
   if (s->cfg.guest_enabled && strcasecmp(handle, s->cfg.guest_handle) == 0)
   {
@@ -885,28 +1061,30 @@ static int authenticate(Session *s, DbUser *user_out)
     prompt_line(s, "Location (City, State): ", guest_location, sizeof(guest_location));
     prompt_line(s, "How did you hear about us? ", guest_referral, sizeof(guest_referral));
 
-    /* Create temporary guest user record */
     DbUser guest = {0};
-    guest.id = 0; /* No real ID */
-    snprintf(guest.handle, sizeof(guest.handle), "%s",
-             s->cfg.guest_handle[0] ? s->cfg.guest_handle : "GUEST");
+    const char *guest_handle = s->cfg.guest_handle[0] ? s->cfg.guest_handle : "GUEST";
+    if (!db_user_fetch(s->db, guest_handle, &guest))
+    {
+      if (!db_user_create(s->db, guest_handle, "!", s->cfg.guest_level_id > 0 ? s->cfg.guest_level_id : 1) ||
+          !db_user_fetch(s->db, guest_handle, &guest))
+      {
+        send_str(s, "\r\nGuest account is unavailable.\r\n");
+        log_audit(guest_handle, "guest_login_failed", "persistent user create failed");
+        return -1;
+      }
+    }
     snprintf(guest.real_name, sizeof(guest.real_name), "%s", guest_name[0] ? guest_name : guest.handle);
     snprintf(guest.city_state, sizeof(guest.city_state), "%s", guest_location);
-    guest.security_level_id = s->cfg.guest_level_id;
-    guest.level = 10;          /* Basic guest level */
-    guest.time_limit_min = 30; /* 30 minute limit for guests */
+    if (guest.time_limit_min <= 0)
+      guest.time_limit_min = 30;
 
     if (user_out)
       *user_out = guest;
     log_info("auth: guest login from %s (%s)", guest_name, guest_location);
+    log_audit(guest.handle, "guest_login", guest_referral[0] ? guest_referral : "no referral");
+    login_record(&s->cfg, s->ip, handle, true);
     send_str(s, "\r\nWelcome, guest! Your access is limited.\r\n");
     return 1;
-  }
-
-  if (login_throttled(&s->cfg, s->ip, handle))
-  {
-    send_str(s, "\r\nToo many attempts. Please wait and try again.\r\n");
-    return -1;
   }
 
   DbUser user;
@@ -1163,263 +1341,6 @@ static int authenticate(Session *s, DbUser *user_out)
       return 1;
     }
     return -1;
-  }
-}
-
-/* Full-screen editor for message composition */
-#define FSEDIT_MAX_LINES 50
-#define FSEDIT_LINE_LEN 78
-
-typedef struct
-{
-  char lines[FSEDIT_MAX_LINES][FSEDIT_LINE_LEN + 1];
-  int line_count;
-  int cur_line;
-  int cur_col;
-  int insert_mode;
-} FsEditor;
-
-static void fsedit_redraw(Session *s, FsEditor *ed)
-{
-  char buf[256];
-  send_str(s, "\x1b[2J\x1b[H"); /* Clear screen */
-  send_str(s, "\x1b[1;36m=== Full-Screen Editor ===\x1b[0m\r\n");
-  send_str(s, "\x1b[1;33mCtrl-S=Save  Ctrl-A=Abort  Ctrl-Y=Delete Line  Ctrl-N=Insert Line\x1b[0m\r\n");
-  send_str(s, "----------------------------------------------------------------------\r\n");
-
-  for (int i = 0; i < ed->line_count && i < 20; i++)
-  {
-    snprintf(buf, sizeof(buf), "%s%2d|%s\x1b[0m\r\n",
-             (i == ed->cur_line) ? "\x1b[1;32m" : "",
-             i + 1, ed->lines[i]);
-    send_str(s, buf);
-  }
-
-  send_str(s, "----------------------------------------------------------------------\r\n");
-  snprintf(buf, sizeof(buf), "Line %d/%d  Col %d  %s\r\n",
-           ed->cur_line + 1, ed->line_count, ed->cur_col + 1,
-           ed->insert_mode ? "[INS]" : "[OVR]");
-  send_str(s, buf);
-
-  /* Position cursor */
-  snprintf(buf, sizeof(buf), "\x1b[%d;%dH", ed->cur_line + 4, ed->cur_col + 4);
-  send_str(s, buf);
-}
-
-int fsedit_edit(Session *s, char *text_out, size_t text_cap)
-{
-  FsEditor ed;
-  memset(&ed, 0, sizeof(ed));
-  ed.line_count = 1;
-  ed.insert_mode = 1;
-
-  /* Parse existing text into lines if provided */
-  if (text_out[0])
-  {
-    char *p = text_out;
-    while (*p && ed.line_count < FSEDIT_MAX_LINES)
-    {
-      char *nl = strchr(p, '\n');
-      size_t len = nl ? (size_t)(nl - p) : strlen(p);
-      if (len > FSEDIT_LINE_LEN)
-        len = FSEDIT_LINE_LEN;
-      strncpy(ed.lines[ed.line_count - 1], p, len);
-      ed.lines[ed.line_count - 1][len] = '\0';
-      /* Remove trailing \r */
-      char *cr = strchr(ed.lines[ed.line_count - 1], '\r');
-      if (cr)
-        *cr = '\0';
-      if (nl)
-      {
-        ed.line_count++;
-        p = nl + 1;
-      }
-      else
-      {
-        break;
-      }
-    }
-  }
-
-  fsedit_redraw(s, &ed);
-
-  while (1)
-  {
-    uint8_t buf[8];
-    fd_set rfds;
-    FD_ZERO(&rfds);
-    FD_SET(s->fd, &rfds);
-    struct timeval tv = {.tv_sec = 60, .tv_usec = 0};
-    int r = select(s->fd + 1, &rfds, NULL, NULL, &tv);
-    if (r <= 0)
-      continue;
-
-    ssize_t n = recv(s->fd, buf, 1, 0);
-    if (n <= 0)
-      return -1;
-
-    uint8_t ch = buf[0];
-
-    /* Handle escape sequences */
-    if (ch == 0x1B)
-    {
-      /* Read escape sequence */
-      n = recv(s->fd, buf, 2, MSG_DONTWAIT);
-      if (n == 2 && buf[0] == '[')
-      {
-        switch (buf[1])
-        {
-        case 'A': /* Up arrow */
-          if (ed.cur_line > 0)
-            ed.cur_line--;
-          break;
-        case 'B': /* Down arrow */
-          if (ed.cur_line < ed.line_count - 1)
-            ed.cur_line++;
-          break;
-        case 'C': /* Right arrow */
-          if (ed.cur_col < (int)strlen(ed.lines[ed.cur_line]))
-            ed.cur_col++;
-          break;
-        case 'D': /* Left arrow */
-          if (ed.cur_col > 0)
-            ed.cur_col--;
-          break;
-        }
-        fsedit_redraw(s, &ed);
-      }
-      continue;
-    }
-
-    /* Ctrl-S = Save */
-    if (ch == 0x13)
-    {
-      text_out[0] = '\0';
-      for (int i = 0; i < ed.line_count; i++)
-      {
-        strncat(text_out, ed.lines[i], text_cap - strlen(text_out) - 3);
-        strncat(text_out, "\r\n", text_cap - strlen(text_out) - 1);
-      }
-      return 1;
-    }
-
-    /* Ctrl-A = Abort */
-    if (ch == 0x01)
-    {
-      return 0;
-    }
-
-    /* Ctrl-Y = Delete line */
-    if (ch == 0x19)
-    {
-      if (ed.line_count > 1)
-      {
-        for (int i = ed.cur_line; i < ed.line_count - 1; i++)
-        {
-          strcpy(ed.lines[i], ed.lines[i + 1]);
-        }
-        ed.line_count--;
-        if (ed.cur_line >= ed.line_count)
-          ed.cur_line = ed.line_count - 1;
-      }
-      else
-      {
-        ed.lines[0][0] = '\0';
-      }
-      ed.cur_col = 0;
-      fsedit_redraw(s, &ed);
-      continue;
-    }
-
-    /* Ctrl-N = Insert line */
-    if (ch == 0x0E)
-    {
-      if (ed.line_count < FSEDIT_MAX_LINES)
-      {
-        for (int i = ed.line_count; i > ed.cur_line + 1; i--)
-        {
-          strcpy(ed.lines[i], ed.lines[i - 1]);
-        }
-        ed.lines[ed.cur_line + 1][0] = '\0';
-        ed.line_count++;
-        ed.cur_line++;
-        ed.cur_col = 0;
-      }
-      fsedit_redraw(s, &ed);
-      continue;
-    }
-
-    /* Enter = new line */
-    if (ch == '\r' || ch == '\n')
-    {
-      if (ed.line_count < FSEDIT_MAX_LINES)
-      {
-        /* Split current line at cursor */
-        char rest[FSEDIT_LINE_LEN + 1];
-        strcpy(rest, ed.lines[ed.cur_line] + ed.cur_col);
-        ed.lines[ed.cur_line][ed.cur_col] = '\0';
-
-        /* Move lines down */
-        for (int i = ed.line_count; i > ed.cur_line + 1; i--)
-        {
-          strcpy(ed.lines[i], ed.lines[i - 1]);
-        }
-        strcpy(ed.lines[ed.cur_line + 1], rest);
-        ed.line_count++;
-        ed.cur_line++;
-        ed.cur_col = 0;
-      }
-      fsedit_redraw(s, &ed);
-      continue;
-    }
-
-    /* Backspace */
-    if (ch == 0x08 || ch == 0x7F)
-    {
-      if (ed.cur_col > 0)
-      {
-        char *line = ed.lines[ed.cur_line];
-        memmove(line + ed.cur_col - 1, line + ed.cur_col, strlen(line + ed.cur_col) + 1);
-        ed.cur_col--;
-      }
-      else if (ed.cur_line > 0)
-      {
-        /* Join with previous line */
-        int prev_len = (int)strlen(ed.lines[ed.cur_line - 1]);
-        if (prev_len + (int)strlen(ed.lines[ed.cur_line]) < FSEDIT_LINE_LEN)
-        {
-          strcat(ed.lines[ed.cur_line - 1], ed.lines[ed.cur_line]);
-          for (int i = ed.cur_line; i < ed.line_count - 1; i++)
-          {
-            strcpy(ed.lines[i], ed.lines[i + 1]);
-          }
-          ed.line_count--;
-          ed.cur_line--;
-          ed.cur_col = prev_len;
-        }
-      }
-      fsedit_redraw(s, &ed);
-      continue;
-    }
-
-    /* Regular character */
-    if (ch >= 0x20 && ch < 0x7F)
-    {
-      char *line = ed.lines[ed.cur_line];
-      int len = (int)strlen(line);
-      if (len < FSEDIT_LINE_LEN)
-      {
-        if (ed.insert_mode)
-        {
-          memmove(line + ed.cur_col + 1, line + ed.cur_col, strlen(line + ed.cur_col) + 1);
-        }
-        line[ed.cur_col] = (char)ch;
-        if (ed.cur_col >= len)
-          line[ed.cur_col + 1] = '\0';
-        ed.cur_col++;
-        fsedit_redraw(s, &ed);
-      }
-    }
   }
 }
 
@@ -1701,6 +1622,8 @@ static void handle_action(Session *s, const char *action)
     send_str(s, "\r\nFiles:\r\n");
     for (int i = 0; i < fcount; i++)
     {
+      if ((files[i].flags & FILE_FLAG_NOTVAL) && !acs_allows(s, "+A"))
+        continue;
       snprintf(buf, sizeof(buf), "#%d %-20s %8d bytes by %s\r\n  %s\r\n",
                files[i].id, files[i].filename, files[i].size_bytes, files[i].uploader, files[i].desc);
       send_str(s, buf);
@@ -1710,6 +1633,13 @@ static void handle_action(Session *s, const char *action)
     if (n > 0 && line[0])
     {
       int id = atoi((char *)line);
+      DbFileRec rec = {0};
+      if (!db_file_get(s->db, id, &rec) ||
+          ((rec.flags & FILE_FLAG_NOTVAL) && !acs_allows(s, "+A")))
+      {
+        send_str(s, "\r\nFile unavailable.\r\n");
+      }
+      else
       if (s->batch_count < (int)(sizeof(s->batch_queue) / sizeof(s->batch_queue[0])))
       {
         s->batch_queue[s->batch_count++] = id;
@@ -1724,54 +1654,9 @@ static void handle_action(Session *s, const char *action)
     if (n > 0 && line[0])
     {
       int id = atoi((char *)line);
-      DbFileRec rec;
-      if (!db_file_get(s->db, id, &rec))
-      {
-        send_str(s, "\r\nNot found.\r\n");
-      }
-      else
-      {
-        /* ratio/credit enforcement */
-        int cost = (rec.size_bytes / 1024) + 1;
-        if (s->credits < cost)
-        {
-          if (!send_named_art(s, "NOCREDTS"))
-            send_str(s, "\r\nNot enough credits.\r\n");
-        }
-        else
-        {
-          s->credits -= cost;
-          db_user_update_time_credit(s->db, s->user.id, s->time_left_min, s->credits, s->file_points);
-          char path[512];
-          if (!file_area_resolve(area.path, rec.filename, path, sizeof(path)))
-          {
-            send_str(s, "\r\nPath error.\r\n");
-          }
-          else if (access(path, R_OK) != 0)
-          {
-            send_str(s, "\r\nFile missing.\r\n");
-          }
-          else
-          {
-            send_str(s, "\r\nStarting file transfer...\r\n");
-            DbProtocol protos[4];
-            int pcnt = db_protocols_list(s->db, protos, 4, "down");
-            if (pcnt > 0)
-              protocol_launch(s, &protos[0], path, "down");
-            else
-            {
-              /* fallback: raw send */
-              char *data = file_read_all(path, NULL);
-              if (data)
-              {
-                fd_write_all(s->fd, data, strlen(data));
-                free(data);
-              }
-            }
-            db_stats_inc(s->db, "downloads");
-          }
-        }
-      }
+      char idbuf[32];
+      snprintf(idbuf, sizeof(idbuf), "%d", id);
+      cmd_file_download(s, idbuf);
     }
     send_str(s, "\r\nUpload a file using configured transfer protocol? (Y/N): ");
     n = session_readline(s, line, sizeof(line), s->cfg.idle_timeout_sec);
@@ -3679,39 +3564,7 @@ static void handle_action(Session *s, const char *action)
   }
   else if (!strcmp(action, "batchrun"))
   {
-    if (s->batch_count == 0)
-    {
-      send_str(s, "\r\nNo files queued.\r\n");
-      return;
-    }
-    char buf[256];
-    snprintf(buf, sizeof(buf), "\r\nProcessing %d queued downloads...\r\n", s->batch_count);
-    send_str(s, buf);
-    for (int i = 0; i < s->batch_count; i++)
-    {
-      DbFileRec rec;
-      if (db_file_get(s->db, s->batch_queue[i], &rec))
-      {
-        DbFileArea area = {0};
-        DbFileArea areas[32];
-        int ac = db_file_area_list(s->db, areas, 32);
-        for (int j = 0; j < ac; j++)
-          if (areas[j].id == rec.area_id)
-            area = areas[j];
-        char path[512];
-        if (file_area_resolve(area.path, rec.filename, path, sizeof(path)))
-        {
-          send_str(s, "Downloading ");
-          send_str(s, rec.filename);
-          send_str(s, "\r\n");
-          DbProtocol protos[4];
-          int pcnt = db_protocols_list(s->db, protos, 4, "down");
-          if (pcnt > 0)
-            protocol_launch(s, &protos[0], path, "down");
-        }
-      }
-    }
-    s->batch_count = 0;
+    cmd_file_batch_download(s, NULL);
   }
   else if (!strcmp(action, "setfilescandate"))
   {
@@ -3943,36 +3796,99 @@ static void handle_action(Session *s, const char *action)
       return;
     }
 #ifdef HAVE_SQLITE
+    log_audit(s->user.handle, "maintenance_start", "interactive");
     send_str(s, "\r\nRunning VACUUM...\r\n");
     db_exec(s->db, "VACUUM");
     send_str(s, "Purge messages older than days: ");
     uint8_t line[16];
     int n = session_readline(s, line, sizeof(line), s->cfg.idle_timeout_sec);
-    if (n > 0)
+    if (n > 0 && line[0])
     {
-      int days = atoi((char *)line);
-      char sql[128];
-      snprintf(sql, sizeof(sql), "DELETE FROM messages WHERE posted_at < datetime('now','-%d days')", days);
-      db_exec(s->db, sql);
+      int days = 0;
+      if (!parse_strict_int((char *)line, 1, 36500, &days))
+      {
+        send_str(s, "\r\nInvalid day count; message purge skipped.\r\n");
+      }
+      else
+      {
+        char prompt[160];
+        snprintf(prompt, sizeof(prompt),
+                 "Preview: messages older than %d day(s) will be removed. Type DELETE to confirm: ",
+                 days);
+        char confirm[16] = {0};
+        prompt_line(s, prompt, confirm, sizeof(confirm));
+        if (!strcmp(confirm, "DELETE"))
+        {
+          char sql[160];
+          snprintf(sql, sizeof(sql),
+                   "DELETE FROM messages WHERE created_at < datetime('now','-%d days')",
+                   days);
+          if (db_exec(s->db, "BEGIN IMMEDIATE") && db_exec(s->db, sql) && db_exec(s->db, "COMMIT"))
+          {
+            send_str(s, "\r\nMessage purge complete.\r\n");
+            log_audit(s->user.handle, "maintenance_purge_messages", prompt);
+          }
+          else
+          {
+            db_exec(s->db, "ROLLBACK");
+            send_str(s, "\r\nMessage purge failed and was rolled back.\r\n");
+          }
+        }
+      }
     }
     send_str(s, "Purge files older than days (0 skip): ");
     n = session_readline(s, line, sizeof(line), s->cfg.idle_timeout_sec);
     if (n > 0)
     {
-      int days = atoi((char *)line);
+      int days = 0;
+      if (!parse_strict_int((char *)line, 0, 36500, &days))
+      {
+        send_str(s, "\r\nInvalid day count; file purge skipped.\r\n");
+        days = 0;
+      }
       if (days > 0)
       {
-        char sql[128];
-        snprintf(sql, sizeof(sql), "DELETE FROM files WHERE uploaded_at < datetime('now','-%d days')", days);
-        db_exec(s->db, sql);
+        char confirm[16] = {0};
+        char prompt[160];
+        snprintf(prompt, sizeof(prompt),
+                 "Preview: file records older than %d day(s) will be removed. Type DELETE to confirm: ",
+                 days);
+        prompt_line(s, prompt, confirm, sizeof(confirm));
+        if (!strcmp(confirm, "DELETE"))
+        {
+          char sql[160];
+          snprintf(sql, sizeof(sql),
+                   "DELETE FROM files WHERE uploaded_at < datetime('now','-%d days')",
+                   days);
+          if (db_exec(s->db, "BEGIN IMMEDIATE") && db_exec(s->db, sql) && db_exec(s->db, "COMMIT"))
+          {
+            send_str(s, "\r\nFile record purge complete. Run file-area cleanup to remove orphaned files.\r\n");
+            log_audit(s->user.handle, "maintenance_purge_files", prompt);
+          }
+          else
+          {
+            db_exec(s->db, "ROLLBACK");
+            send_str(s, "\r\nFile purge failed and was rolled back.\r\n");
+          }
+        }
       }
     }
     send_str(s, "Pack users (reset SMW/timebank)? (Y/N): ");
     n = session_readline(s, line, sizeof(line), s->cfg.idle_timeout_sec);
     if (n > 0 && (line[0] == 'Y' || line[0] == 'y'))
     {
-      db_exec(s->db, "UPDATE users SET smw=0");
-      db_exec(s->db, "DELETE FROM meta WHERE k LIKE 'tb_%'");
+      if (db_exec(s->db, "BEGIN IMMEDIATE") &&
+          db_exec(s->db, "UPDATE users SET smw=0") &&
+          db_exec(s->db, "DELETE FROM meta WHERE k LIKE 'tb_%'") &&
+          db_exec(s->db, "COMMIT"))
+      {
+        log_audit(s->user.handle, "maintenance_pack_users", "smw/timebank reset");
+      }
+      else
+      {
+        db_exec(s->db, "ROLLBACK");
+        send_str(s, "\r\nUser pack failed and was rolled back.\r\n");
+      }
     }
     send_str(s, "\r\nMaintenance complete.\r\n");
 #else
@@ -4809,6 +4725,10 @@ static void handle_action(Session *s, const char *action)
       send_str(s, "\r\nFailed to queue netmail.\r\n");
     }
   }
+  else if (!strcmp(action, "configeditor"))
+  {
+    cmd_config_editor(s);
+  }
   else if (!strcmp(action, "help"))
   {
     send_str(s, "\r\nHelp:\r\n");
@@ -5106,7 +5026,9 @@ void *session_thread_main(void *arg)
 
   Menu menu;
   memset(&menu, 0, sizeof(menu));
-  if (!menu_load(s->cfg.menu_main, &menu))
+  char active_menu_path[256];
+  resolve_start_menu_path(s, active_menu_path, sizeof(active_menu_path));
+  if (!menu_load(active_menu_path, &menu))
   {
     send_str(s, "ERROR: failed to load menu file.\r\n");
     s->alive = 0;
@@ -5179,6 +5101,21 @@ void *session_thread_main(void *arg)
       if (!send_named_art(s, "NOACCESS"))
         send_str(s, "\r\nAccess denied.\r\n");
       continue;
+    }
+    if (it->flags & CMD_FLAG_PASSWORD)
+    {
+      char pw[64] = {0};
+      if (prompt_password(s, "Command password: ", pw, sizeof(pw)) <= 0 ||
+          strcmp(pw, it->password) != 0)
+      {
+        send_str(s, "\r\nInvalid command password.\r\n");
+        log_audit(s->user.handle, "menu_password_denied", it->action);
+        continue;
+      }
+    }
+    if (it->flags & CMD_FLAG_SYSOP_LOG)
+    {
+      log_audit(s->user.handle, "menu_sysop_command", it->action);
     }
     handle_action(s, it->action);
     send_str(s, "\r\n");

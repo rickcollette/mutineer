@@ -6,7 +6,6 @@
 #include "plank/plank_crypto.h"
 #include "plank/plank_types.h"
 #include <openssl/evp.h>
-#include <openssl/sha.h>
 #include <openssl/rand.h>
 #include <openssl/err.h>
 #include <stdlib.h>
@@ -169,23 +168,36 @@ bool plank_crypto_verify_ed25519(const uint8_t* message, size_t message_len,
  * ============================================================================ */
 
 bool plank_crypto_sha256(const uint8_t* data, size_t len, uint8_t* hash_out) {
-    SHA256_CTX ctx;
-    if (!SHA256_Init(&ctx)) return false;
-    if (!SHA256_Update(&ctx, data, len)) return false;
-    if (!SHA256_Final(hash_out, &ctx)) return false;
-    return true;
+    unsigned int out_len = 0;
+    return EVP_Digest(data, len, hash_out, &out_len, EVP_sha256(), NULL) == 1 &&
+           out_len == PLANK_HASH_SIZE;
 }
 
 void plank_sha256_init(plank_sha256_ctx_t* ctx) {
-    SHA256_Init((SHA256_CTX*)ctx->state);
+    if (!ctx) return;
+    EVP_MD_CTX* md = EVP_MD_CTX_new();
+    if (md) EVP_DigestInit_ex(md, EVP_sha256(), NULL);
+    memset(ctx->state, 0, sizeof(ctx->state));
+    memcpy(ctx->state, &md, sizeof(md));
 }
 
 void plank_sha256_update(plank_sha256_ctx_t* ctx, const uint8_t* data, size_t len) {
-    SHA256_Update((SHA256_CTX*)ctx->state, data, len);
+    if (!ctx) return;
+    EVP_MD_CTX* md = NULL;
+    memcpy(&md, ctx->state, sizeof(md));
+    if (md) EVP_DigestUpdate(md, data, len);
 }
 
 void plank_sha256_final(plank_sha256_ctx_t* ctx, uint8_t* hash_out) {
-    SHA256_Final(hash_out, (SHA256_CTX*)ctx->state);
+    if (!ctx || !hash_out) return;
+    EVP_MD_CTX* md = NULL;
+    unsigned int out_len = 0;
+    memcpy(&md, ctx->state, sizeof(md));
+    if (md) {
+        EVP_DigestFinal_ex(md, hash_out, &out_len);
+        EVP_MD_CTX_free(md);
+    }
+    memset(ctx->state, 0, sizeof(ctx->state));
 }
 
 /* ============================================================================

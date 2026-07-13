@@ -210,9 +210,7 @@ static bucc_token_t scan_number(bucc_lexer_t* lex) {
     uint32_t start_col = lex->col;
     const char* start = lex->source + lex->pos;
     
-    bool negative = false;
     if (peek_char(lex) == '-') {
-        negative = true;
         advance(lex);
     }
     

@@ -3,6 +3,7 @@
 
 typedef struct BbsConfig
 {
+  char source_path[256];
   char bind[64];
   int port;
   char db_path[256];
@@ -28,6 +29,8 @@ typedef struct BbsConfig
   char wfc_status_logging_char;
   char wfc_status_online_char;
   char wfc_status_chat_char;
+  int wfc_shell_enabled;
+  char wfc_shell_command[256];
   int scheduler_enabled; /* run events thread */
   int scheduler_tick_sec;
   /* auth */
@@ -72,3 +75,4 @@ typedef struct BbsConfig
 } BbsConfig;
 
 bool cfg_load(const char *path, BbsConfig *out);
+bool cfg_save(const char *path, const BbsConfig *cfg);

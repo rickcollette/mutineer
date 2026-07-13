@@ -6,7 +6,7 @@ Statuses: ✅ implemented, 🟡 partial/stubbed, ❌ missing, 🎨 theme-only.
 
 ## Visual / theme
 
-- 🎨 Base palette: green (Mutineer) vs. blue (Renegade). **Status:** 🟡 (motd + logon/help/sysop/WFC/system art done; file/message/door/voting screens still use inline text).
+- 🎨 Base palette: green (Mutineer) vs. blue (Renegade). **Status:** ✅ (motd, logon/help/sysop/WFC/system, file/message/door/chat/voting menu art available with text fallback).
 - 🎨 Color scheme selection. **Status:** ✅ (`pickscheme` action; 8 named schemes; `^0–^9` MCI tokens backed by scheme table).
 
 ## Core runtime
@@ -40,7 +40,7 @@ Statuses: ✅ implemented, 🟡 partial/stubbed, ❌ missing, 🎨 theme-only.
 
 - External `.mnu` files driving commands. **Status:** ✅
 - Menu Editor (`menueditor` sysop action). **Status:** ✅
-- Full menu tree (WFC, logon, sysop, file/message/door/chat/vote areas). **Status:** 🟡 (deeper per-area trees pending).
+- Full menu tree (WFC, logon, sysop, file/message/door/chat/vote areas). **Status:** ✅ (area menus are backed by `.mnu` trees and matching ANSI/ASCII display files).
 - MCI/ANSI token expansion (`%XX`, `~XX`, `^0–^9`, `~L#`, `~B#`, `~RS`). **Status:** ✅
 
 ## Messaging
@@ -50,15 +50,15 @@ Statuses: ✅ implemented, 🟡 partial/stubbed, ❌ missing, 🎨 theme-only.
 - Mailbox capacity limits, draft auto-save. **Status:** ✅
 - Email / local mail + SMW. **Status:** ✅
 - QWK packets (NDX, NEWFILES.DAT, per-user max-msgs). **Status:** ✅
-- FidoNet netmail outbound export. **Status:** 🟡 (export implemented; tosser integration pending).
+- FidoNet netmail outbound export and echomail queue handoff. **Status:** ✅ (export/import helpers, echolink queueing, high-water cleanup, and smoke coverage are in-tree).
 
 ## File areas
 
 - File bases, upload/download, descriptions, ratios, credits. **Status:** ✅
 - FP (scan date), FK (batch remove), FJ (batch upload), FT (archive test), FQ (archive extract). **Status:** ✅
 - `*7` Validate Files sysop command. **Status:** ✅
-- Archive viewing/conversion hooks. **Status:** ❌ (stub).
-- Batch transfer, protocols (Zmodem/Xmodem via external commands). **Status:** 🟡
+- Archive viewing/test/extract hooks. **Status:** ✅ (libarchive-backed; conversion/virus scan claims are not advertised as complete).
+- Batch transfer, protocols (Zmodem/Xmodem via external commands). **Status:** ✅ (argv templates, timeout supervision, and policy checks).
 
 ## Doors / external programs
 
@@ -67,7 +67,7 @@ Statuses: ✅ implemented, 🟡 partial/stubbed, ❌ missing, 🎨 theme-only.
 
 ## Chat
 
-- Multi-node channel chat, line chat, split-screen chat. **Status:** 🟡 (split-screen UI is rapid-refresh; proper two-panel ANSI pending).
+- Multi-node channel chat, line chat, split-screen chat. **Status:** ✅ (split-screen action routes to the ANSI split-chat implementation).
 - Paging sysop with max-page limit and email fallback. **Status:** ✅
 - Per-session chat logging to file (`chat_log_path`). **Status:** ✅
 
@@ -82,7 +82,7 @@ Statuses: ✅ implemented, 🟡 partial/stubbed, ❌ missing, 🎨 theme-only.
 ## Display files / art
 
 - Missing system display files (`NOACCESS`, `2MANYCAL`, `NOTLEFTA`, `NOCREDTS`, `PWCHANGE`). **Status:** ✅ (`.ans` + `.asc` created; wired into session at access denied / time limit / credits / password expiry / daily limit).
-- Full green-themed ANSI art pack. **Status:** 🟡 (system display files done; file/message/door/voting screens still inline).
+- Full green-themed ANSI art pack. **Status:** ✅ (system, menu, file, message, door, chat, and voting art files are present with ASCII fallback).
 
 ## Data storage
 
@@ -92,11 +92,11 @@ Statuses: ✅ implemented, 🟡 partial/stubbed, ❌ missing, 🎨 theme-only.
 
 - Telnet-only; no FOSSIL/modem emulation. **Status:** ✅
 - PLANK offline networking (bundle export/import, store, identity, dedupe). **Status:** ✅
-- FTN/netmail routing. **Status:** 🟡 (outbound netmail export; full tosser integration pending).
+- FTN/netmail routing. **Status:** ✅ (netmail/echomail helpers, export/import workflow, queue cleanup, and smoke path are available).
 
 ## Immediate next candidates
 
-1. Complete green ANSI art pack (file area, message area, door, voting screens).
-2. Improve split-screen chat UI (proper two-panel ANSI).
-3. FTN echomail tosser integration.
-4. Archive/virus-scan hook wiring.
+1. Add an interactive config editor for file-backed settings.
+2. Expand structured audit detail for external process launches.
+3. Add release-gate warning cleanup.
+4. Add Docker quick-start E2E coverage.

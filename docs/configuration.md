@@ -86,6 +86,8 @@ Keys match `BbsConfig` fields in `include/bbs_config.h`. Defaults shown are from
 | `wfc_status_logging_char` | char | `L` | No | Node status char during login |
 | `wfc_status_online_char` | char | `A` | No | Node status char when online |
 | `wfc_status_chat_char` | char | `S` | No | Node status char during chat |
+| `wfc_shell_enabled` | int/bool | `0` | No | Enable the local WFC `D` command |
+| `wfc_shell_command` | string | *(empty)* | No | Argv-template command for WFC `D`; disabled unless explicitly set |
 
 ### Scheduler
 
@@ -138,16 +140,14 @@ Keys match `BbsConfig` fields in `include/bbs_config.h`. Defaults shown are from
 | `door_cleanup_on_exit` | int | `1` | No | Remove runtime tree on successful exit |
 | `door_keep_failed_runs` | int | `0` | No | Keep runtime tree on failure for debugging |
 
-## Config Keys in mutineer.conf (Not in BbsConfig)
+### Plugins
 
-The sample `conf/mutineer.conf` includes plugin settings read by `plugin_loader.c` (not in `BbsConfig` struct):
-
-| Key | Example | Description |
-|-----|---------|-------------|
-| `plugins_enabled` | `true` | Enable plugin loading |
-| `plugins_dir` | `plugins` | Directory containing `.so` plugins |
-| `plugins_allowlist` | *(empty)* | Comma-separated plugin IDs to allow |
-| `plugins_denylist` | *(empty)* | Comma-separated plugin IDs to deny |
+| Key | Type | Default | Required | Description |
+|-----|------|---------|----------|-------------|
+| `plugins_enabled` | int/bool | `1` | No | Enable plugin loading |
+| `plugins_dir` | string | `plugins` | No | Directory containing `.so` plugins |
+| `plugins_allowlist` | string | *(empty)* | No | Comma-separated plugin IDs to allow |
+| `plugins_denylist` | string | *(empty)* | No | Comma-separated plugin IDs to deny |
 
 ## Required vs Optional
 

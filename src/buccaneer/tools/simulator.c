@@ -360,7 +360,7 @@ int bucc_simulate(const char* module_path, const char* user_name,
     
     bucc_vm_status_t status = bucc_vm_run(vm);
     
-    if (status != VM_OK && status != VM_HALT) {
+    if (status != VM_OK && status != VM_HALT && status != VM_CHAIN) {
         fprintf(stderr, "\nVM Error: %s\n", 
                 vm->error_message ? vm->error_message : "Unknown error");
         
@@ -387,5 +387,5 @@ int bucc_simulate(const char* module_path, const char* user_name,
     bucc_map_release(sim.kv_store);
     free(sim.user_name);
     
-    return (status == VM_OK || status == VM_HALT) ? 0 : 1;
+    return (status == VM_OK || status == VM_HALT || status == VM_CHAIN) ? 0 : 1;
 }

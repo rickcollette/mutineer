@@ -13,8 +13,129 @@
 #include <ctype.h>
 #include <sys/socket.h>
 #include <sys/select.h>
+#include <unistd.h>
 
 #define INBOX_MAX_MSGS 500   /* max private messages per user inbox */
+
+static bool area_password_cached(Session *s, char kind, int area_id) {
+  if (!s) return false;
+  for (int i = 0; i < s->area_password_cache_count; i++) {
+    if (s->area_password_cache[i].kind == kind &&
+        s->area_password_cache[i].area_id == area_id) return true;
+  }
+  return false;
+}
+
+static void area_password_cache_add(Session *s, char kind, int area_id) {
+  if (!s || area_password_cached(s, kind, area_id)) return;
+  int i = s->area_password_cache_count;
+  if (i >= (int)(sizeof(s->area_password_cache) / sizeof(s->area_password_cache[0]))) {
+    i = 0;
+  } else {
+    s->area_password_cache_count++;
+  }
+  s->area_password_cache[i].kind = kind;
+  s->area_password_cache[i].area_id = area_id;
+}
+
+static bool msg_area_password_ok(Session *s, const DbMsgArea *area) {
+  if (!s || !area || !area->password[0]) return true;
+  if (area_password_cached(s, 'M', area->id)) return true;
+  char entered[64] = {0};
+  char prompt[128];
+  snprintf(prompt, sizeof(prompt), "Password for %s: ", area->name);
+  if (prompt_line(s, prompt, entered, sizeof(entered)) < 0) return false;
+  if (strcmp(entered, area->password) != 0) {
+    send_str(s, "\r\nAccess denied.\r\n");
+    return false;
+  }
+  area_password_cache_add(s, 'M', area->id);
+  return true;
+}
+
+static bool msg_area_can(Session *s, int area_id, bool post, DbMsgArea *area_out) {
+  if (!s) return false;
+  if (area_id <= 0) return true; /* private mail has its own recipient checks */
+  DbMsgArea area;
+  if (!db_msg_area_get(s->db, area_id, &area)) {
+    send_str(s, "\r\nMessage area not found.\r\n");
+    return false;
+  }
+  const char *acs = post ? area.acs_post : area.acs_read;
+  if (!acs || !acs[0]) acs = area.acs;
+  if (acs && acs[0] && !acs_allows(s, acs)) {
+    send_str(s, "\r\nAccess denied.\r\n");
+    return false;
+  }
+  if (!msg_area_password_ok(s, &area)) return false;
+  if (area_out) *area_out = area;
+  return true;
+}
+
+static bool msg_can_read(Session *s, int msg_id, DbMessage *msg_out) {
+  DbMessage msg;
+  if (!db_message_get(s->db, msg_id, &msg)) {
+    send_str(s, "\r\nMessage not found.\r\n");
+    return false;
+  }
+  if (!msg_area_can(s, msg.area_id, false, NULL)) return false;
+  if (msg_out) *msg_out = msg;
+  return true;
+}
+
+static bool msg_can_reply(Session *s, int msg_id, DbMessage *msg_out) {
+  DbMessage msg;
+  if (!msg_can_read(s, msg_id, &msg)) return false;
+  if (!msg_area_can(s, msg.area_id, true, NULL)) return false;
+  if (msg_out) *msg_out = msg;
+  return true;
+}
+
+static void msg_display(Session *s, const DbMessage *msg) {
+  char buf[256];
+  send_str(s, "\r\n\x1b[1;33m============================================\x1b[0m\r\n");
+  snprintf(buf, sizeof(buf), "\x1b[1;37mFrom:\x1b[0m %s\r\n", msg->user_handle);
+  send_str(s, buf);
+  if (msg->to_name[0]) {
+    snprintf(buf, sizeof(buf), "\x1b[1;37mTo:\x1b[0m %s\r\n", msg->to_name);
+    send_str(s, buf);
+  }
+  snprintf(buf, sizeof(buf), "\x1b[1;37mSubject:\x1b[0m %s\r\n", msg->subject);
+  send_str(s, buf);
+  snprintf(buf, sizeof(buf), "\x1b[1;37mDate:\x1b[0m %s\r\n", msg->created_at);
+  send_str(s, buf);
+  if (msg->reply_to > 0) {
+    snprintf(buf, sizeof(buf), "\x1b[1;37mReply to:\x1b[0m #%d\r\n", msg->reply_to);
+    send_str(s, buf);
+  }
+  send_str(s, "\x1b[1;33m============================================\x1b[0m\r\n");
+  send_str(s, msg->body);
+  send_str(s, "\r\n\x1b[1;33m============================================\x1b[0m\r\n");
+}
+
+static bool safe_basename(const char *name) {
+  if (!name || !name[0] || strlen(name) > 127) return false;
+  if (strstr(name, "..")) return false;
+  for (const char *p = name; *p; p++) {
+    unsigned char c = (unsigned char)*p;
+    if (*p == '/' || *p == '\\' || c < 32) return false;
+  }
+  return true;
+}
+
+static bool attachment_path(Session *s, const char *name, char *out, size_t outcap) {
+  if (!safe_basename(name)) return false;
+  const char *data = (s && s->cfg.data_path[0]) ? s->cfg.data_path : "data";
+  char root[512], joined[512], realroot[512], realjoined[512];
+  snprintf(root, sizeof(root), "%s/attachments", data);
+  snprintf(joined, sizeof(joined), "%s/%s", root, name);
+  if (!realpath(root, realroot) || !realpath(joined, realjoined)) return false;
+  size_t n = strlen(realroot);
+  if (strncmp(realroot, realjoined, n) != 0 ||
+      (realjoined[n] != '/' && realjoined[n] != '\0')) return false;
+  snprintf(out, outcap, "%s", realjoined);
+  return true;
+}
 
 /* Append signature and/or tagline to a message body buffer. */
 static void append_sig_tag(Session *s, char *body, size_t cap) {
@@ -63,7 +184,7 @@ void cmd_msg_area_change(Session* s, const char* data) {
   if (data && data[0]) {
     int area_id = atoi(data);
     for (int i = 0; i < acount; i++) {
-      if (areas[i].id == area_id && acs_allows(s, areas[i].acs)) {
+      if (areas[i].id == area_id && msg_area_can(s, areas[i].id, false, NULL)) {
         s->current_msg_area = area_id;
         char buf[128];
         snprintf(buf, sizeof(buf), "\r\nMessage area changed to: %s\r\n", areas[i].name);
@@ -78,7 +199,7 @@ void cmd_msg_area_change(Session* s, const char* data) {
   send_str(s, "\r\nMessage Areas:\r\n");
   char buf[256];
   for (int i = 0; i < acount; i++) {
-    if (!acs_allows(s, areas[i].acs)) continue;
+    if (!msg_area_can(s, areas[i].id, false, NULL)) continue;
     int mcount = db_count_messages_area(s->db, areas[i].id);
     snprintf(buf, sizeof(buf), "  [%2d] %-30s (%d msgs)\r\n", areas[i].id, areas[i].name, mcount);
     send_str(s, buf);
@@ -91,10 +212,7 @@ void cmd_msg_area_change(Session* s, const char* data) {
   int area_id = atoi(line);
   for (int i = 0; i < acount; i++) {
     if (areas[i].id == area_id) {
-      if (!acs_allows(s, areas[i].acs)) {
-        send_str(s, "\r\nAccess denied.\r\n");
-        return;
-      }
+      if (!msg_area_can(s, areas[i].id, false, NULL)) return;
       s->current_msg_area = area_id;
       snprintf(buf, sizeof(buf), "\r\nMessage area changed to: %s\r\n", areas[i].name);
       send_str(s, buf);
@@ -117,7 +235,7 @@ void cmd_msg_area_list(Session* s, const char* data) {
   char buf[256];
   int total_msgs = 0;
   for (int i = 0; i < acount; i++) {
-    if (!acs_allows(s, areas[i].acs)) continue;
+    if (!msg_area_can(s, areas[i].id, false, NULL)) continue;
     int mcount = db_count_messages_area(s->db, areas[i].id);
     total_msgs += mcount;
     const char* marker = (areas[i].id == s->current_msg_area) ? "*" : " ";
@@ -140,10 +258,7 @@ void cmd_msg_read(Session* s, const char* data) {
   }
   
   DbMsgArea area;
-  if (!db_msg_area_get(s->db, s->current_msg_area, &area)) {
-    send_str(s, "\r\nMessage area not found.\r\n");
-    return;
-  }
+  if (!msg_area_can(s, s->current_msg_area, false, &area)) return;
   
   DbMessage msgs[50];
   int mcount = db_messages_list(s->db, s->current_msg_area, msgs, 50);
@@ -169,21 +284,8 @@ void cmd_msg_read(Session* s, const char* data) {
   
   int msg_id = atoi(line);
   DbMessage msg;
-  if (!db_message_get(s->db, msg_id, &msg)) {
-    send_str(s, "\r\nMessage not found.\r\n");
-    return;
-  }
-  
-  send_str(s, "\r\n\x1b[1;33m============================================\x1b[0m\r\n");
-  snprintf(buf, sizeof(buf), "\x1b[1;37mFrom:\x1b[0m %s\r\n", msg.user_handle);
-  send_str(s, buf);
-  snprintf(buf, sizeof(buf), "\x1b[1;37mSubject:\x1b[0m %s\r\n", msg.subject);
-  send_str(s, buf);
-  snprintf(buf, sizeof(buf), "\x1b[1;37mDate:\x1b[0m %s\r\n", msg.created_at);
-  send_str(s, buf);
-  send_str(s, "\x1b[1;33m============================================\x1b[0m\r\n");
-  send_str(s, msg.body);
-  send_str(s, "\r\n\x1b[1;33m============================================\x1b[0m\r\n");
+  if (!msg_can_read(s, msg_id, &msg)) return;
+  msg_display(s, &msg);
 }
 
 /* MP - Post message */
@@ -199,6 +301,8 @@ void cmd_msg_post(Session* s, const char* data) {
     send_str(s, "\r\nNo message area selected. Use MA to select one.\r\n");
     return;
   }
+
+  if (!msg_area_can(s, s->current_msg_area, true, NULL)) return;
 
   /* Offer to resume a saved draft for this area */
   DbDraft draft;
@@ -383,7 +487,7 @@ void cmd_msg_new_scan(Session* s, const char* data) {
   int found = 0;
 
   for (int a = 0; a < acount; a++) {
-    if (!acs_allows(s, areas[a].acs)) continue;
+    if (!msg_area_can(s, areas[a].id, false, NULL)) continue;
     /* MZ: skip areas the user has excluded from scan */
     if (!db_user_scan_area_get(s->db, s->user.id, areas[a].id)) continue;
 
@@ -424,7 +528,7 @@ void cmd_msg_search(Session* s, const char* data) {
   char buf[512];
   
   for (int a = 0; a < acount; a++) {
-    if (!acs_allows(s, areas[a].acs)) continue;
+    if (!msg_area_can(s, areas[a].id, false, NULL)) continue;
     
     DbMessage msgs[100];
     int mcount = db_messages_list(s->db, areas[a].id, msgs, 100);
@@ -472,10 +576,7 @@ void cmd_msg_reply(Session* s, const char* data) {
   }
   
   DbMessage orig;
-  if (!db_message_get(s->db, msg_id, &orig)) {
-    send_str(s, "\r\nMessage not found.\r\n");
-    return;
-  }
+  if (!msg_can_reply(s, msg_id, &orig)) return;
   
   char buf[256];
   snprintf(buf, sizeof(buf), "\r\nReplying to: %s by %s\r\n", orig.subject, orig.user_handle);
@@ -567,6 +668,7 @@ void cmd_msg_read_new(Session* s, const char* data) {
     send_str(s, "\r\nNo message area selected. Use MA to select one.\r\n");
     return;
   }
+  if (!msg_area_can(s, s->current_msg_area, false, NULL)) return;
   
   const char* since = s->user.last_login_at;
   if (!since || !since[0]) {
@@ -623,7 +725,7 @@ void cmd_msg_your_messages(Session* s, const char* data) {
   char buf[256];
   
   for (int a = 0; a < acount; a++) {
-    if (!acs_allows(s, areas[a].acs)) continue;
+    if (!msg_area_can(s, areas[a].id, false, NULL)) continue;
     
     DbMessage msgs[100];
     int mcount = db_messages_list(s->db, areas[a].id, msgs, 100);
@@ -673,7 +775,7 @@ void cmd_msg_your_scan(Session* s, const char* data) {
   send_str(s, "\r\n\x1b[1;32mPublic Messages:\x1b[0m\r\n");
   
   for (int a = 0; a < acount; a++) {
-    if (!acs_allows(s, areas[a].acs)) continue;
+    if (!msg_area_can(s, areas[a].id, false, NULL)) continue;
     
     DbMessage msgs[100];
     int mcount = db_messages_list(s->db, areas[a].id, msgs, 100);
@@ -723,25 +825,8 @@ void cmd_msg_your_scan(Session* s, const char* data) {
   
   int msg_id = atoi(line);
   DbMessage msg;
-  if (!db_message_get(s->db, msg_id, &msg)) {
-    send_str(s, "\r\nMessage not found.\r\n");
-    return;
-  }
-  
-  send_str(s, "\r\n\x1b[1;33m============================================\x1b[0m\r\n");
-  snprintf(buf, sizeof(buf), "\x1b[1;37mFrom:\x1b[0m %s\r\n", msg.user_handle);
-  send_str(s, buf);
-  if (msg.to_name[0]) {
-    snprintf(buf, sizeof(buf), "\x1b[1;37mTo:\x1b[0m %s\r\n", msg.to_name);
-    send_str(s, buf);
-  }
-  snprintf(buf, sizeof(buf), "\x1b[1;37mSubject:\x1b[0m %s\r\n", msg.subject);
-  send_str(s, buf);
-  snprintf(buf, sizeof(buf), "\x1b[1;37mDate:\x1b[0m %s\r\n", msg.created_at);
-  send_str(s, buf);
-  send_str(s, "\x1b[1;33m============================================\x1b[0m\r\n");
-  send_str(s, msg.body);
-  send_str(s, "\r\n\x1b[1;33m============================================\x1b[0m\r\n");
+  if (!msg_can_read(s, msg_id, &msg)) return;
+  msg_display(s, &msg);
 }
 
 /* RM - Edit own message */
@@ -758,10 +843,7 @@ void cmd_msg_edit(Session* s, const char* data) {
   }
   
   DbMessage msg;
-  if (!db_message_get(s->db, msg_id, &msg)) {
-    send_str(s, "\r\nMessage not found.\r\n");
-    return;
-  }
+  if (!msg_can_reply(s, msg_id, &msg)) return;
   
   /* Check if user owns this message or is sysop */
   if (msg.user_id != s->user.id && !acs_allows(s, "+A")) {
@@ -817,10 +899,7 @@ void cmd_msg_continuous_read(Session* s, const char* data) {
   }
   
   DbMsgArea area;
-  if (!db_msg_area_get(s->db, s->current_msg_area, &area)) {
-    send_str(s, "\r\nMessage area not found.\r\n");
-    return;
-  }
+  if (!msg_area_can(s, s->current_msg_area, false, &area)) return;
   
   DbMessage msgs[100];
   int mcount = db_messages_list(s->db, s->current_msg_area, msgs, 100);
@@ -877,10 +956,7 @@ void cmd_msg_quick_scan(Session* s, const char* data) {
   }
   
   DbMsgArea area;
-  if (!db_msg_area_get(s->db, s->current_msg_area, &area)) {
-    send_str(s, "\r\nMessage area not found.\r\n");
-    return;
-  }
+  if (!msg_area_can(s, s->current_msg_area, false, &area)) return;
   
   DbMessage msgs[100];
   int mcount = db_messages_list(s->db, s->current_msg_area, msgs, 100);
@@ -912,10 +988,7 @@ void cmd_msg_list(Session* s, const char* data) {
   }
   
   DbMsgArea area;
-  if (!db_msg_area_get(s->db, s->current_msg_area, &area)) {
-    send_str(s, "\r\nMessage area not found.\r\n");
-    return;
-  }
+  if (!msg_area_can(s, s->current_msg_area, false, &area)) return;
   
   DbMessage msgs[100];
   int mcount = db_messages_list(s->db, s->current_msg_area, msgs, 100);
@@ -956,16 +1029,7 @@ void cmd_msg_list(Session* s, const char* data) {
         prompt_line(s, "Message #: ", num, sizeof(num));
         int msg_id = atoi(num);
         DbMessage msg;
-        if (db_message_get(s->db, msg_id, &msg)) {
-          send_str(s, "\r\n\x1b[1;33m============================================\x1b[0m\r\n");
-          snprintf(buf, sizeof(buf), "\x1b[1;37mFrom:\x1b[0m %s\r\n", msg.user_handle);
-          send_str(s, buf);
-          snprintf(buf, sizeof(buf), "\x1b[1;37mSubject:\x1b[0m %s\r\n", msg.subject);
-          send_str(s, buf);
-          send_str(s, "\x1b[1;33m============================================\x1b[0m\r\n");
-          send_str(s, msg.body);
-          send_str(s, "\r\n\x1b[1;33m============================================\x1b[0m\r\n");
-        }
+        if (msg_can_read(s, msg_id, &msg)) msg_display(s, &msg);
       }
     } else {
       break;
@@ -991,10 +1055,7 @@ void cmd_msg_jump_reply(Session* s, const char* data) {
   }
   
   DbMessage msg;
-  if (!db_message_get(s->db, msg_id, &msg)) {
-    send_str(s, "\r\nMessage not found.\r\n");
-    return;
-  }
+  if (!msg_can_read(s, msg_id, &msg)) return;
   
   /* Find replies to this message */
   DbMessage replies[50];
@@ -1024,16 +1085,7 @@ void cmd_msg_jump_reply(Session* s, const char* data) {
       int n = session_readline(s, line, sizeof(line), 30);
       if (n > 0 && line[0] != 'N' && line[0] != 'n') {
         DbMessage parent;
-        if (db_message_get(s->db, msg.reply_to, &parent)) {
-          send_str(s, "\r\n\x1b[1;33m============================================\x1b[0m\r\n");
-          snprintf(buf, sizeof(buf), "\x1b[1;37mFrom:\x1b[0m %s\r\n", parent.user_handle);
-          send_str(s, buf);
-          snprintf(buf, sizeof(buf), "\x1b[1;37mSubject:\x1b[0m %s\r\n", parent.subject);
-          send_str(s, buf);
-          send_str(s, "\x1b[1;33m============================================\x1b[0m\r\n");
-          send_str(s, parent.body);
-          send_str(s, "\r\n\x1b[1;33m============================================\x1b[0m\r\n");
-        }
+        if (msg_can_read(s, msg.reply_to, &parent)) msg_display(s, &parent);
       }
     }
     return;
@@ -1053,21 +1105,8 @@ void cmd_msg_jump_reply(Session* s, const char* data) {
   
   int read_id = atoi(line);
   DbMessage reply;
-  if (!db_message_get(s->db, read_id, &reply)) {
-    send_str(s, "\r\nMessage not found.\r\n");
-    return;
-  }
-  
-  send_str(s, "\r\n\x1b[1;33m============================================\x1b[0m\r\n");
-  snprintf(buf, sizeof(buf), "\x1b[1;37mFrom:\x1b[0m %s\r\n", reply.user_handle);
-  send_str(s, buf);
-  snprintf(buf, sizeof(buf), "\x1b[1;37mSubject:\x1b[0m %s\r\n", reply.subject);
-  send_str(s, buf);
-  snprintf(buf, sizeof(buf), "\x1b[1;37mDate:\x1b[0m %s\r\n", reply.created_at);
-  send_str(s, buf);
-  send_str(s, "\x1b[1;33m============================================\x1b[0m\r\n");
-  send_str(s, reply.body);
-  send_str(s, "\r\n\x1b[1;33m============================================\x1b[0m\r\n");
+  if (!msg_can_read(s, read_id, &reply)) return;
+  msg_display(s, &reply);
 }
 
 /* RT - Thread view */
@@ -1084,10 +1123,7 @@ void cmd_msg_thread_view(Session* s, const char* data) {
   }
   
   DbMessage root;
-  if (!db_message_get(s->db, msg_id, &root)) {
-    send_str(s, "\r\nMessage not found.\r\n");
-    return;
-  }
+  if (!msg_can_read(s, msg_id, &root)) return;
   
   /* Find the thread root */
   int thread_root_id = root.thread_root > 0 ? root.thread_root : root.id;
@@ -1153,25 +1189,8 @@ void cmd_msg_thread_view(Session* s, const char* data) {
   
   int read_id = atoi(line);
   DbMessage msg;
-  if (!db_message_get(s->db, read_id, &msg)) {
-    send_str(s, "\r\nMessage not found.\r\n");
-    return;
-  }
-  
-  send_str(s, "\r\n\x1b[1;33m============================================\x1b[0m\r\n");
-  snprintf(buf, sizeof(buf), "\x1b[1;37mFrom:\x1b[0m %s\r\n", msg.user_handle);
-  send_str(s, buf);
-  snprintf(buf, sizeof(buf), "\x1b[1;37mSubject:\x1b[0m %s\r\n", msg.subject);
-  send_str(s, buf);
-  snprintf(buf, sizeof(buf), "\x1b[1;37mDate:\x1b[0m %s\r\n", msg.created_at);
-  send_str(s, buf);
-  if (msg.reply_to > 0) {
-    snprintf(buf, sizeof(buf), "\x1b[1;37mReply to:\x1b[0m #%d\r\n", msg.reply_to);
-    send_str(s, buf);
-  }
-  send_str(s, "\x1b[1;33m============================================\x1b[0m\r\n");
-  send_str(s, msg.body);
-  send_str(s, "\r\n\x1b[1;33m============================================\x1b[0m\r\n");
+  if (!msg_can_read(s, read_id, &msg)) return;
+  msg_display(s, &msg);
 }
 
 /* RV - View/Download attachment */
@@ -1188,10 +1207,7 @@ void cmd_msg_view_attachment(Session* s, const char* data) {
   }
   
   DbMessage msg;
-  if (!db_message_get(s->db, msg_id, &msg)) {
-    send_str(s, "\r\nMessage not found.\r\n");
-    return;
-  }
+  if (!msg_can_read(s, msg_id, &msg)) return;
   
   if (!msg.file_attached[0]) {
     send_str(s, "\r\nThis message has no file attachment.\r\n");
@@ -1204,7 +1220,10 @@ void cmd_msg_view_attachment(Session* s, const char* data) {
   
   /* Check if file exists in attachments directory */
   char filepath[512];
-  snprintf(filepath, sizeof(filepath), "data/attachments/%s", msg.file_attached);
+  if (!attachment_path(s, msg.file_attached, filepath, sizeof(filepath))) {
+    send_str(s, "Attachment path is invalid or not accessible.\r\n");
+    return;
+  }
   
   FILE* f = fopen(filepath, "rb");
   if (!f) {
@@ -1270,7 +1289,7 @@ void cmd_msg_toggle_scan_areas(Session* s, const char* data) {
 
   char buf[256];
   for (int i = 0; i < acount; i++) {
-    if (!acs_allows(s, areas[i].acs)) continue;
+    if (!msg_area_can(s, areas[i].id, false, NULL)) continue;
     int enabled = db_user_scan_area_get(s->db, s->user.id, areas[i].id);
     snprintf(buf, sizeof(buf), "  %2d  [%s]  %s\r\n",
              areas[i].id, enabled ? "ON " : "OFF", areas[i].name);
@@ -1285,7 +1304,7 @@ void cmd_msg_toggle_scan_areas(Session* s, const char* data) {
     int id = atoi(line);
     bool found = false;
     for (int i = 0; i < acount; i++) {
-      if (areas[i].id == id && acs_allows(s, areas[i].acs)) {
+      if (areas[i].id == id && msg_area_can(s, areas[i].id, false, NULL)) {
         int cur = db_user_scan_area_get(s->db, s->user.id, areas[i].id);
         db_user_scan_area_set(s->db, s->user.id, areas[i].id, cur ? 0 : 1);
         snprintf(buf, sizeof(buf), "  %s scan %s.\r\nEnter area # to toggle (blank=done): ",

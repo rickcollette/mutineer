@@ -87,88 +87,43 @@ static void log_callback(plank_log_level_t level, const char* component,
  * ============================================================================ */
 
 static int process_fanout_queue(void) {
-    int processed = 0;
-    
-    /* Query pending fanout items */
-    /* This would need proper query implementation */
-    
-    /* For each pending item:
-     * 1. Load the object
-     * 2. Determine target links based on subscriptions
-     * 3. Queue for outbound to each target
-     * 4. Mark fanout complete
-     */
-    
-    return processed;
+    if (!g_db) return 0;
+    int before = db_changes(g_db);
+    db_exec(g_db,
+        "INSERT INTO plank_outbound_queue (link_id, object_id, priority) "
+        "SELECT fq.target_link_id, fq.object_id, 0 "
+        "FROM cove_fanout_queue fq "
+        "WHERE fq.status = 0 "
+        "AND NOT EXISTS (SELECT 1 FROM plank_outbound_queue oq "
+        "                WHERE oq.link_id = fq.target_link_id AND oq.object_id = fq.object_id)");
+    db_exec(g_db,
+        "UPDATE cove_fanout_queue SET status = 1, sent_at = datetime('now') "
+        "WHERE status = 0 AND EXISTS (SELECT 1 FROM plank_outbound_queue oq "
+        "                            WHERE oq.link_id = cove_fanout_queue.target_link_id "
+        "                              AND oq.object_id = cove_fanout_queue.object_id)");
+    db_exec(g_db,
+        "UPDATE cove_downstream SET backlog_count = "
+        "(SELECT COUNT(*) FROM cove_fanout_queue fq "
+        " WHERE fq.target_link_id = cove_downstream.link_id AND fq.status = 0), "
+        "last_sync_at = datetime('now') "
+        "WHERE link_id IN (SELECT DISTINCT target_link_id FROM cove_fanout_queue)");
+    return db_changes(g_db) - before;
 }
 
 static int process_upstream_queue(void) {
-    int processed = 0;
-    
-    /* Query items that need to be sent upstream */
-    /* This would need proper query implementation */
-    
-    return processed;
-}
-
-/* ============================================================================
- * SUBSCRIPTION MANAGEMENT
- * ============================================================================ */
-
-static bool process_subscription_request(const plank_object_t* obj) {
-    if (!obj || obj->object_class != PLANK_CLASS_SUBSCRIPTION) {
-        return false;
-    }
-    
-    /* Decode subscription body */
-    /* This would need proper implementation */
-    
-    plank_log(PLANK_LOG_INFO, "coved", "Processing subscription request");
-    
-    return true;
-}
-
-/* ============================================================================
- * AREA AUTHORITY
- * ============================================================================ */
-
-static bool is_area_authority(const char* area_addr) {
-    if (!area_addr) return false;
-    
-    /* Check if this COVE is the authority for the area */
-    /* This would need proper query implementation */
-    
-    return false;
-}
-
-static bool process_area_definition(const plank_object_t* obj) {
-    if (!obj || obj->object_class != PLANK_CLASS_AREA_DEFINITION) {
-        return false;
-    }
-    
-    /* Decode and store area definition */
-    /* This would need proper implementation */
-    
-    plank_log(PLANK_LOG_INFO, "coved", "Processing area definition");
-    
-    return true;
-}
-
-/* ============================================================================
- * MODERATION DISTRIBUTION
- * ============================================================================ */
-
-static bool distribute_moderation(const plank_object_t* obj) {
-    if (!obj || obj->object_class != PLANK_CLASS_MODERATION) {
-        return false;
-    }
-    
-    /* Distribute moderation event to all subscribers of the affected area */
-    /* This would need proper implementation */
-    
-    plank_log(PLANK_LOG_INFO, "coved", "Distributing moderation event");
-    
-    return true;
+    if (!g_db) return 0;
+    int before = db_changes(g_db);
+    db_exec(g_db,
+        "INSERT INTO plank_outbound_queue (link_id, object_id, priority) "
+        "SELECT cu.link_id, j.object_id, 1 "
+        "FROM cove_upstream cu JOIN plank_journal j "
+        "WHERE cu.status = 1 AND j.source_kind != 2 AND j.processing_state = 1 "
+        "AND NOT EXISTS (SELECT 1 FROM plank_outbound_queue oq "
+        "                WHERE oq.link_id = cu.link_id AND oq.object_id = j.object_id)");
+    db_exec(g_db,
+        "UPDATE cove_upstream SET last_sync_at = datetime('now') "
+        "WHERE status = 1 AND link_id IN (SELECT DISTINCT link_id FROM plank_outbound_queue)");
+    return db_changes(g_db) - before;
 }
 
 /* ============================================================================
@@ -176,21 +131,39 @@ static bool distribute_moderation(const plank_object_t* obj) {
  * ============================================================================ */
 
 static int process_journal(void) {
-    int processed = 0;
-    
-    /* Query unprocessed journal entries */
-    /* For each entry:
-     * 1. Load the object
-     * 2. Validate against policy
-     * 3. If message: determine fanout targets
-     * 4. If subscription: update subscription state
-     * 5. If moderation: apply and distribute
-     * 6. Mark as processed
-     */
-    
-    /* Query: SELECT * FROM plank_journal WHERE processing_state = 0 ORDER BY id LIMIT batch_size */
-    
-    return processed;
+    if (!g_db) return 0;
+    int before = db_changes(g_db);
+
+    db_exec(g_db,
+        "INSERT INTO cove_fanout_queue (object_id, area_addr, target_link_id) "
+        "SELECT j.object_id, pm.area_addr, ps.link_id "
+        "FROM plank_journal j "
+        "JOIN plank_messages pm ON pm.object_id = j.object_id "
+        "JOIN plank_areas pa ON pa.area_addr = pm.area_addr "
+        "JOIN plank_subscriptions ps ON ps.area_id = pa.id "
+        "JOIN plank_links l ON l.id = ps.link_id "
+        "WHERE j.processing_state = 0 AND pm.area_addr IS NOT NULL "
+        "AND ps.action IN (1,4) AND l.enabled = 1 AND l.paused = 0 "
+        "AND (j.source_link_id IS NULL OR ps.link_id != j.source_link_id) "
+        "AND NOT EXISTS (SELECT 1 FROM cove_fanout_queue fq "
+        "                WHERE fq.object_id = j.object_id AND fq.target_link_id = ps.link_id)");
+
+    db_exec(g_db,
+        "INSERT INTO cove_downstream (link_id, subscribed_areas, status) "
+        "SELECT DISTINCT ps.link_id, '[]', 1 FROM plank_subscriptions ps "
+        "WHERE ps.action IN (1,4) "
+        "ON CONFLICT(link_id) DO UPDATE SET status = 1");
+
+    db_exec(g_db,
+        "INSERT INTO plank_audit (event_type, object_id, details) "
+        "SELECT 'cove_journal_processed', j.object_id, 'journal fanout queued' "
+        "FROM plank_journal j WHERE j.processing_state = 0");
+
+    db_exec(g_db,
+        "UPDATE plank_journal SET processing_state = 1 "
+        "WHERE processing_state = 0");
+
+    return db_changes(g_db) - before;
 }
 
 /* ============================================================================
@@ -198,20 +171,22 @@ static int process_journal(void) {
  * ============================================================================ */
 
 static void check_downstream_health(void) {
-    /* Query downstream links and check their health */
-    /* This would need proper query implementation */
-    
-    /* For each downstream:
-     * - Check last successful exchange time
-     * - Check pending queue size
-     * - Check error rate
-     * - Update health status
-     */
+    if (!g_db) return;
+    db_exec(g_db,
+        "UPDATE cove_downstream SET backlog_count = "
+        "(SELECT COUNT(*) FROM cove_fanout_queue fq "
+        " WHERE fq.target_link_id = cove_downstream.link_id AND fq.status = 0)");
+    db_exec(g_db,
+        "INSERT INTO plank_audit (event_type, link_id, details) "
+        "SELECT 'cove_downstream_health', link_id, "
+        "'pending=' || backlog_count || ',status=' || status FROM cove_downstream");
 }
 
 static void check_upstream_health(void) {
-    /* Query upstream links and check their health */
-    /* This would need proper query implementation */
+    if (!g_db) return;
+    db_exec(g_db,
+        "INSERT INTO plank_audit (event_type, link_id, details) "
+        "SELECT 'cove_upstream_health', link_id, 'status=' || status FROM cove_upstream");
 }
 
 /* ============================================================================
@@ -228,11 +203,11 @@ static void run_maintenance(void) {
         plank_log(PLANK_LOG_INFO, "coved", "Pruned %d dedupe records", pruned);
     }
     
-    /* Clean up completed fanout entries */
-    /* This would need proper query implementation */
-    
-    /* Archive old audit logs */
-    /* This would need proper query implementation */
+    db_exec(g_db, "DELETE FROM cove_fanout_queue WHERE status = 1 AND sent_at < datetime('now','-7 days')");
+    db_exec(g_db, "DELETE FROM plank_audit WHERE event_time < datetime('now','-90 days')");
+    db_exec(g_db, "UPDATE plank_deadletters SET state = 2 WHERE state = 0 AND first_failure_at < datetime('now','-30 days')");
+    db_exec(g_db, "UPDATE plank_quarantine SET resolution = 2, reviewed_at = datetime('now'), reviewed_by = 'coved' "
+                  "WHERE resolution = 0 AND quarantined_at < datetime('now','-30 days')");
 }
 
 /* ============================================================================

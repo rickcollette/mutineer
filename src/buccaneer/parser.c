@@ -611,7 +611,13 @@ bucc_node_t* bucc_parse_select_stmt(bucc_parser_t* p) {
         bucc_node_t* case_node = bucc_ast_stmt_case(case_span, NULL, false);
         do {
             bucc_node_t* val = bucc_parse_expression(p);
-            bucc_node_list_push(&case_node->data.case_clause.values, val);
+            if (match(p, TOK_KW_TO)) {
+                bucc_node_t* high = bucc_parse_expression(p);
+                bucc_node_list_push(&case_node->data.case_clause.range_lows, val);
+                bucc_node_list_push(&case_node->data.case_clause.range_highs, high);
+            } else {
+                bucc_node_list_push(&case_node->data.case_clause.values, val);
+            }
         } while (match(p, TOK_COMMA));
         
         expect_newline(p);

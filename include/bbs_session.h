@@ -29,6 +29,11 @@ typedef struct Session {
   int batch_queue[32];
   int batch_area[32];
   int batch_count;
+  struct {
+    char kind;
+    int area_id;
+  } area_password_cache[32];
+  int area_password_cache_count;
   int line_chat_partner; /* node number */
   int ansi;              /* 1=ANSI graphics enabled, 0=ASCII only */
   int call_id;           /* call_history record id for this session */

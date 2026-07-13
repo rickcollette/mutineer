@@ -1,6 +1,7 @@
 #include "bbs_wfc.h"
 #include "bbs_session.h"
 #include "bbs_log.h"
+#include "bbs_process.h"
 #include <pthread.h>
 #include <stdio.h>
 #include <unistd.h>
@@ -1228,14 +1229,35 @@ static int wfc_handle_cmd(WfcCtx *ctx, const char *cmd)
     return 0;
 
   case 'D':
-    /* Drop to shell */
+    if (!ctx->cfg.wfc_shell_enabled || !ctx->cfg.wfc_shell_command[0])
+    {
+      log_audit("wfc", "wfc_shell_denied", "disabled");
+      printf("\r\n[WFC] Shell escape is disabled by configuration.\r\n");
+      fflush(stdout);
+      return 0;
+    }
     printf(CLEAR_SCREEN);
     printf(SHOW_CURSOR);
     printf(COLOR_RESET);
-    printf("\nDropping to shell. Type 'exit' to return.\n\n");
+    printf("\nStarting configured shell command. Exit it to return.\n\n");
     fflush(stdout);
     disable_raw_mode();
-    system("/bin/sh");
+    char errbuf[256] = {0};
+    char **argv = NULL;
+    if (!bbs_argv_parse_template(ctx->cfg.wfc_shell_command, NULL, &argv, errbuf, sizeof(errbuf)))
+    {
+      log_audit("wfc", "wfc_shell_rejected", errbuf);
+      printf("Shell command rejected: %s\r\n", errbuf);
+    }
+    else
+    {
+      BbsProcessResult result;
+      log_audit("wfc", "wfc_shell_start", ctx->cfg.wfc_shell_command);
+      bbs_exec_argv(argv, "wfc-shell", NULL, STDIN_FILENO, STDOUT_FILENO, STDERR_FILENO,
+                    0, &result, errbuf, sizeof(errbuf));
+      log_audit("wfc", "wfc_shell_end", errbuf[0] ? errbuf : "complete");
+      bbs_argv_free(argv);
+    }
     enable_raw_mode();
     ctx->last_keypress = time(NULL);
     return 0;
@@ -1421,21 +1443,24 @@ void wfc_start(const BbsConfig *cfg, BbsDb *db)
 
   if (pthread_create(&g_wfc->thread, NULL, wfc_thread, g_wfc) != 0)
   {
+    pthread_mutex_destroy(&g_wfc->lock);
     free(g_wfc);
     g_wfc = NULL;
     return;
   }
-
-  pthread_detach(g_wfc->thread);
 }
 
 void wfc_stop(void)
 {
-  if (!g_wfc)
+  WfcCtx *ctx = g_wfc;
+  if (!ctx)
     return;
-  g_wfc->running = 0;
-  /* Give thread time to clean up */
-  usleep(200000);
+  ctx->running = 0;
+  if (!pthread_equal(pthread_self(), ctx->thread))
+    pthread_join(ctx->thread, NULL);
+  pthread_mutex_destroy(&ctx->lock);
+  g_wfc = NULL;
+  free(ctx);
 }
 
 void wfc_set_status(WfcStatus status, const char *extra)

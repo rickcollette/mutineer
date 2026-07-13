@@ -4,6 +4,11 @@ project(mutineer C)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
+option(MUTINEER_WARNINGS_AS_ERRORS "Treat project compiler warnings as errors" OFF)
+if (MUTINEER_WARNINGS_AS_ERRORS)
+  set(CMAKE_COMPILE_WARNING_AS_ERROR ON)
+endif()
+
 add_executable(mutineer
   src/main.c
   src/config.c
@@ -25,6 +30,7 @@ add_executable(mutineer
   src/doors.c
   src/file_cmds.c
   src/msg_cmds.c
+  src/fsedit.c
   src/chat.c
   src/qwk.c
   src/fido_netmail.c
@@ -127,6 +133,31 @@ target_include_directories(test_buccaneer_host PRIVATE src/buccaneer)
 target_link_libraries(test_buccaneer_host PRIVATE buccaneer)
 add_test(NAME buccaneer_host COMMAND test_buccaneer_host)
 
+add_executable(test_buccaneer_vm tests/test_buccaneer_vm.c)
+target_include_directories(test_buccaneer_vm PRIVATE src/buccaneer)
+target_link_libraries(test_buccaneer_vm PRIVATE buccaneer)
+add_test(NAME buccaneer_vm COMMAND test_buccaneer_vm)
+
+add_executable(test_buccaneer_bbs tests/test_buccaneer_bbs.c)
+target_include_directories(test_buccaneer_bbs PRIVATE src/buccaneer)
+target_link_libraries(test_buccaneer_bbs PRIVATE buccaneer)
+add_test(NAME buccaneer_bbs COMMAND test_buccaneer_bbs)
+
+add_executable(test_scheduler
+  tests/test_scheduler.c
+  src/scheduler.c
+  src/process.c
+  src/acs.c
+  src/log.c
+  src/db.c
+  src/hash.c
+  src/util.c
+)
+target_include_directories(test_scheduler PRIVATE include)
+target_link_libraries(test_scheduler PRIVATE OpenSSL::Crypto Threads::Threads)
+target_require_sqlite(test_scheduler)
+add_test(NAME scheduler COMMAND test_scheduler WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+
 add_executable(test_acs tests/test_acs.c src/acs.c src/util.c src/db.c src/hash.c)
 target_include_directories(test_acs PRIVATE include)
 target_link_libraries(test_acs PRIVATE OpenSSL::Crypto)
@@ -185,6 +216,39 @@ add_test(NAME tools COMMAND test_tools WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 add_executable(test_file_cmds tests/test_file_cmds.c)
 target_include_directories(test_file_cmds PRIVATE include)
 add_test(NAME file_cmds COMMAND test_file_cmds WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+
+add_executable(test_first15_matrix tests/test_first15_matrix.c)
+target_include_directories(test_first15_matrix PRIVATE include)
+add_test(NAME first15_matrix COMMAND test_first15_matrix WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+
+foreach(next15_test
+  test_config_editor
+  test_menu_flags
+  test_audit_runtime
+  test_who_guest_maintenance
+  test_scheduler_wfc_lifecycle
+  test_backup
+  test_file_validation
+  test_start_menu
+  test_plank_bbs_integration
+  test_runtime_stress
+)
+  add_executable(${next15_test} tests/test_next15_matrix.c src/config.c src/util.c)
+  target_include_directories(${next15_test} PRIVATE include)
+  target_compile_options(${next15_test} PRIVATE -Wall -Wextra -Wpedantic)
+  add_test(NAME ${next15_test} COMMAND ${next15_test} WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+endforeach()
+set_tests_properties(test_runtime_stress PROPERTIES LABELS "sanitizer;stress")
+
+add_test(NAME docker_quickstart_smoke
+         COMMAND ${CMAKE_SOURCE_DIR}/tests/docker_quickstart_smoke.sh ${CMAKE_BINARY_DIR}
+         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(docker_quickstart_smoke PROPERTIES LABELS "docker")
+
+add_executable(test_fsedit tests/test_fsedit.c src/fsedit.c)
+target_include_directories(test_fsedit PRIVATE include)
+target_link_libraries(test_fsedit PRIVATE Threads::Threads)
+add_test(NAME fsedit COMMAND test_fsedit)
 
 # CLI tests for tools (shell script)
 add_test(NAME tools_cli

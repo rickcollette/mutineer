@@ -59,14 +59,6 @@ static void ansi_clear_screen(Session* s) {
   send_str(s, "\x1b[2J\x1b[H");
 }
 
-static void ansi_save_cursor(Session* s) {
-  send_str(s, "\x1b[s");
-}
-
-static void ansi_restore_cursor(Session* s) {
-  send_str(s, "\x1b[u");
-}
-
 static void ansi_scroll_region(Session* s, int top, int bottom) {
   char buf[32];
   snprintf(buf, sizeof(buf), "\x1b[%d;%dr", top, bottom);
@@ -80,47 +72,10 @@ static void draw_split_divider(Session* s) {
   send_str(s, "\x1b[0m");
 }
 
-static void draw_split_header(Session* s, const char* other_name) {
-  char buf[128];
-  ansi_goto(s, 1, 1);
-  send_str(s, "\x1b[1;36m");
-  snprintf(buf, sizeof(buf), "Split-Screen Chat with %s", other_name);
-  send_str(s, buf);
-  send_str(s, "\x1b[0m");
-  ansi_clear_line(s);
-}
-
 static void draw_input_prompt(Session* s) {
   ansi_goto(s, SPLIT_INPUT_LINE, 1);
   ansi_clear_line(s);
   send_str(s, "\x1b[1;32m> \x1b[0m");
-}
-
-typedef struct {
-  char lines[10][80];
-  int count;
-  int next_line;
-} ChatWindow;
-
-static void chat_window_init(ChatWindow* w) {
-  memset(w, 0, sizeof(*w));
-}
-
-static void chat_window_add(ChatWindow* w, const char* line) {
-  strncpy(w->lines[w->next_line], line, 79);
-  w->lines[w->next_line][79] = '\0';
-  w->next_line = (w->next_line + 1) % 10;
-  if (w->count < 10) w->count++;
-}
-
-static void chat_window_draw(Session* s, ChatWindow* w, int start_row) {
-  int oldest = (w->count < 10) ? 0 : w->next_line;
-  for (int i = 0; i < w->count && i < 10; i++) {
-    int idx = (oldest + i) % 10;
-    ansi_goto(s, start_row + i, 1);
-    ansi_clear_line(s);
-    send_str(s, w->lines[idx]);
-  }
 }
 
 /* Deliver a line to a session's chat inbox (called by the sending side). */

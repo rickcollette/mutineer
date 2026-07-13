@@ -345,6 +345,7 @@ bool db_init_schema(BbsDb *db, const char *schema_path);
 /* Execute a single SQL statement (used for small tasks). */
 bool db_exec(BbsDb *db, const char *sql);
 int db_exec_simple(BbsDb *db, const char *sql); /* returns rows affected, -1 on error */
+int db_changes(BbsDb *db);
 const char *db_last_error(BbsDb *db);
 bool db_query(BbsDb *db, const char *sql, bool (*row_cb)(void *row, void *ctx), void *ctx);
 int db_query_int(BbsDb *db, const char *sql, int default_val);

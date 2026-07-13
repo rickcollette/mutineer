@@ -126,6 +126,17 @@ int db_exec_simple(BbsDb *db, const char *sql)
 #endif
 }
 
+int db_changes(BbsDb *db)
+{
+  if (!db)
+    return 0;
+#ifdef HAVE_SQLITE
+  return sqlite3_total_changes(db->db);
+#else
+  return 0;
+#endif
+}
+
 bool db_query(BbsDb *db, const char *sql, bool (*row_cb)(void *row, void *ctx), void *ctx)
 {
   if (!db || !row_cb)

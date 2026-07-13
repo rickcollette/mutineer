@@ -104,8 +104,9 @@ int main(int argc, char** argv) {
   int rc = net_run_listener(&cfg, db, &g_stop);
 
   online_broadcast("\r\nSystem shutting down.\r\n");
-  plugin_loader_shutdown();
+  scheduler_stop();
   wfc_stop();
+  plugin_loader_shutdown();
   db_close(db);
   log_info("shutdown");
   log_close();

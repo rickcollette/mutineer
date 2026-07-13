@@ -16,6 +16,122 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+static bool area_password_cached(Session *s, char kind, int area_id) {
+  if (!s) return false;
+  for (int i = 0; i < s->area_password_cache_count; i++) {
+    if (s->area_password_cache[i].kind == kind &&
+        s->area_password_cache[i].area_id == area_id) return true;
+  }
+  return false;
+}
+
+static void area_password_cache_add(Session *s, char kind, int area_id) {
+  if (!s || area_password_cached(s, kind, area_id)) return;
+  int i = s->area_password_cache_count;
+  if (i >= (int)(sizeof(s->area_password_cache) / sizeof(s->area_password_cache[0]))) {
+    i = 0;
+  } else {
+    s->area_password_cache_count++;
+  }
+  s->area_password_cache[i].kind = kind;
+  s->area_password_cache[i].area_id = area_id;
+}
+
+static bool is_sysop(Session *s) {
+  return s && acs_allows(s, "+A");
+}
+
+static bool file_area_password_ok(Session *s, const DbFileArea *area) {
+  if (!s || !area || !area->password[0]) return true;
+  if (area_password_cached(s, 'F', area->id)) return true;
+  char entered[64] = {0};
+  char prompt[128];
+  snprintf(prompt, sizeof(prompt), "Password for %s: ", area->name);
+  if (prompt_line(s, prompt, entered, sizeof(entered)) < 0) return false;
+  if (strcmp(entered, area->password) != 0) {
+    send_str(s, "\r\nAccess denied.\r\n");
+    return false;
+  }
+  area_password_cache_add(s, 'F', area->id);
+  return true;
+}
+
+static bool file_area_can(Session *s, const DbFileArea *area, const char *acs) {
+  if (!s || !area) return false;
+  if (acs && acs[0] && !acs_allows(s, acs)) {
+    send_str(s, "\r\nAccess denied.\r\n");
+    return false;
+  }
+  return file_area_password_ok(s, area);
+}
+
+static bool file_visible_to_user(Session *s, const DbFileRec *rec) {
+  if (!s || !rec) return false;
+  if ((rec->flags & FILE_FLAG_NOTVAL) && !is_sysop(s)) return false;
+  if (rec->flags & FILE_FLAG_OFFLINE) return false;
+  return true;
+}
+
+static bool file_download_allowed(Session *s, const DbFileArea *area, const DbFileRec *rec,
+                                  bool quiet, int *cost_out) {
+  int kb = (rec->size_bytes + 1023) / 1024;
+  int cost = kb > 0 ? kb : 1;
+  bool free_file = (rec->flags & FILE_FLAG_FREE) || area->free_files || (area->flags & FA_FLAG_FREEFILES);
+  if (cost_out) *cost_out = free_file ? 0 : cost;
+
+  if (!file_visible_to_user(s, rec)) {
+    if (!quiet) send_str(s, "\r\nFile is not available for download.\r\n");
+    return false;
+  }
+  if (!file_area_can(s, area, area->acs_download[0] ? area->acs_download : area->acs_list)) return false;
+
+  DbSecurityLevel sl;
+  if (db_security_level_fetch(s->db, s->user.security_level_id, &sl)) {
+    if (sl.dl_one_day > 0 && s->user.dl_today >= sl.dl_one_day) {
+      if (!quiet) send_str(s, "\r\nDaily file download limit reached.\r\n");
+      return false;
+    }
+    if (sl.dl_k_one_day > 0 && s->user.dl_k_today + kb > sl.dl_k_one_day) {
+      if (!quiet) send_str(s, "\r\nDaily download KB limit reached.\r\n");
+      return false;
+    }
+  }
+
+  if (!free_file && !HAS_AC_FLAG(&s->user, AC_FNOCREDITS) && s->credits < cost) {
+    if (!quiet) {
+      char buf[128];
+      snprintf(buf, sizeof(buf), "\r\nInsufficient credits. Need %d, have %d.\r\n", cost, s->credits);
+      send_str(s, buf);
+    }
+    return false;
+  }
+  if (!HAS_AC_FLAG(&s->user, AC_FNODLRATIO) && s->user.dl_ratio_den > 0) {
+    int required_ul = s->user.downloads / s->user.dl_ratio_den;
+    if (s->user.uploads < required_ul) {
+      if (!quiet) send_str(s, "\r\nYou need to upload more files to maintain your ratio.\r\n");
+      return false;
+    }
+  }
+  return true;
+}
+
+static void file_record_download_success(Session *s, const DbFileArea *area, const DbFileRec *rec, int cost) {
+  bool free_file = (rec->flags & FILE_FLAG_FREE) || area->free_files || (area->flags & FA_FLAG_FREEFILES);
+  if (!free_file && !HAS_AC_FLAG(&s->user, AC_FNOCREDITS)) {
+    s->credits -= cost;
+    s->user.credits -= cost;
+  }
+  s->user.downloads++;
+  s->user.dk += (rec->size_bytes / 1024);
+  s->user.dl_today++;
+  s->user.dl_k_today += (rec->size_bytes / 1024);
+  db_file_inc_downloads(s->db, rec->id);
+}
+
+static bool resolve_file_path_for_cmd(Session* s, int file_id,
+                                      char* filepath, size_t fplen,
+                                      DbFileRec* rec_out);
+
 /* FA - Change file area */
 void cmd_file_area_change(Session* s, const char* data) {
   if (!s) return;
@@ -27,7 +143,7 @@ void cmd_file_area_change(Session* s, const char* data) {
   if (data && data[0]) {
     int area_id = atoi(data);
     for (int i = 0; i < acount; i++) {
-      if (areas[i].id == area_id && acs_allows(s, areas[i].acs_list)) {
+      if (areas[i].id == area_id && file_area_can(s, &areas[i], areas[i].acs_list)) {
         s->current_file_area = area_id;
         char buf[128];
         snprintf(buf, sizeof(buf), "\r\nFile area changed to: %s\r\n", areas[i].name);
@@ -42,7 +158,7 @@ void cmd_file_area_change(Session* s, const char* data) {
   send_str(s, "\r\nFile Areas:\r\n");
   char buf[256];
   for (int i = 0; i < acount; i++) {
-    if (!acs_allows(s, areas[i].acs_list)) continue;
+    if (!file_area_can(s, &areas[i], areas[i].acs_list)) continue;
     int fcount = db_count_files_area(s->db, areas[i].id);
     snprintf(buf, sizeof(buf), "  [%2d] %-30s (%d files)\r\n", areas[i].id, areas[i].name, fcount);
     send_str(s, buf);
@@ -55,10 +171,7 @@ void cmd_file_area_change(Session* s, const char* data) {
   int area_id = atoi(line);
   for (int i = 0; i < acount; i++) {
     if (areas[i].id == area_id) {
-      if (!acs_allows(s, areas[i].acs_list)) {
-        send_str(s, "\r\nAccess denied.\r\n");
-        return;
-      }
+      if (!file_area_can(s, &areas[i], areas[i].acs_list)) return;
       s->current_file_area = area_id;
       snprintf(buf, sizeof(buf), "\r\nFile area changed to: %s\r\n", areas[i].name);
       send_str(s, buf);
@@ -81,7 +194,7 @@ void cmd_file_area_list(Session* s, const char* data) {
   char buf[256];
   int total_files = 0;
   for (int i = 0; i < acount; i++) {
-    if (!acs_allows(s, areas[i].acs_list)) continue;
+    if (!file_area_can(s, &areas[i], areas[i].acs_list)) continue;
     int fcount = db_count_files_area(s->db, areas[i].id);
     total_files += fcount;
     const char* marker = (areas[i].id == s->current_file_area) ? "*" : " ";
@@ -108,6 +221,7 @@ void cmd_file_list(Session* s, const char* data) {
     send_str(s, "\r\nFile area not found.\r\n");
     return;
   }
+  if (!file_area_can(s, &area, area.acs_list)) return;
   
   DbFileRec files[50];
   int fcount = db_file_list(&area, s->db, files, 50);
@@ -119,6 +233,7 @@ void cmd_file_list(Session* s, const char* data) {
   send_str(s, "--------------------------------------------------------------\r\n");
   
   for (int i = 0; i < fcount; i++) {
+    if (!file_visible_to_user(s, &files[i])) continue;
     const char* flag_str = "";
     if (files[i].flags & FILE_FLAG_NOTVAL) flag_str = "[!]";
     else if (files[i].flags & FILE_FLAG_FREE) flag_str = "[F]";
@@ -152,6 +267,16 @@ void cmd_file_extended(Session* s, const char* data) {
   
   DbFileRec rec;
   if (!db_file_get(s->db, file_id, &rec)) {
+    send_str(s, "\r\nFile not found.\r\n");
+    return;
+  }
+  DbFileArea area_for_policy;
+  if (!db_file_area_get(s->db, rec.area_id, &area_for_policy)) {
+    send_str(s, "\r\nFile area not found.\r\n");
+    return;
+  }
+  if (!file_visible_to_user(s, &rec) ||
+      !file_area_can(s, &area_for_policy, area_for_policy.acs_list)) {
     send_str(s, "\r\nFile not found.\r\n");
     return;
   }
@@ -200,28 +325,14 @@ void cmd_file_download(Session* s, const char* data) {
     send_str(s, "\r\nFile not found.\r\n");
     return;
   }
-  
-  /* Check credits/ratio unless exempt */
-  int cost = (rec.size_bytes / 1024) + 1;
-  if (!HAS_AC_FLAG(&s->user, AC_FNOCREDITS)) {
-    if (s->credits < cost) {
-      char buf[128];
-      snprintf(buf, sizeof(buf), "\r\nInsufficient credits. Need %d, have %d.\r\n", cost, s->credits);
-      send_str(s, buf);
-      return;
-    }
+  DbFileArea area;
+  if (!db_file_area_get(s->db, rec.area_id, &area)) {
+    send_str(s, "\r\nFile area not found.\r\n");
+    return;
   }
   
-  /* Check download ratio unless exempt */
-  if (!HAS_AC_FLAG(&s->user, AC_FNODLRATIO)) {
-    if (s->user.dl_ratio_den > 0) {
-      int required_ul = s->user.downloads / s->user.dl_ratio_den;
-      if (s->user.uploads < required_ul) {
-        send_str(s, "\r\nYou need to upload more files to maintain your ratio.\r\n");
-        return;
-      }
-    }
-  }
+  int cost = 0;
+  if (!file_download_allowed(s, &area, &rec, false, &cost)) return;
   
   char buf[256];
   snprintf(buf, sizeof(buf), "\r\nPreparing download: %s (%d bytes)\r\n", rec.filename, rec.size_bytes);
@@ -240,13 +351,6 @@ void cmd_file_download(Session* s, const char* data) {
   
   snprintf(buf, sizeof(buf), "\r\nStarting %cmodem transfer...\r\n", proto);
   send_str(s, buf);
-  
-  /* Get file area for path resolution */
-  DbFileArea area;
-  if (!db_file_area_get(s->db, rec.area_id, &area)) {
-    send_str(s, "\r\nFile area not found.\r\n");
-    return;
-  }
   
   /* Get file path */
   char filepath[512];
@@ -271,15 +375,7 @@ void cmd_file_download(Session* s, const char* data) {
   
   if (selected) {
     if (protocol_launch(s, selected, filepath, "down")) {
-      if (!HAS_AC_FLAG(&s->user, AC_FNOCREDITS)) {
-        s->credits -= cost;
-        s->user.credits -= cost;
-      }
-      s->user.downloads++;
-      s->user.dk += (rec.size_bytes / 1024);
-      s->user.dl_today++;
-      s->user.dl_k_today += (rec.size_bytes / 1024);
-      db_file_inc_downloads(s->db, file_id);
+      file_record_download_success(s, &area, &rec, cost);
       send_str(s, "\r\nDownload complete.\r\n");
     } else {
       send_str(s, "\r\nTransfer failed or cancelled.\r\n");
@@ -304,9 +400,12 @@ void cmd_file_upload(Session* s, const char* data) {
     return;
   }
   
-  /* Check upload ACS */
-  if (!acs_allows(s, area.acs_upload)) {
-    send_str(s, "\r\nYou don't have permission to upload to this area.\r\n");
+  if (!file_area_can(s, &area, area.acs_upload)) return;
+
+  DbProtocol protos[4];
+  int pcnt = db_protocols_list(s->db, protos, 4, "up");
+  if (pcnt == 0) {
+    send_str(s, "\r\nNo upload protocols configured. Upload unavailable.\r\n");
     return;
   }
   
@@ -364,10 +463,6 @@ void cmd_file_upload(Session* s, const char* data) {
     send_str(s, "\r\nPath error.\r\n");
     return;
   }
-  
-  /* Look up protocol from database */
-  DbProtocol protos[4];
-  int pcnt = db_protocols_list(s->db, protos, 4, "up");
   
   DbProtocol* selected = NULL;
   for (int i = 0; i < pcnt; i++) {
@@ -435,6 +530,9 @@ void cmd_file_batch_download(Session* s, const char* data) {
   for (int i = 0; i < s->batch_count; i++) {
     DbFileRec rec;
     if (db_file_get(s->db, s->batch_queue[i], &rec)) {
+      DbFileArea area;
+      if (!db_file_area_get(s->db, rec.area_id, &area)) continue;
+      if (!file_download_allowed(s, &area, &rec, true, NULL)) continue;
       snprintf(buf, sizeof(buf), "  %d. %s (%d bytes)\r\n", i + 1, rec.filename, rec.size_bytes);
       send_str(s, buf);
       total_size += rec.size_bytes;
@@ -500,6 +598,8 @@ void cmd_file_batch_download(Session* s, const char* data) {
       }
     }
     if (!area) continue;
+    int cost = 0;
+    if (!file_download_allowed(s, area, &rec, false, &cost)) continue;
     
     char filepath[512];
     if (!file_area_resolve(area->path, rec.filename, filepath, sizeof(filepath))) continue;
@@ -509,11 +609,7 @@ void cmd_file_batch_download(Session* s, const char* data) {
     
     if (protocol_launch(s, selected, filepath, "down")) {
       success_count++;
-      db_file_inc_downloads(s->db, rec.id);
-      s->user.downloads++;
-      s->user.dk += (rec.size_bytes / 1024);
-      s->user.dl_today++;
-      s->user.dl_k_today += (rec.size_bytes / 1024);
+      file_record_download_success(s, area, &rec, cost);
     }
   }
   
@@ -550,12 +646,13 @@ void cmd_file_find(Session* s, const char* data) {
   char buf[512];
   
   for (int a = 0; a < acount; a++) {
-    if (!acs_allows(s, areas[a].acs_list)) continue;
+    if (!file_area_can(s, &areas[a], areas[a].acs_list)) continue;
     
     DbFileRec files[100];
     int fcount = db_file_list(&areas[a], s->db, files, 100);
     
     for (int f = 0; f < fcount; f++) {
+      if (!file_visible_to_user(s, &files[f])) continue;
       /* Simple case-insensitive substring search */
       char fn_lower[64], pat_lower[64];
       snprintf(fn_lower, sizeof(fn_lower), "%s", files[f].filename);
@@ -597,12 +694,13 @@ void cmd_file_new_scan(Session* s, const char* data) {
   int found = 0;
   
   for (int a = 0; a < acount; a++) {
-    if (!acs_allows(s, areas[a].acs_list)) continue;
+    if (!file_area_can(s, &areas[a], areas[a].acs_list)) continue;
     
     DbFileRec files[100];
     int fcount = db_file_list(&areas[a], s->db, files, 100);
     
     for (int f = 0; f < fcount; f++) {
+      if (!file_visible_to_user(s, &files[f])) continue;
       if (strcmp(files[f].uploaded_at, since) > 0) {
         snprintf(buf, sizeof(buf), "[%s] %s (%d bytes) - %s\r\n",
                  areas[a].name, files[f].filename, files[f].size_bytes, files[f].desc);
@@ -630,26 +728,8 @@ void cmd_file_view_archive(Session* s, const char* data) {
   }
   
   DbFileRec rec;
-  if (!db_file_get(s->db, file_id, &rec)) {
-    send_str(s, "\r\nFile not found.\r\n");
-    return;
-  }
-  
-  /* Get file area to resolve full path */
-  DbFileArea area;
-  if (!db_file_area_get(s->db, rec.area_id, &area)) {
-    send_str(s, "\r\nFile area not found.\r\n");
-    return;
-  }
-  
   char filepath[512];
-  snprintf(filepath, sizeof(filepath), "%s/%s", area.path, rec.filename);
-  
-  /* Check file exists */
-  if (access(filepath, R_OK) != 0) {
-    send_str(s, "\r\nFile not accessible on disk.\r\n");
-    return;
-  }
+  if (!resolve_file_path_for_cmd(s, file_id, filepath, sizeof(filepath), &rec)) return;
   
   char buf[256];
   snprintf(buf, sizeof(buf), "\r\n\x1b[1;36mArchive: %s\x1b[0m\r\n", rec.filename);
@@ -696,12 +776,13 @@ void cmd_file_zippy_search(Session* s, const char* data) {
   char buf[256];
   
   for (int a = 0; a < acount; a++) {
-    if (!acs_allows(s, areas[a].acs_list)) continue;
+    if (!file_area_can(s, &areas[a], areas[a].acs_list)) continue;
     
     DbFileRec files[100];
     int fcount = db_file_list(&areas[a], s->db, files, 100);
     
     for (int f = 0; f < fcount; f++) {
+      if (!file_visible_to_user(s, &files[f])) continue;
       char fn_lower[64], pat_lower[64];
       snprintf(fn_lower, sizeof(fn_lower), "%s", files[f].filename);
       snprintf(pat_lower, sizeof(pat_lower), "%s", pattern);
@@ -815,6 +896,11 @@ static bool resolve_file_path_for_cmd(Session* s, int file_id,
   DbFileArea area;
   if (!db_file_area_get(s->db, rec_out->area_id, &area)) {
     send_str(s, "\r\nFile area not found.\r\n");
+    return false;
+  }
+  if (!file_area_can(s, &area, area.acs_download[0] ? area.acs_download : area.acs_list) ||
+      !file_visible_to_user(s, rec_out)) {
+    send_str(s, "\r\nFile not available.\r\n");
     return false;
   }
   if (!file_area_resolve(area.path, rec_out->filename, filepath, fplen)) {

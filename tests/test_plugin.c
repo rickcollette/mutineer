@@ -11,6 +11,8 @@
 #include <pthread.h>
 #include <unistd.h>
 #include <sys/stat.h>
+#include <fcntl.h>
+#include <errno.h>
 #include "bbs_plugin_api.h"
 #include "bbs_plugin_loader.h"
 #include "bbs_plugin_registry.h"
@@ -20,6 +22,48 @@
 } while(0)
 
 static const char* g_hello_plugin_path = "build/plugins/hello.so";
+
+static void rm_rf(const char* path) {
+  char cmd[512];
+  snprintf(cmd, sizeof(cmd), "rm -rf '%s'", path);
+  (void)system(cmd);
+}
+
+static int copy_file(const char* src, const char* dst) {
+  int in = open(src, O_RDONLY);
+  if (in < 0) return -1;
+  int out = open(dst, O_WRONLY | O_CREAT | O_TRUNC, 0755);
+  if (out < 0) {
+    close(in);
+    return -1;
+  }
+  char buf[8192];
+  ssize_t n;
+  while ((n = read(in, buf, sizeof(buf))) > 0) {
+    ssize_t off = 0;
+    while (off < n) {
+      ssize_t w = write(out, buf + off, (size_t)(n - off));
+      if (w <= 0) {
+        close(in);
+        close(out);
+        return -1;
+      }
+      off += w;
+    }
+  }
+  close(in);
+  close(out);
+  return n == 0 ? 0 : -1;
+}
+
+static int make_plugin_dir(char* dir, size_t dir_sz) {
+  snprintf(dir, dir_sz, "/tmp/mutineer_plugin_test_%ld_%d", (long)getpid(), rand());
+  rm_rf(dir);
+  if (mkdir(dir, 0755) != 0) return -1;
+  char dst[512];
+  snprintf(dst, sizeof(dst), "%s/hello.so", dir);
+  return copy_file(g_hello_plugin_path, dst);
+}
 
 /* Test ABI constants */
 static int test_abi_constants(void) {
@@ -300,18 +344,89 @@ static int test_concurrent_registry(void) {
 
 /* Test plugin loader (requires plugins directory) */
 static int test_loader_init(void) {
-  /* Create a temporary plugins directory */
-  mkdir("test_plugins", 0755);
-  
-  /* Initialize with no plugins */
-  plugin_registry_init();
-  
   TEST_ASSERT(!plugin_loader_enabled(), "Loader should not be enabled before init");
-  
-  /* Note: Full loader test requires actual .so files */
-  
-  plugin_registry_shutdown();
-  rmdir("test_plugins");
+  return 0;
+}
+
+static int test_loader_config_rules(void) {
+  if (access(g_hello_plugin_path, F_OK) != 0) {
+    printf("  (skipping - hello.so not built yet)\n");
+    return 0;
+  }
+
+  char dir[256];
+  TEST_ASSERT(make_plugin_dir(dir, sizeof(dir)) == 0, "temp plugin dir creates");
+
+  BbsConfig cfg = {0};
+  cfg.plugins_enabled = 0;
+  snprintf(cfg.plugins_dir, sizeof(cfg.plugins_dir), "%s", dir);
+  TEST_ASSERT(plugin_loader_init(&cfg), "disabled loader init succeeds");
+  TEST_ASSERT(!plugin_loader_enabled(), "disabled loader reports disabled");
+  TEST_ASSERT(plugin_registry_count() == 0, "disabled loader leaves registry empty");
+  plugin_loader_shutdown();
+
+  memset(&cfg, 0, sizeof(cfg));
+  cfg.plugins_enabled = 1;
+  snprintf(cfg.plugins_dir, sizeof(cfg.plugins_dir), "%s", dir);
+  TEST_ASSERT(plugin_loader_init(&cfg), "custom plugin dir init succeeds");
+  TEST_ASSERT(plugin_loader_enabled(), "custom plugin dir reports enabled");
+  TEST_ASSERT(plugin_registry_find("com.mutineer.hello") != NULL, "custom dir loads hello plugin");
+  plugin_loader_shutdown();
+
+  memset(&cfg, 0, sizeof(cfg));
+  cfg.plugins_enabled = 1;
+  snprintf(cfg.plugins_dir, sizeof(cfg.plugins_dir), "%s", dir);
+  snprintf(cfg.plugins_allowlist, sizeof(cfg.plugins_allowlist), "com.example.missing");
+  TEST_ASSERT(plugin_loader_init(&cfg), "allowlist init succeeds");
+  TEST_ASSERT(plugin_registry_count() == 0, "allowlist excludes unlisted plugin");
+  plugin_loader_shutdown();
+
+  memset(&cfg, 0, sizeof(cfg));
+  cfg.plugins_enabled = 1;
+  snprintf(cfg.plugins_dir, sizeof(cfg.plugins_dir), "%s", dir);
+  snprintf(cfg.plugins_allowlist, sizeof(cfg.plugins_allowlist), "com.mutineer.hello");
+  snprintf(cfg.plugins_denylist, sizeof(cfg.plugins_denylist), "com.mutineer.hello");
+  TEST_ASSERT(plugin_loader_init(&cfg), "denylist init succeeds");
+  TEST_ASSERT(plugin_registry_count() == 0, "denylist wins over allowlist");
+  plugin_loader_shutdown();
+
+  rm_rf(dir);
+  return 0;
+}
+
+static int test_host_api_filesystem_safety(void) {
+  char root[256];
+  snprintf(root, sizeof(root), "/tmp/mutineer_plugin_data_%ld_%d", (long)getpid(), rand());
+  rm_rf(root);
+  TEST_ASSERT(mkdir(root, 0755) == 0, "plugin data root creates");
+
+  BbsConfig cfg = {0};
+  cfg.plugins_enabled = 0;
+  snprintf(cfg.data_path, sizeof(cfg.data_path), "%s", root);
+  TEST_ASSERT(plugin_loader_init(&cfg), "host API config init succeeds");
+  const bbs_host_api_t* api = plugin_get_host_api();
+  TEST_ASSERT(api != NULL, "host API available");
+
+  TEST_ASSERT(api->kv_set("safe.ns", "safe-key", "value") == BBS_OK, "safe KV set succeeds");
+  char out[32];
+  TEST_ASSERT(api->kv_get("safe.ns", "safe-key", out, sizeof(out)) == BBS_OK, "safe KV get succeeds");
+  TEST_ASSERT(strcmp(out, "value") == 0, "safe KV value round-trips");
+
+  TEST_ASSERT(api->kv_set("../escape", "key", "x") == BBS_EINVAL, "KV namespace traversal rejected");
+  TEST_ASSERT(api->kv_set("/abs", "key", "x") == BBS_EINVAL, "KV absolute-like namespace rejected");
+  TEST_ASSERT(api->kv_set("safe", "../key", "x") == BBS_EINVAL, "KV key traversal rejected");
+  TEST_ASSERT(api->kv_set("safe", "bad/key", "x") == BBS_EINVAL, "KV slash key rejected");
+  TEST_ASSERT(access("/tmp/escape", F_OK) != 0, "invalid KV does not create outside file");
+
+  char data_dir[512];
+  TEST_ASSERT(api->plugin_data_dir("com.example.safe", data_dir, sizeof(data_dir)) == BBS_OK,
+              "safe plugin data dir succeeds");
+  TEST_ASSERT(strstr(data_dir, root) == data_dir, "plugin data dir stays under root");
+  TEST_ASSERT(api->plugin_data_dir("../escape", data_dir, sizeof(data_dir)) == BBS_EINVAL,
+              "plugin data traversal rejected");
+
+  plugin_loader_shutdown();
+  rm_rf(root);
   return 0;
 }
 
@@ -352,6 +467,8 @@ int main(int argc, char** argv) {
   RUN_TEST(test_abi_mismatch);
   RUN_TEST(test_concurrent_registry);
   RUN_TEST(test_loader_init);
+  RUN_TEST(test_loader_config_rules);
+  RUN_TEST(test_host_api_filesystem_safety);
   
   printf("\n%d/%d tests passed\n", total - failures, total);
   return failures > 0 ? 1 : 0;

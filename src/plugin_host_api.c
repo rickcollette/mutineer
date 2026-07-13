@@ -20,12 +20,52 @@
 #include <errno.h>
 #include <pthread.h>
 #include <time.h>
+#include <limits.h>
+#include <ctype.h>
 
 /* Cast opaque session to internal Session type */
 #define TO_SESSION(s) ((Session*)(s))
 
 static char g_plugin_data_root[512] = "data/plugins";
 static char g_plugin_kv_root[512] = "data/plugin_kv";
+
+static bool plugin_safe_identifier(const char* value, size_t max_len) {
+  if (!value || !value[0]) return false;
+  size_t len = strlen(value);
+  if (len == 0 || len > max_len) return false;
+  if (!strcmp(value, ".") || !strcmp(value, "..")) return false;
+  if (strstr(value, "..")) return false;
+  for (size_t i = 0; i < len; i++) {
+    unsigned char c = (unsigned char)value[i];
+    if (!(isalnum(c) || c == '.' || c == '_' || c == '-')) return false;
+  }
+  return true;
+}
+
+static bool path_under_root(const char* root, const char* path) {
+  if (!root || !path) return false;
+  char real_root[PATH_MAX];
+  char real_path[PATH_MAX];
+  if (!realpath(root, real_root) || !realpath(path, real_path)) return false;
+  size_t n = strlen(real_root);
+  return strncmp(real_root, real_path, n) == 0 &&
+         (real_path[n] == '\0' || real_path[n] == '/');
+}
+
+static bool child_path_under_root(const char* root, const char* parent, const char* child,
+                                  char* out, size_t out_sz) {
+  if (!root || !parent || !child || !out || out_sz == 0) return false;
+  char real_root[PATH_MAX];
+  char real_parent[PATH_MAX];
+  if (!realpath(root, real_root) || !realpath(parent, real_parent)) return false;
+  size_t n = strlen(real_root);
+  if (strncmp(real_root, real_parent, n) != 0 ||
+      (real_parent[n] != '\0' && real_parent[n] != '/')) {
+    return false;
+  }
+  path_join(real_parent, child, out, out_sz);
+  return true;
+}
 
 void plugin_host_api_configure(const BbsConfig* cfg) {
   const char* data_root = (cfg && cfg->data_path[0]) ? cfg->data_path : "data";
@@ -328,15 +368,17 @@ static const char* host_session_remote_addr(bbs_session_t* s) {
 
 static bbs_rc_t host_kv_get(const char* ns, const char* key, char* out, size_t out_sz) {
   if (!ns || !key || !out || out_sz == 0) return BBS_EINVAL;
-  if (!bbs_safe_identifier(ns, 96) || !bbs_safe_identifier(key, 160)) return BBS_EINVAL;
+  if (!plugin_safe_identifier(ns, 96) || !plugin_safe_identifier(key, 160)) return BBS_EINVAL;
   
   out[0] = '\0';
   
+  if (!bbs_mkdir_p(g_plugin_kv_root, 0755)) return BBS_EIO;
   char path[512];
   path_join(g_plugin_kv_root, ns, path, sizeof(path));
+  if (!path_under_root(g_plugin_kv_root, path)) return BBS_EINVAL;
   
   char filepath[768];
-  path_join(path, key, filepath, sizeof(filepath));
+  if (!child_path_under_root(g_plugin_kv_root, path, key, filepath, sizeof(filepath))) return BBS_EIO;
   
   FILE* f = fopen(filepath, "r");
   if (!f) return BBS_EINVAL;  /* Key not found */
@@ -350,7 +392,7 @@ static bbs_rc_t host_kv_get(const char* ns, const char* key, char* out, size_t o
 
 static bbs_rc_t host_kv_set(const char* ns, const char* key, const char* val) {
   if (!ns || !key) return BBS_EINVAL;
-  if (!bbs_safe_identifier(ns, 96) || !bbs_safe_identifier(key, 160)) return BBS_EINVAL;
+  if (!plugin_safe_identifier(ns, 96) || !plugin_safe_identifier(key, 160)) return BBS_EINVAL;
   
   /* Create namespace directory if needed */
   char path[512];
@@ -359,9 +401,10 @@ static bbs_rc_t host_kv_set(const char* ns, const char* key, const char* val) {
   
   path_join(g_plugin_kv_root, ns, path, sizeof(path));
   if (!bbs_mkdir_p(path, 0755)) return BBS_EIO;
+  if (!path_under_root(g_plugin_kv_root, path)) return BBS_EIO;
   
   char filepath[768];
-  path_join(path, key, filepath, sizeof(filepath));
+  if (!child_path_under_root(g_plugin_kv_root, path, key, filepath, sizeof(filepath))) return BBS_EIO;
   
   if (!val) {
     /* Delete key */
@@ -382,7 +425,7 @@ static bbs_rc_t host_kv_set(const char* ns, const char* key, const char* val) {
 
 static bbs_rc_t host_plugin_data_dir(const char* plugin_id, char* out, size_t out_sz) {
   if (!plugin_id || !out || out_sz == 0) return BBS_EINVAL;
-  if (!bbs_safe_identifier(plugin_id, 96)) return BBS_EINVAL;
+  if (!plugin_safe_identifier(plugin_id, 96)) return BBS_EINVAL;
   
   char path[512];
   snprintf(path, sizeof(path), "%s", g_plugin_data_root);
@@ -390,6 +433,7 @@ static bbs_rc_t host_plugin_data_dir(const char* plugin_id, char* out, size_t ou
   
   path_join(g_plugin_data_root, plugin_id, path, sizeof(path));
   if (!bbs_mkdir_p(path, 0755)) return BBS_EIO;
+  if (!path_under_root(g_plugin_data_root, path)) return BBS_EIO;
   
   snprintf(out, out_sz, "%s", path);
   return BBS_OK;

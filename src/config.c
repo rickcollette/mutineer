@@ -2,12 +2,25 @@
 #include "bbs_util.h"
 #include <stdio.h>
 #include <string.h>
+#include <strings.h>
 #include <stdlib.h>
 #include <ctype.h>
+#include <unistd.h>
 
 static char cfg_status_char(const char *v, char fallback)
 {
   return (v && v[0]) ? (char)toupper((unsigned char)v[0]) : fallback;
+}
+
+static int cfg_bool(const char *v)
+{
+  if (!v)
+    return 0;
+  if (!strcasecmp(v, "true") || !strcasecmp(v, "yes") || !strcasecmp(v, "on"))
+    return 1;
+  if (!strcasecmp(v, "false") || !strcasecmp(v, "no") || !strcasecmp(v, "off"))
+    return 0;
+  return atoi(v) != 0;
 }
 
 static void cfg_defaults(BbsConfig *c)
@@ -35,6 +48,8 @@ static void cfg_defaults(BbsConfig *c)
   c->wfc_status_logging_char = 'L';
   c->wfc_status_online_char = 'A';
   c->wfc_status_chat_char = 'S';
+  c->wfc_shell_enabled = 0;
+  c->wfc_shell_command[0] = '\0';
   c->scheduler_enabled = 1;
   c->scheduler_tick_sec = 30;
   c->login_window_sec = 120;
@@ -69,6 +84,7 @@ static void cfg_defaults(BbsConfig *c)
 bool cfg_load(const char *path, BbsConfig *out)
 {
   cfg_defaults(out);
+  snprintf(out->source_path, sizeof(out->source_path), "%s", path ? path : "");
 
   FILE *f = fopen(path, "rb");
   if (!f)
@@ -140,7 +156,7 @@ bool cfg_load(const char *path, BbsConfig *out)
     }
     else if (!strcmp(k, "wfc_enabled"))
     {
-      out->wfc_enabled = atoi(v);
+      out->wfc_enabled = cfg_bool(v);
     }
     else if (!strcmp(k, "wfc_refresh_ms"))
     {
@@ -178,9 +194,17 @@ bool cfg_load(const char *path, BbsConfig *out)
     {
       out->wfc_status_chat_char = cfg_status_char(v, out->wfc_status_chat_char);
     }
+    else if (!strcmp(k, "wfc_shell_enabled"))
+    {
+      out->wfc_shell_enabled = cfg_bool(v);
+    }
+    else if (!strcmp(k, "wfc_shell_command"))
+    {
+      snprintf(out->wfc_shell_command, sizeof(out->wfc_shell_command), "%s", v);
+    }
     else if (!strcmp(k, "scheduler_enabled"))
     {
-      out->scheduler_enabled = atoi(v);
+      out->scheduler_enabled = cfg_bool(v);
     }
     else if (!strcmp(k, "scheduler_tick_sec"))
     {
@@ -196,7 +220,7 @@ bool cfg_load(const char *path, BbsConfig *out)
     }
     else if (!strcmp(k, "password_upgrade"))
     {
-      out->password_upgrade = atoi(v);
+      out->password_upgrade = cfg_bool(v);
     }
     else if (!strcmp(k, "default_credits"))
     {
@@ -224,7 +248,7 @@ bool cfg_load(const char *path, BbsConfig *out)
     }
     else if (!strcmp(k, "plugins_enabled"))
     {
-      out->plugins_enabled = atoi(v) != 0;
+      out->plugins_enabled = cfg_bool(v);
     }
     else if (!strcmp(k, "plugins_dir"))
     {
@@ -240,11 +264,11 @@ bool cfg_load(const char *path, BbsConfig *out)
     }
     else if (!strcmp(k, "allow_multi_login"))
     {
-      out->allow_multi_login = atoi(v);
+      out->allow_multi_login = cfg_bool(v);
     }
     else if (!strcmp(k, "guest_enabled"))
     {
-      out->guest_enabled = atoi(v);
+      out->guest_enabled = cfg_bool(v);
     }
     else if (!strcmp(k, "guest_handle"))
     {
@@ -256,7 +280,7 @@ bool cfg_load(const char *path, BbsConfig *out)
     }
     else if (!strcmp(k, "welcome_letter_enabled"))
     {
-      out->welcome_letter_enabled = atoi(v);
+      out->welcome_letter_enabled = cfg_bool(v);
     }
     else if (!strcmp(k, "welcome_letter_file"))
     {
@@ -288,11 +312,11 @@ bool cfg_load(const char *path, BbsConfig *out)
     }
     else if (!strcmp(k, "door_cleanup_on_exit"))
     {
-      out->door_cleanup_on_exit = atoi(v);
+      out->door_cleanup_on_exit = cfg_bool(v);
     }
     else if (!strcmp(k, "door_keep_failed_runs"))
     {
-      out->door_keep_failed_runs = atoi(v);
+      out->door_keep_failed_runs = cfg_bool(v);
     }
     else if (!strcmp(k, "max_page_sysop"))
     {
@@ -309,5 +333,98 @@ bool cfg_load(const char *path, BbsConfig *out)
   }
 
   fclose(f);
+  return true;
+}
+
+bool cfg_save(const char *path, const BbsConfig *c)
+{
+  if (!path || !path[0] || !c)
+    return false;
+
+  char tmp[512], bak[512];
+  snprintf(tmp, sizeof(tmp), "%s.tmp", path);
+  snprintf(bak, sizeof(bak), "%s.bak", path);
+
+  FILE *f = fopen(tmp, "w");
+  if (!f)
+    return false;
+
+#define WSTR(k, v) fprintf(f, "%s=%s\n", (k), (v))
+#define WINT(k, v) fprintf(f, "%s=%d\n", (k), (int)(v))
+#define WCHR(k, v) fprintf(f, "%s=%c\n", (k), (v))
+  WSTR("bind", c->bind);
+  WINT("port", c->port);
+  WSTR("db_path", c->db_path);
+  WSTR("menu_main", c->menu_main);
+  WINT("idle_timeout_sec", c->idle_timeout_sec);
+  WSTR("motd", c->motd);
+  WSTR("bbs_name", c->bbs_name);
+  WSTR("sysop_name", c->sysop_name);
+  WSTR("data_path", c->data_path);
+  WSTR("logs_path", c->logs_path);
+  WSTR("art_path", c->art_path);
+  WINT("session_time_limit_min", c->session_time_limit_min);
+  WINT("wfc_enabled", c->wfc_enabled);
+  WINT("wfc_refresh_ms", c->wfc_refresh_ms);
+  WINT("wfc_blank_sec", c->wfc_blank_sec);
+  WINT("wfc_node_num", c->wfc_node_num);
+  WINT("wfc_fg_color", c->wfc_fg_color);
+  WINT("wfc_bg_color", c->wfc_bg_color);
+  WCHR("wfc_status_idle_char", c->wfc_status_idle_char);
+  WCHR("wfc_status_logging_char", c->wfc_status_logging_char);
+  WCHR("wfc_status_online_char", c->wfc_status_online_char);
+  WCHR("wfc_status_chat_char", c->wfc_status_chat_char);
+  WINT("wfc_shell_enabled", c->wfc_shell_enabled);
+  WSTR("wfc_shell_command", c->wfc_shell_command);
+  WINT("scheduler_enabled", c->scheduler_enabled);
+  WINT("scheduler_tick_sec", c->scheduler_tick_sec);
+  WINT("login_window_sec", c->login_window_sec);
+  WINT("login_max_attempts", c->login_max_attempts);
+  WINT("password_upgrade", c->password_upgrade);
+  WINT("default_credits", c->default_credits);
+  WINT("default_file_points", c->default_file_points);
+  WSTR("doors_path", c->doors_path);
+  WSTR("dropfile_path", c->dropfile_path);
+  WSTR("protocol_path", c->protocol_path);
+  WINT("protocol_timeout_sec", c->protocol_timeout_sec);
+  WINT("plugins_enabled", c->plugins_enabled);
+  WSTR("plugins_dir", c->plugins_dir);
+  WSTR("plugins_allowlist", c->plugins_allowlist);
+  WSTR("plugins_denylist", c->plugins_denylist);
+  WINT("allow_multi_login", c->allow_multi_login);
+  WINT("guest_enabled", c->guest_enabled);
+  WSTR("guest_handle", c->guest_handle);
+  WINT("guest_level_id", c->guest_level_id);
+  WINT("welcome_letter_enabled", c->welcome_letter_enabled);
+  WSTR("welcome_letter_file", c->welcome_letter_file);
+  WSTR("welcome_letter_from", c->welcome_letter_from);
+  WINT("password_expire_days", c->password_expire_days);
+  WSTR("dosbox_path", c->dosbox_path);
+  WSTR("door_runtime_path", c->door_runtime_path);
+  WSTR("door_copy_mode", c->door_copy_mode);
+  WINT("door_default_timeout_sec", c->door_default_timeout_sec);
+  WINT("door_cleanup_on_exit", c->door_cleanup_on_exit);
+  WINT("door_keep_failed_runs", c->door_keep_failed_runs);
+  WINT("max_page_sysop", c->max_page_sysop);
+  WINT("max_calls_per_day", c->max_calls_per_day);
+  WSTR("chat_log_path", c->chat_log_path);
+#undef WSTR
+#undef WINT
+#undef WCHR
+
+  if (fclose(f) != 0) {
+    unlink(tmp);
+    return false;
+  }
+  unlink(bak);
+  if (access(path, F_OK) == 0 && rename(path, bak) != 0) {
+    unlink(tmp);
+    return false;
+  }
+  if (rename(tmp, path) != 0) {
+    if (access(bak, F_OK) == 0) rename(bak, path);
+    unlink(tmp);
+    return false;
+  }
   return true;
 }
