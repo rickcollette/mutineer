@@ -1,80 +1,106 @@
-<!-- generated-by: gsd-doc-writer -->
-
 # Mutineer BBS Documentation
 
-Complete documentation for **Mutineer BBS** — a classic telnet bulletin board system written in C11, styled after Renegade BBS with a green pirate theme. SQLite persistence, modern password hashing, DOSBox DOS door runner, PLANK store-and-forward networking, and the embedded Buccaneer scripting VM.
+Complete documentation for **Mutineer BBS** — a classic telnet bulletin board system in C11, with SQLite, DOS doors, PLANK networking, plugins, and the **Buccaneer** door language.
 
-## Getting Started
+**Live site:** [rickcollette.github.io/mutineer](https://rickcollette.github.io/mutineer/)
 
-| Document | Description |
-|----------|-------------|
-| [Overview](overview.md) | Project summary, features, layout, binaries, dependencies |
-| [Getting Started](getting-started.md) | Install, build, init, run, test, troubleshooting |
-| [Configuration](configuration.md) | All `BbsConfig` keys from `include/bbs_config.h` |
+---
 
-## Architecture and Design
+## Start here
 
 | Document | Description |
 |----------|-------------|
-| [Architecture](architecture.md) | Process model, startup, session lifecycle, components, source map |
-| [Menus and UI](menus-and-ui.md) | Menu format, templates, MCI, ACS, art files, F-keys |
-| [Developer Guide](developer-guide.md) | Build, test, structure, contributing |
+| [Quick Start](quick-start.md) | Run in 5 minutes — Docker or binary |
+| [Running on Windows](windows.md) | Docker Desktop and WSL2 |
+| [Getting Started](getting-started.md) | Full install, build, test, troubleshooting |
+| [Deployment](deployment.md) | Docker, releases, systemd, backups |
 
-## User-Facing Subsystems
+---
+
+## BBS operator guides
+
+Deep guides for each major subsystem:
+
+| Document | Topics |
+|----------|--------|
+| [Overview](overview.md) | Features, layout, binaries, design goals |
+| [Configuration](configuration.md) | All `BbsConfig` keys |
+| [Menus and UI](menus-and-ui.md) | `.mnu` files, templates, MCI, ACS, art, F-keys |
+| [Messages and Mail](messages-and-mail.md) | Areas, M*/R* commands, QWK, FidoNet, conferences |
+| [Files and Protocols](files-and-protocols.md) | File areas, batch, archives, credits, protocols |
+| [Chat and Social](chat-and-social.md) | Chat, paging, wall, whisper, oneliners |
+| [Doors and Scripting](doors-and-scripting.md) | Native, DOSBox, Buccaneer, plugins |
+| [Sysop Guide](sysop-guide.md) | WFC, editors, scheduler, maintenance, security |
+| [PLANK Networking](networking-plank.md) | Store-and-forward, daemons, plankctl |
+| [Plugins](plugins.md) | `.so` plugins, API, examples |
+| [CLI Tools](cli-tools.md) | `mutineer-maint`, QWK tools, stats, initbbs |
+| [Screenshots](screenshots.md) | Capturing BBS and WFC screens |
+
+---
+
+## Buccaneer (door language)
+
+| Document | Audience |
+|----------|----------|
+| [Buccaneer hub](buccaneer/index.md) | Index and spec links |
+| [**Programmer's Guide**](buccaneer/programmers-guide.md) | **Full language tutorial for door authors** |
+| [Host API Reference](buccaneer/host-api.md) | `TERM`, `USER`, `DATA`, `KV`, … |
+| [Toolchain](buccaneer/toolchain.md) | `bucc`, linter, formatter, simulator |
+| [Door Packages](buccaneer/door-packages.md) | `door.json`, capabilities, install |
+
+---
+
+## Architecture and development
 
 | Document | Description |
 |----------|-------------|
-| [Messages and Mail](messages-and-mail.md) | Message areas, M*/R* commands, QWK, FidoNet, conferences |
-| [Files and Protocols](files-and-protocols.md) | File areas, F* commands, batch, archives, credits |
-| [Chat and Social](chat-and-social.md) | Chat modes, paging, wall, whisper, oneliners |
-| [Doors and Scripting](doors-and-scripting.md) | Native, DOSBox, Buccaneer status, plugins comparison |
+| [Architecture](architecture.md) | Processes, sessions, components, source map |
+| [Developer Guide](developer-guide.md) | Contributing, tests, code layout |
 
-## Sysop and Operations
-
-| Document | Description |
-|----------|-------------|
-| [Sysop Guide](sysop-guide.md) | WFC, user admin, editors, scheduler, maintenance, security |
-| [CLI Tools](cli-tools.md) | All standalone command-line utilities |
-
-## Networking and Extensions
-
-| Document | Description |
-|----------|-------------|
-| [PLANK Networking](networking-plank.md) | PLANK protocol, daemons, plankctl, schema |
-| [Buccaneer](buccaneer.md) | Language, VM, host bridge, toolchain, integration status |
-| [Plugins](plugins.md) | Plugin API, building, host API, examples |
+---
 
 ## Reference
 
 | Document | Description |
 |----------|-------------|
-| [Menu Actions](reference/menu-actions.md) | All `handle_action()` actions from `session.c` |
-| [Message Commands](reference/message-commands.md) | M* and R* command reference |
-| [File Commands](reference/file-commands.md) | F* command reference |
-| [ACS and MCI](reference/acs-mci.md) | Full ACS terms and MCI tokens |
-| [Database Schema](reference/database.md) | All SQLite tables (BBS + PLANK) |
+| [Menu Actions](reference/menu-actions.md) | `handle_action()` codes |
+| [Message Commands](reference/message-commands.md) | M* and R* commands |
+| [File Commands](reference/file-commands.md) | F* commands |
+| [ACS and MCI](reference/acs-mci.md) | Access control and template tokens |
+| [Database Schema](reference/database.md) | SQLite tables |
 
-## Legacy and Supplementary Docs
+---
 
-These older docs remain in the repository for historical context. Prefer the documents above for current reference:
+## Legacy docs
 
-- `docs/admin.md` — earlier admin reference
-- `docs/PLANK_ADMIN.md` — earlier PLANK admin guide
-- `docs/ACS_MCI.md`, `docs/MCI.md`, `docs/TEMPLATES.md` — earlier template docs
-- `SPECS/` — design specifications (Buccaneer, DOS doors, PLANK)
+Older files kept for history — prefer the guides above:
 
-## Quick Links
+| File | Superseded by |
+|------|----------------|
+| `admin.md` | [Sysop Guide](sysop-guide.md) |
+| `PLANK_ADMIN.md` | [PLANK Networking](networking-plank.md) |
+| `ACS_MCI.md`, `MCI.md`, `TEMPLATES.md` | [Menus and UI](menus-and-ui.md), [ACS reference](reference/acs-mci.md) |
+| `networking.md`, `doors_protocols.md` | [PLANK](networking-plank.md), [Doors](doors-and-scripting.md) |
+| `SPEC.md`, `FILES.md`, `PARITY.md`, `WHY.md` | [Overview](overview.md), subsystem guides |
+
+Implementer specifications: `SPECS/BUCCANEER/`, `SPECS/` (PLANK, DOS doors).
+
+---
+
+## Quick commands
 
 ```bash
-# Build and run
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build
+# Docker
+docker compose up -d && telnet localhost 2929
+
+# From source
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build
 build/mutineer-initbbs -c conf/mutineer.conf -y
 build/mutineer -c conf/mutineer.conf
 ```
 
-Default telnet port: **2929** (configurable in `conf/mutineer.conf`).
+Default port: **2929** · Docker default login: **sysop** / **mutineer**
 
 ## License
 
-Mutineer BBS is released under the [MIT License](../LICENSE).
+[MIT License](../LICENSE)

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Buccaneer Scripting Language — Mutineer BBS</title>
+  <title>Buccaneer — Mutineer BBS</title>
   <link rel="stylesheet" href="assets/css/site.css">
 </head>
 <body>
@@ -11,173 +11,17 @@
     <a href="index.html" class="logo">MUTINEER BBS</a>
     <span class="tagline">Documentation</span>
   </header>
-  <nav class="doc-nav"><a href="index.html" class="home">← Home</a><a href="overview.html">Overview</a><a href="getting-started.html">Getting Started</a><a href="configuration.html">Configuration</a><a href="architecture.html">Architecture</a><a href="menus-and-ui.html">Menus & UI</a><a href="messages-and-mail.html">Messages & Mail</a><a href="files-and-protocols.html">Files & Protocols</a><a href="chat-and-social.html">Chat & Social</a><a href="doors-and-scripting.html">Doors & Scripting</a><a href="sysop-guide.html">Sysop Guide</a><a href="networking-plank.html">PLANK Networking</a><a href="buccaneer.html" class="active">Buccaneer</a><a href="plugins.html">Plugins</a><a href="developer-guide.html">Developer Guide</a><a href="cli-tools.html">CLI Tools</a><a href="reference/menu-actions.html">Menu Actions</a><a href="reference/message-commands.html">Message Commands</a><a href="reference/file-commands.html">File Commands</a><a href="reference/acs-mci.html">ACS & MCI</a><a href="reference/database.html">Database Schema</a></nav>
-  <main class="doc-content"><p>&lt;!-- generated-by: gsd-doc-writer --&gt;</p>
-<h1>Buccaneer Scripting Language</h1>
-<p>Buccaneer is Mutineer&#x27;s embedded scripting language for writing interactive BBS doors in a Pascal-like syntax. The compiler, bytecode VM, and host bridge live in <code>src/buccaneer/</code>.</p>
-<h2>Overview</h2>
-<pre><code class="">
-.bucc source → bucc compiler → bytecode module → VM execution
-                                                    ↕
-                                              host bridge (terminal I/O, doors)
-</code></pre>
-<p>Design specification: <code>SPECS/BUCCANEER/Buccaneer_SPEC.md</code>.</p>
-<h2>Language Features</h2>
+  <nav class="doc-nav"><a href="index.html" class="home">← Home</a><a href="quick-start.html">Quick Start</a><a href="windows.html">Windows</a><a href="getting-started.html">Getting Started</a><a href="deployment.html">Deployment</a><a href="overview.html">Overview</a><a href="configuration.html">Configuration</a><a href="architecture.html">Architecture</a><a href="menus-and-ui.html">Menus & UI</a><a href="messages-and-mail.html">Messages & Mail</a><a href="files-and-protocols.html">Files & Protocols</a><a href="chat-and-social.html">Chat & Social</a><a href="doors-and-scripting.html">Doors & Scripting</a><a href="sysop-guide.html">Sysop Guide</a><a href="networking-plank.html">PLANK</a><a href="buccaneer/programmers-guide.html">BUCC Guide</a><a href="buccaneer/host-api.html">BUCC API</a><a href="plugins.html">Plugins</a><a href="developer-guide.html">Developer</a><a href="cli-tools.html">CLI Tools</a><a href="reference/menu-actions.html">Menu Actions</a><a href="reference/message-commands.html">Messages Ref</a><a href="reference/file-commands.html">Files Ref</a><a href="reference/acs-mci.html">ACS & MCI</a><a href="reference/database.html">Database</a></nav>
+  <main class="doc-content"><h1>Buccaneer</h1>
+<p>The Buccaneer documentation has moved to a dedicated section:</p>
 <ul>
-<li>Pascal-like syntax (procedures, functions, variables, control flow)</li>
-<li>Strong typing with inference in semantic pass</li>
-<li>String, integer, boolean, array types</li>
-<li>Module system with <code>IMPORT</code>/<code>EXPORT</code></li>
-<li>Door-specific intrinsics via host bridge</li>
+<li><strong><a href="buccaneer/index.html">Buccaneer hub</a></strong> — overview and links</li>
+<li><strong><a href="buccaneer/programmers-guide.html">Programmer&#x27;s Guide</a></strong> — full language guide for door authors</li>
+<li><strong><a href="buccaneer/host-api.html">Host API Reference</a></strong></li>
+<li><strong><a href="buccaneer/toolchain.html">Toolchain</a></strong></li>
+<li><strong><a href="buccaneer/door-packages.html">Door Packages</a></strong></li>
 </ul>
-<h3>Example: Hello World</h3>
-<p>From <code>src/buccaneer/examples/hello.bucc</code>:</p>
-<pre><code class="pascal">
-PROGRAM Hello;
-
-PROCEDURE Main;
-BEGIN
-  WriteLn(&#x27;Ahoy from Buccaneer!&#x27;);
-END;
-
-BEGIN
-  Main;
-END.
-</code></pre>
-<h3>Example: Guess Game</h3>
-<p><code>examples/guess.bucc</code> — interactive number guessing with user input loop.</p>
-<h2>Toolchain</h2>
-<p>Build from <code>src/buccaneer/Makefile</code>:</p>
-<table>
-<tr><th>Binary</th><th>Source</th><th>Purpose</th></tr>
-<table>
-<tr><th><code>bucc</code></th><th><code>tools/bucc.c</code></th><th>Compile .bucc to bytecode</th></tr>
-<table>
-<tr><th><code>bucc-linter</code></th><th><code>tools/linter.c</code></th><th>Static analysis</th></tr>
-<table>
-<tr><th><code>bucc-formatter</code></th><th><code>tools/formatter.c</code></th><th>Source formatting</th></tr>
-<table>
-<tr><th><code>bucc-simulator</code></th><th><code>tools/simulator.c</code></th><th>Standalone VM runner</th></tr>
-</table>
-<h3>Compile and Run</h3>
-<pre><code class="bash">
-cd src/buccaneer
-make
-./bucc examples/hello.bucc -o hello.bcm
-./bucc-simulator hello.bcm
-</code></pre>
-<p>Docker-based tests: <code>src/buccaneer/tests/run-tests-docker.sh</code>.</p>
-<h2>Compiler Pipeline</h2>
-<table>
-<tr><th>Stage</th><th>File</th><th>Output</th></tr>
-<table>
-<tr><th>Lexer</th><th><code>lexer.c</code></th><th>Token stream</th></tr>
-<table>
-<tr><th>Parser</th><th><code>parser.c</code></th><th>AST (<code>ast.c</code>)</th></tr>
-<table>
-<tr><th>Semantic</th><th><code>semantic.c</code></th><th>Typed AST, symbol table</th></tr>
-<table>
-<tr><th>Emit</th><th><code>emit.c</code></th><th>Bytecode module (<code>module.c</code>)</th></tr>
-</table>
-<p>Headers in <code>src/buccaneer/include/bucc_*.h</code>.</p>
-<h2>Virtual Machine</h2>
-<p><code>vm.c</code> executes bytecode with stack-based operations:</p>
-<ul>
-<li>Arithmetic, comparison, logic</li>
-<li>String operations</li>
-<li>Control flow (jump, call, return)</li>
-<li>Host function calls (<code>OP_CALL_HOST</code>)</li>
-<li>Dispatch/coroutine support (<code>OP_DISPATCH_CALL</code>)</li>
-<li>Array allocation and indexing</li>
-</ul>
-<p>VM states: running, halted, error, chain (door transfer).</p>
-<h2>Host Bridge</h2>
-<p><code>host.c</code> and <code>bbs.c</code> connect VM to BBS services:</p>
-<table>
-<tr><th>Host Function</th><th>Purpose</th></tr>
-<table>
-<tr><th>Terminal I/O</th><th>ReadLine, Write, WriteLn, Cls</th></tr>
-<table>
-<tr><th>Door control</th><th>DOOR.EXIT, DOOR.CHAIN</th></tr>
-<table>
-<tr><th>User info</th><th>Handle, level, credits, time</th></tr>
-<table>
-<tr><th>File I/O</th><th>Limited file access for scripts</th></tr>
-</table>
-<p>Host API header: <code>include/bucc_host.h</code>.</p>
-<p>Door manifest example: <code>examples/door.json</code> for Buccaneer door metadata.</p>
-<h2>Package Format</h2>
-<p><code>package.c</code> handles compiled module packaging:</p>
-<ul>
-<li>Module header with version and exports</li>
-<li>Procedure table with bytecode offsets</li>
-<li>String/constant pools</li>
-<li>Debug symbols (optional)</li>
-</ul>
-<p>Header: <code>include/bucc_package.h</code>.</p>
-<h2>Integration Status</h2>
-<p>Buccaneer is <strong>implemented but not production-ready</strong> for in-BBS door launching. Known issues from <code>BUCC_TODO.md</code>:</p>
-<h3>Critical Bugs</h3>
-<table>
-<tr><th>ID</th><th>Issue</th></tr>
-<table>
-<tr><th>BUG-1</th><th><code>DOOR.CHAIN</code> sets <code>VM_HALT</code> instead of <code>VM_CHAIN</code></th></tr>
-<table>
-<tr><th>BUG-2</th><th><code>DOOR.EXIT</code> discards exit code</th></tr>
-<table>
-<tr><th>BUG-3</th><th><code>OP_ARRAY_NEW</code> with count=0 calls <code>malloc(0)</code></th></tr>
-<table>
-<tr><th>BUG-4</th><th><code>OP_DISPATCH_CALL</code> discards const on module pointer</th></tr>
-<table>
-<tr><th>BUG-5</th><th>Out-of-range dispatch leaves stack inconsistent</th></tr>
-<table>
-<tr><th>BUG-6</th><th><code>OP_CALL_HOST</code> silently truncates args beyond 16</th></tr>
-<table>
-<tr><th>BUG-7</th><th><code>OP_DISPATCH_CALL</code> emits base_proc_id=0</th></tr>
-</table>
-<h3>Missing Features</h3>
-<ul>
-<li>Full integration with <code>doors.c</code> door launcher</li>
-<li>Complete DOOR.SYS dropfile generation from VM</li>
-<li>Production error reporting and timeout handling</li>
-<li>Menu registration for <code>.bucc</code> doors in DB</li>
-</ul>
-<h3>Recommended Use</h3>
-<ol>
-<li><strong>Development/testing:</strong> Use <code>bucc-simulator</code> with compiled modules</li>
-<li><strong>Production doors:</strong> Use native or DOSBox runners</li>
-<li><strong>Track progress:</strong> Monitor <code>BUCC_TODO.md</code> and <code>SPECS/BUCCANEER/</code></li>
-</ol>
-<h2>Testing</h2>
-<pre><code class="bash">
-cd src/buccaneer/tests
-make
-./run-tests-docker.sh
-</code></pre>
-<p>Test suites: lexer, parser, value, VM, package, e2e.</p>
-<h2>Comparison with Plugins</h2>
-<table>
-<tr><th>Aspect</th><th>Buccaneer</th><th>Plugin (.so)</th></tr>
-<table>
-<tr><th>Language</th><th>Pascal-like script</th><th>C</th></tr>
-<table>
-<tr><th>Build</th><th>bucc compiler</th><th>gcc/clang shared lib</th></tr>
-<table>
-<tr><th>Reload</th><th>Recompile script</th><th>Reload .so</th></tr>
-<table>
-<tr><th>Sandboxing</th><th>VM bytecode</th><th>None (native code)</th></tr>
-<table>
-<tr><th>Performance</th><th>Interpreted</th><th>Native</th></tr>
-<table>
-<tr><th>ABI stability</th><th>Internal</th><th><code>bbs_plugin_api.h</code> v1.0</th></tr>
-</table>
-<p>See <a href="doors-and-scripting.html">Doors and Scripting</a> for selection guidance.</p>
-<h2>Related Documentation</h2>
-<ul>
-<li><a href="doors-and-scripting.html">Doors and Scripting</a></li>
-<li><code>SPECS/BUCCANEER/Buccaneer_SPEC.md</code></li>
-<li><code>BUCC_TODO.md</code></li>
-</ul></main>
+<p>For how Buccaneer fits alongside native and DOS doors, see <a href="doors-and-scripting.html">Doors and Scripting</a>.</p></main>
   <footer class="site-footer">
     <p>Mutineer BBS — <a href="https://github.com/rickcollette/mutineer">GitHub</a> — MIT License</p>
   </footer>

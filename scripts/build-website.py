@@ -11,8 +11,11 @@ OUT = os.path.join(ROOT, "website")
 OUT_DOCS = os.path.join(OUT, "docs")
 
 NAV = [
-    ("Overview", "overview.html"),
+    ("Quick Start", "quick-start.html"),
+    ("Windows", "windows.html"),
     ("Getting Started", "getting-started.html"),
+    ("Deployment", "deployment.html"),
+    ("Overview", "overview.html"),
     ("Configuration", "configuration.html"),
     ("Architecture", "architecture.html"),
     ("Menus & UI", "menus-and-ui.html"),
@@ -21,16 +24,17 @@ NAV = [
     ("Chat & Social", "chat-and-social.html"),
     ("Doors & Scripting", "doors-and-scripting.html"),
     ("Sysop Guide", "sysop-guide.html"),
-    ("PLANK Networking", "networking-plank.html"),
-    ("Buccaneer", "buccaneer.html"),
+    ("PLANK", "networking-plank.html"),
+    ("BUCC Guide", "buccaneer/programmers-guide.html"),
+    ("BUCC API", "buccaneer/host-api.html"),
     ("Plugins", "plugins.html"),
-    ("Developer Guide", "developer-guide.html"),
+    ("Developer", "developer-guide.html"),
     ("CLI Tools", "cli-tools.html"),
     ("Menu Actions", "reference/menu-actions.html"),
-    ("Message Commands", "reference/message-commands.html"),
-    ("File Commands", "reference/file-commands.html"),
+    ("Messages Ref", "reference/message-commands.html"),
+    ("Files Ref", "reference/file-commands.html"),
     ("ACS & MCI", "reference/acs-mci.html"),
-    ("Database Schema", "reference/database.html"),
+    ("Database", "reference/database.html"),
 ]
 
 
@@ -132,8 +136,8 @@ def md_to_html(text: str) -> str:
 
 
 def build_nav(current: str, depth: int) -> str:
-    prefix = "../" if depth else ""
-    home = ("../" if depth else "") + "index.html"
+    prefix = "../" * depth
+    home = prefix + "index.html"
     items = []
     for label, href in NAV:
         full = prefix + href
@@ -143,10 +147,9 @@ def build_nav(current: str, depth: int) -> str:
 
 
 def wrap(title: str, body: str, current: str, depth: int) -> str:
-    css = ("../" if depth else "") + "../assets/css/site.css" if depth else "assets/css/site.css"
-    if depth:
-        css = "../assets/css/site.css"
-    home = ("../" if depth else "") + "index.html"
+    prefix = "../" * depth
+    css = (prefix + "../assets/css/site.css") if depth else "assets/css/site.css"
+    home = prefix + "index.html"
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -190,8 +193,11 @@ def main():
     os.makedirs(OUT_DOCS, exist_ok=True)
     pages = [
         ("index.md", "index.html", 0),
-        ("overview.md", "overview.html", 0),
+        ("quick-start.md", "quick-start.html", 0),
+        ("windows.md", "windows.html", 0),
         ("getting-started.md", "getting-started.html", 0),
+        ("deployment.md", "deployment.html", 0),
+        ("overview.md", "overview.html", 0),
         ("configuration.md", "configuration.html", 0),
         ("architecture.md", "architecture.html", 0),
         ("menus-and-ui.md", "menus-and-ui.html", 0),
@@ -201,7 +207,13 @@ def main():
         ("doors-and-scripting.md", "doors-and-scripting.html", 0),
         ("sysop-guide.md", "sysop-guide.html", 0),
         ("networking-plank.md", "networking-plank.html", 0),
+        ("screenshots.md", "screenshots.html", 0),
         ("buccaneer.md", "buccaneer.html", 0),
+        ("buccaneer/index.md", "buccaneer/index.html", 1),
+        ("buccaneer/programmers-guide.md", "buccaneer/programmers-guide.html", 1),
+        ("buccaneer/host-api.md", "buccaneer/host-api.html", 1),
+        ("buccaneer/toolchain.md", "buccaneer/toolchain.html", 1),
+        ("buccaneer/door-packages.md", "buccaneer/door-packages.html", 1),
         ("plugins.md", "plugins.html", 0),
         ("developer-guide.md", "developer-guide.html", 0),
         ("cli-tools.md", "cli-tools.html", 0),

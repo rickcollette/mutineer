@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Running Mutineer on Windows — Mutineer BBS</title>
+  <link rel="stylesheet" href="assets/css/site.css">
+</head>
+<body>
+  <header class="site-header">
+    <a href="index.html" class="logo">MUTINEER BBS</a>
+    <span class="tagline">Documentation</span>
+  </header>
+  <nav class="doc-nav"><a href="index.html" class="home">← Home</a><a href="quick-start.html">Quick Start</a><a href="windows.html" class="active">Windows</a><a href="getting-started.html">Getting Started</a><a href="deployment.html">Deployment</a><a href="overview.html">Overview</a><a href="configuration.html">Configuration</a><a href="architecture.html">Architecture</a><a href="menus-and-ui.html">Menus & UI</a><a href="messages-and-mail.html">Messages & Mail</a><a href="files-and-protocols.html">Files & Protocols</a><a href="chat-and-social.html">Chat & Social</a><a href="doors-and-scripting.html">Doors & Scripting</a><a href="sysop-guide.html">Sysop Guide</a><a href="networking-plank.html">PLANK</a><a href="buccaneer/programmers-guide.html">BUCC Guide</a><a href="buccaneer/host-api.html">BUCC API</a><a href="plugins.html">Plugins</a><a href="developer-guide.html">Developer</a><a href="cli-tools.html">CLI Tools</a><a href="reference/menu-actions.html">Menu Actions</a><a href="reference/message-commands.html">Messages Ref</a><a href="reference/file-commands.html">Files Ref</a><a href="reference/acs-mci.html">ACS & MCI</a><a href="reference/database.html">Database</a></nav>
+  <main class="doc-content"><h1>Running Mutineer on Windows</h1>
+<p>Mutineer is a <strong>Linux-native</strong> C program. On Windows you run it through <strong>Docker Desktop</strong> (easiest) or <strong>WSL2</strong> (full Linux toolchain). Native Windows builds are not supported today.</p>
+<h2>Option A: Docker Desktop (recommended)</h2>
+<p>Best if you want a running BBS with minimal setup and no compiler install.</p>
+<h3>Prerequisites</h3>
+<ol>
+<li>Install <a href="https://docs.docker.com/desktop/setup/install/windows-install/">Docker Desktop for Windows</a>.</li>
+<li>Enable <strong>WSL 2 backend</strong> when prompted (Docker Desktop uses it internally).</li>
+<li>Install a telnet client:</li>
+</ol>
+<p>   - <strong>Windows 11</strong>: <code>Optional Features</code> → enable <strong>Telnet Client</strong>, or</p>
+<p>   - Use <strong>SyncTERM</strong>, <strong>PuTTY</strong> (raw telnet to <code>localhost:2929</code>), or <strong>Windows Terminal</strong> + <code>telnet localhost 2929</code>.</p>
+<h3>Run the BBS</h3>
+<p>Open <strong>PowerShell</strong> or <strong>Command Prompt</strong> in the project folder:</p>
+<pre><code class="powershell">
+git clone https://github.com/rickcollette/mutineer.git
+cd mutineer
+docker compose up -d
+</code></pre>
+<p>Connect:</p>
+<pre><code class="powershell">
+telnet localhost 2929
+</code></pre>
+<p>Default login: <strong>sysop</strong> / <strong>mutineer</strong>.</p>
+<h3>Port and firewall</h3>
+<p>Docker publishes port <strong>2929</strong> to the host. If connection fails:</p>
+<ul>
+<li>Confirm the container is running: <code>docker compose ps</code></li>
+<li>Check Windows Firewall allows Docker Desktop</li>
+<li>Try <code>127.0.0.1</code> instead of <code>localhost</code> in your client</li>
+</ul>
+<h3>Persisted data</h3>
+<p>User database and uploads live in Docker volumes. To reset completely:</p>
+<pre><code class="powershell">
+docker compose down -v
+docker compose up -d
+</code></pre>
+<h3>Screenshots / WFC</h3>
+<p>WFC needs an interactive terminal. From WSL or Git Bash inside the repo:</p>
+<pre><code class="bash">
+./scripts/open-wfc.sh
+./scripts/open-bbs-telnet.sh
+</code></pre>
+<p>See <a href="screenshots.html">Screenshots</a>.</p>
+<hr>
+<h2>Option B: WSL2 (Ubuntu)</h2>
+<p>Best if you want to <strong>build from source</strong>, run tests, or develop on Windows.</p>
+<h3>Prerequisites</h3>
+<ol>
+<li>Install WSL2: in PowerShell (Admin):</li>
+</ol>
+<p>   ```powershell</p>
+<p>   wsl --install -d Ubuntu</p>
+<p>   ```</p>
+<ol>
+<li>Reboot, open <strong>Ubuntu</strong> from the Start menu, create your Linux user.</li>
+</ol>
+<ol>
+<li>Inside WSL, install build dependencies:</li>
+</ol>
+<p>   ```bash</p>
+<p>   sudo apt update</p>
+<p>   sudo apt install -y git cmake build-essential libsqlite3-dev libssl-dev \</p>
+<p>     telnet dosbox expect</p>
+<p>   ```</p>
+<h3>Clone and build</h3>
+<pre><code class="bash">
+cd ~
+git clone https://github.com/rickcollette/mutineer.git
+cd mutineer
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build
+build/mutineer-initbbs -c conf/mutineer.conf -y
+build/mutineer -c conf/mutineer.conf
+</code></pre>
+<p>In a <strong>second WSL terminal</strong>:</p>
+<pre><code class="bash">
+telnet localhost 2929
+</code></pre>
+<h3>Access from Windows clients</h3>
+<p>WSL2 forwards <code>localhost</code> automatically in recent Windows versions. Point SyncTERM or PuTTY at:</p>
+<ul>
+<li>Host: <code>localhost</code></li>
+<li>Port: <code>2929</code></li>
+</ul>
+<p>If that fails, get the WSL IP from inside Ubuntu:</p>
+<pre><code class="bash">
+hostname -I | awk &#x27;{print $1}&#x27;
+</code></pre>
+<p>Use that IP in your Windows BBS client instead of <code>localhost</code>.</p>
+<h3>Docker inside WSL</h3>
+<p>You can also run <code>docker compose up -d</code> from the repo in WSL if Docker Desktop integrates with WSL (Settings → Resources → WSL Integration → enable your distro).</p>
+<hr>
+<h2>Option comparison</h2>
+<table>
+<tr><th>Approach</th><th>Build from source</th><th>Telnet from Windows</th><th>Sysop WFC</th><th>Difficulty</th></tr>
+<table>
+<tr><th>Docker Desktop</th><th>No</th><th>Yes</th><th>Via WSL script</th><th>Low</th></tr>
+<table>
+<tr><th>WSL2 Ubuntu</th><th>Yes</th><th>Yes</th><th>Yes in WSL terminal</th><th>Medium</th></tr>
+<table>
+<tr><th>Native Windows</th><th>Not supported</th><th>—</th><th>—</th><th>—</th></tr>
+</table>
+<hr>
+<h2>Troubleshooting</h2>
+<h3><code>telnet</code> is not recognized (PowerShell)</h3>
+<p>Enable Telnet Client in Windows Features, install SyncTERM, or use WSL: <code>wsl telnet localhost 2929</code>.</p>
+<h3>Docker: <code>docker compose</code> not found</h3>
+<p>Use Docker Desktop’s built-in Compose v2: <code>docker compose</code> (with a space). Update Docker Desktop if the command is missing.</p>
+<h3>WSL: cannot connect to port 2929 from Windows</h3>
+<p>Restart WSL: <code>wsl --shutdown</code>, then start Ubuntu again. Confirm <code>mutineer</code> is listening: <code>ss -tlnp | grep 2929</code> inside WSL.</p>
+<h3>Login fails after many test attempts</h3>
+<p>Reset the database volume (Docker) or re-run <code>mutineer-initbbs -y</code> (WSL). Default sysop password is <strong>mutineer</strong> on a fresh install.</p>
+<hr>
+<h2>Next steps</h2>
+<ul>
+<li><a href="quick-start.html">Quick Start</a></li>
+<li><a href="getting-started.html">Getting Started</a> — tests, plugins, doors</li>
+<li><a href="deployment.html">Deployment</a> — Docker volumes, releases, production</li>
+</ul></main>
+  <footer class="site-footer">
+    <p>Mutineer BBS — <a href="https://github.com/rickcollette/mutineer">GitHub</a> — MIT License</p>
+  </footer>
+</body>
+</html>

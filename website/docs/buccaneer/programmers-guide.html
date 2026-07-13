@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Buccaneer Programmer&#x27;s Guide — Mutineer BBS</title>
+  <link rel="stylesheet" href="../../assets/css/site.css">
+</head>
+<body>
+  <header class="site-header">
+    <a href="../index.html" class="logo">MUTINEER BBS</a>
+    <span class="tagline">Documentation</span>
+  </header>
+  <nav class="doc-nav"><a href="../index.html" class="home">← Home</a><a href="../quick-start.html">Quick Start</a><a href="../windows.html">Windows</a><a href="../getting-started.html">Getting Started</a><a href="../deployment.html">Deployment</a><a href="../overview.html">Overview</a><a href="../configuration.html">Configuration</a><a href="../architecture.html">Architecture</a><a href="../menus-and-ui.html">Menus & UI</a><a href="../messages-and-mail.html">Messages & Mail</a><a href="../files-and-protocols.html">Files & Protocols</a><a href="../chat-and-social.html">Chat & Social</a><a href="../doors-and-scripting.html">Doors & Scripting</a><a href="../sysop-guide.html">Sysop Guide</a><a href="../networking-plank.html">PLANK</a><a href="../buccaneer/programmers-guide.html">BUCC Guide</a><a href="../buccaneer/host-api.html">BUCC API</a><a href="../plugins.html">Plugins</a><a href="../developer-guide.html">Developer</a><a href="../cli-tools.html">CLI Tools</a><a href="../reference/menu-actions.html">Menu Actions</a><a href="../reference/message-commands.html">Messages Ref</a><a href="../reference/file-commands.html">Files Ref</a><a href="../reference/acs-mci.html">ACS & MCI</a><a href="../reference/database.html">Database</a></nav>
+  <main class="doc-content"><h1>Buccaneer Programmer&#x27;s Guide</h1>
+<p>A complete guide for writing BBS door programs in Buccaneer. For API details see <a href="host-api.html">Host API Reference</a>; for packaging see <a href="door-packages.html">Door Packages</a>.</p>
+<h2>1. What Buccaneer is</h2>
+<p>Buccaneer doors run <strong>inside</strong> the BBS process — not as separate shell scripts. Benefits:</p>
+<ul>
+<li>Fast startup per caller</li>
+<li>Per-session VM isolation</li>
+<li>Host-mediated I/O, storage, and messaging</li>
+<li>Capability-based security (<code>door.json</code> declares what a door may do)</li>
+</ul>
+<p>Buccaneer is <strong>BASIC-like</strong> (familiar keywords, <code>IF</code>/<code>FOR</code>/<code>WHILE</code>) but <strong>structured</strong> (no line numbers, explicit <code>END SUB</code>, typed variables).</p>
+<h2>2. Your first program</h2>
+<pre><code class="basic">
+PROGRAM &quot;Hello&quot;
+VERSION &quot;1.0.0&quot;
+CAPABILITY &quot;term.io&quot;
+CAPABILITY &quot;user.read&quot;
+
+SUB Main()
+    TERM.CLS()
+    TERM.PRINTLN(&quot;Ahoy from Buccaneer!&quot;)
+    TERM.PRINTLN(&quot;User: &quot; + USER.NAME())
+    TERM.PRINTLN(&quot;Press a key...&quot;)
+    DIM k AS STRING
+    k = TERM.GETKEY()
+END SUB
+</code></pre>
+<p>Compile and run locally:</p>
+<pre><code class="bash">
+cd src/buccaneer
+make
+./bucc examples/hello.bucc -o /tmp/hello.bcm
+./bucc-simulator /tmp/hello.bcm
+</code></pre>
+<h2>3. Module structure</h2>
+<p>Every <code>.bucc</code> file is one <strong>module</strong> with metadata headers and declarations.</p>
+<h3>Required metadata</h3>
+<table>
+<tr><th>Header</th><th>Example</th><th>Purpose</th></tr>
+<table>
+<tr><th><code>PROGRAM</code></th><th><code>PROGRAM &quot;My Door&quot;</code></th><th>Display / package name</th></tr>
+<table>
+<tr><th><code>VERSION</code></th><th><code>VERSION &quot;1.0.0&quot;</code></th><th>Semver string</th></tr>
+</table>
+<h3>Optional metadata</h3>
+<table>
+<tr><th>Header</th><th>Purpose</th></tr>
+<table>
+<tr><th><code>AUTHOR</code></th><th>Author string</th></tr>
+<table>
+<tr><th><code>DESCRIPTION</code></th><th>Short description</th></tr>
+<table>
+<tr><th><code>CAPABILITY</code></th><th>Requested host powers (repeatable)</th></tr>
+<table>
+<tr><th><code>DATASET</code></th><th>Declare logical datasets for <code>DATA.*</code></th></tr>
+<table>
+<tr><th><code>OPTION</code></th><th>Compiler/tool options</th></tr>
+</table>
+<h3>Entry point</h3>
+<p>Exactly one main procedure:</p>
+<pre><code class="basic">
+SUB Main()
+    &#x27; door logic here
+END SUB
+</code></pre>
+<p>Optional event handlers (when host supports them):</p>
+<ul>
+<li><code>OnEnter</code>, <code>OnInput</code>, <code>OnHangup</code>, <code>OnTimeout</code>, <code>OnResume</code></li>
+</ul>
+<h3>Comments</h3>
+<pre><code class="basic">
+&#x27; This is a comment
+REM This is also a comment
+</code></pre>
+<h2>4. Types</h2>
+<table>
+<tr><th>Type</th><th>Description</th></tr>
+<table>
+<tr><th><code>INTEGER</code></th><th>Signed 64-bit integer</th></tr>
+<table>
+<tr><th><code>DOUBLE</code></th><th>IEEE-754 floating point</th></tr>
+<table>
+<tr><th><code>BOOLEAN</code></th><th><code>TRUE</code> / <code>FALSE</code></th></tr>
+<table>
+<tr><th><code>STRING</code></th><th>UTF-8 text</th></tr>
+<table>
+<tr><th><code>DATE</code></th><th>Date value</th></tr>
+<table>
+<tr><th><code>DATETIME</code></th><th>Date and time</th></tr>
+<table>
+<tr><th><code>NULL</code></th><th>Absence of value</th></tr>
+<table>
+<tr><th><code>ARRAY OF T</code></th><th>Homogeneous array</th></tr>
+<table>
+<tr><th><code>MAP OF STRING TO T</code></th><th>String-keyed map</th></tr>
+</table>
+<h3>Variables</h3>
+<pre><code class="basic">
+DIM score AS INTEGER
+DIM name AS STRING
+DIM flags AS MAP OF STRING TO BOOLEAN
+
+score = 0
+name = &quot;Player1&quot;
+</code></pre>
+<p>Parameters and locals use the same <code>DIM</code> form inside procedures.</p>
+<h2>5. Procedures and functions</h2>
+<pre><code class="basic">
+SUB ShowBanner()
+    TERM.PRINTLN(&quot;=== Scoreboard ===&quot;)
+END SUB
+
+FUNCTION AddScore(base AS INTEGER, bonus AS INTEGER) AS INTEGER
+    AddScore = base + bonus
+END FUNCTION
+
+SUB Main()
+    CALL ShowBanner()
+    DIM total AS INTEGER
+    total = AddScore(10, 5)
+    TERM.PRINTLN(&quot;Total: &quot; + STR$(total))
+END SUB
+</code></pre>
+<ul>
+<li><code>SUB</code> — no return value (use <code>RETURN</code> to exit early)</li>
+<li><code>FUNCTION</code> — assign to the function name to return a value</li>
+</ul>
+<h2>6. Operators and expressions</h2>
+<p>Standard arithmetic: <code>+</code>, <code>-</code>, <code>*</code>, <code>/</code>, <code>\</code> (integer divide), <code>MOD</code>.</p>
+<p>Strings concatenate with <code>+</code>. Comparisons: <code>=</code>, <code>&lt;&gt;</code>, <code>&lt;</code>, <code>&gt;</code>, <code>&lt;=</code>, <code>&gt;=</code>.</p>
+<p>Logical: <code>AND</code>, <code>OR</code>, <code>NOT</code>.</p>
+<p>String functions (common): <code>LEN</code>, <code>LEFT$</code>, <code>RIGHT$</code>, <code>MID$</code>, <code>INSTR</code>, <code>TRIM$</code>, <code>UPPER$</code>, <code>LOWER$</code>, <code>STR$</code>, <code>VAL</code>.</p>
+<h2>7. Control flow</h2>
+<h3>IF</h3>
+<pre><code class="basic">
+IF score &gt; 100 THEN
+    TERM.PRINTLN(&quot;High score!&quot;)
+ELSEIF score &gt; 50 THEN
+    TERM.PRINTLN(&quot;Good job&quot;)
+ELSE
+    TERM.PRINTLN(&quot;Keep trying&quot;)
+END IF
+</code></pre>
+<h3>SELECT CASE</h3>
+<pre><code class="basic">
+SELECT CASE choice
+    CASE 1
+        CALL HandleMessages()
+    CASE 2
+        CALL HandleFiles()
+    CASE ELSE
+        TERM.PRINTLN(&quot;Unknown option&quot;)
+END SELECT
+</code></pre>
+<h3>FOR</h3>
+<pre><code class="basic">
+DIM i AS INTEGER
+FOR i = 1 TO 10
+    TERM.PRINTLN(STR$(i))
+NEXT i
+</code></pre>
+<h3>WHILE / DO</h3>
+<pre><code class="basic">
+WHILE running
+    &#x27; ...
+WEND
+
+DO
+    &#x27; ...
+LOOP UNTIL done
+</code></pre>
+<h2>8. Menu dispatch — ON CALL</h2>
+<p>Structured alternative to line-number <code>ON GOTO</code>:</p>
+<pre><code class="basic">
+DIM choice AS INTEGER
+choice = VAL(TERM.INPUT(&quot;Selection: &quot;, &quot;&quot;))
+
+ON choice CALL OptMessages, OptFiles, OptQuit
+</code></pre>
+<p>Each target must be a <code>SUB</code> with a compatible signature. The compiler assigns procedure indices — use the linter to verify dispatch tables.</p>
+<h2>9. Errors — TRY / CATCH</h2>
+<pre><code class="basic">
+TRY
+    CALL LoadData()
+CATCH err
+    TERM.PRINTLN(&quot;Failed: &quot; + err[&quot;message&quot;])
+END TRY
+</code></pre>
+<p>Classic <code>ON ERROR GOTO</code> is <strong>not</strong> supported in v1.</p>
+<h2>10. Exiting and chaining</h2>
+<table>
+<tr><th>Statement</th><th>Behavior</th></tr>
+<table>
+<tr><th><code>DOOR.EXIT()</code></th><th>Clean exit, code 0</th></tr>
+<table>
+<tr><th><code>DOOR.EXIT(1)</code></th><th>Clean exit with status code</th></tr>
+<table>
+<tr><th><code>HALT</code></th><th>Shorthand for <code>DOOR.EXIT(0)</code></th></tr>
+<table>
+<tr><th><code>RETURN</code></th><th>Exit current <code>SUB</code> only</th></tr>
+<table>
+<tr><th><code>CHAIN &quot;other_program&quot;</code></th><th>Transfer to another program in the same door package</th></tr>
+<table>
+<tr><th><code>CHAIN &quot;other&quot;, args</code></th><th>Chain with argument map</th></tr>
+</table>
+<p><code>CHAIN</code> never runs an OS executable — only declared Buccaneer programs in the same installed application.</p>
+<h3>Application state (APP)</h3>
+<p>Values survive <code>CHAIN</code> within one door app and session:</p>
+<pre><code class="basic">
+APP.SET(&quot;area&quot;, &quot;general&quot;)
+DIM area AS STRING
+area = APP.GET(&quot;area&quot;, &quot;default&quot;)
+</code></pre>
+<h2>11. Terminal I/O (TERM)</h2>
+<p>Primary namespace for user interaction. Implemented functions in Mutineer today include:</p>
+<table>
+<tr><th>Call</th><th>Purpose</th></tr>
+<table>
+<tr><th><code>TERM.PRINT(s)</code></th><th>Print without newline</th></tr>
+<table>
+<tr><th><code>TERM.PRINTLN(s)</code></th><th>Print line</th></tr>
+<table>
+<tr><th><code>TERM.CLS()</code></th><th>Clear screen</th></tr>
+<table>
+<tr><th><code>TERM.COLOR(fg, bg)</code></th><th>Set colors</th></tr>
+<table>
+<tr><th><code>TERM.GETKEY()</code></th><th>Read one key</th></tr>
+<table>
+<tr><th><code>TERM.INPUT(prompt, default)</code></th><th>Read line</th></tr>
+<table>
+<tr><th><code>TERM.WIDTH()</code> / <code>TERM.HEIGHT()</code></th><th>Terminal size</th></tr>
+</table>
+<p>Spec-defined but not yet wired in production host: <code>GOTOXY</code>, <code>PAUSE</code>, <code>INPUT_PASSWORD</code>, <code>SUPPORTS_ANSI</code>, paging helpers. The <strong>simulator</strong> implements more of the spec — test there first.</p>
+<p>See <a href="host-api.html">Host API Reference</a>.</p>
+<h2>12. User and session context</h2>
+<p>Read-only caller information (requires <code>user.read</code> / <code>session.read</code> capabilities):</p>
+<pre><code class="basic">
+DIM h AS STRING
+h = USER.NAME()
+&#x27; USER.ALIAS(), USER.ID(), USER.SECURITY(), USER.TIMELEFT()
+</code></pre>
+<p>Use <code>SESSION.GET</code> / <code>SESSION.SET</code> for door-scoped session keys when exposed by the host.</p>
+<h2>13. Door-owned storage</h2>
+<p>Doors <strong>cannot</strong> write the BBS user/message/file databases directly. Use:</p>
+<table>
+<tr><th>Namespace</th><th>Scope</th><th>Use for</th></tr>
+<table>
+<tr><th><code>KV</code></th><th>Door-persistent key/value</th><th>Settings, small state</th></tr>
+<table>
+<tr><th><code>DATA</code></th><th>Structured datasets</th><th>Scores, tables, records</th></tr>
+<table>
+<tr><th><code>APP</code></th><th>Session + app</th><th>Chain-local state</th></tr>
+<table>
+<tr><th><code>SHARED</code></th><th>App-wide concurrent</th><th>Leaderboards, locks (use carefully)</th></tr>
+<table>
+<tr><th><code>TEXT</code></th><th>Mediated files</th><th>Logs, data files under door roots</th></tr>
+</table>
+<p>Example:</p>
+<pre><code class="basic">
+KV.SET(&quot;last_played&quot;, TERM.TODAY())
+DIM v AS STRING
+v = KV.GET(&quot;last_played&quot;, &quot;&quot;)
+</code></pre>
+<p><code>DATA.INSERT</code>, <code>DATA.FIND</code>, <code>DATA.UPDATE</code>, etc. operate on logical dataset names declared in metadata.</p>
+<h2>14. Capabilities</h2>
+<p>Declare every power your door needs:</p>
+<pre><code class="basic">
+CAPABILITY &quot;term.io&quot;
+CAPABILITY &quot;user.read&quot;
+CAPABILITY &quot;data.read&quot;
+CAPABILITY &quot;data.write&quot;
+CAPABILITY &quot;kv.write&quot;
+</code></pre>
+<p>The host should reject calls without a matching capability (enforcement is being completed — treat declarations as mandatory today).</p>
+<p>Common capability strings:</p>
+<table>
+<tr><th>Capability</th><th>Allows</th></tr>
+<table>
+<tr><th><code>term.io</code></th><th>Terminal input/output</th></tr>
+<table>
+<tr><th><code>term.query</code></th><th>Width/height queries</th></tr>
+<table>
+<tr><th><code>user.read</code></th><th><code>USER.*</code>, <code>USERS.FIND</code></th></tr>
+<table>
+<tr><th><code>data.read</code> / <code>data.write</code></th><th><code>DATA.*</code>, some <code>MSG.*</code> / <code>FILE.*</code></th></tr>
+<table>
+<tr><th><code>kv.read</code> / <code>kv.write</code></th><th><code>KV.*</code></th></tr>
+<table>
+<tr><th><code>text.read</code> / <code>text.write</code></th><th><code>TEXT.*</code></th></tr>
+<table>
+<tr><th><code>bbs.message</code></th><th><code>BBS.SENDMSG</code></th></tr>
+<table>
+<tr><th><code>bbs.query</code></th><th><code>BBS.ONLINE</code>, <code>BBS.NODE</code></th></tr>
+<table>
+<tr><th><code>door.chain</code></th><th><code>DOOR.CHAIN</code></th></tr>
+<table>
+<tr><th><code>shared.read</code> / <code>shared.write</code></th><th><code>SHARED.*</code></th></tr>
+</table>
+<p>Full matrix: <a href="door-packages.html">Door Packages</a> and <code>DOOR_JSON_SCHEMA_SPEC.md</code>.</p>
+<h2>15. Style and best practices</h2>
+<ol>
+<li><strong>Compile before deploy</strong> — ship <code>.bc</code> modules, not raw <code>.bucc</code> on production nodes.</li>
+<li><strong>Lint and format</strong> — <code>bucc-linter</code> and <code>bucc-formatter</code> catch dispatch and type issues early.</li>
+<li><strong>Simulator first</strong> — exercise all branches in <code>bucc-simulator</code>.</li>
+<li><strong>Minimal capabilities</strong> — request only what the door uses.</li>
+<li><strong>Short sessions</strong> — respect caller time limits; use <code>USER.TIMELEFT()</code> when available.</li>
+<li><strong>Handle errors</strong> — wrap file/data operations in <code>TRY/CATCH</code>.</li>
+<li><strong>No busy loops</strong> — use <code>SYS.SLEEP(ms)</code> when polling (sparingly).</li>
+</ol>
+<h2>16. Pascal vs Buccaneer syntax note</h2>
+<p>Older examples may use <code>PROCEDURE</code> / <code>BEGIN</code> / <code>END.</code> style from early prototypes. Current sources use:</p>
+<ul>
+<li><code>SUB</code> / <code>END SUB</code></li>
+<li><code>PROGRAM &quot;name&quot;</code> string metadata</li>
+<li><code>USER.NAME()</code> function-call syntax</li>
+</ul>
+<p>Follow <code>src/buccaneer/examples/*.bucc</code> as the canonical style.</p>
+<h2>17. Further reading</h2>
+<ul>
+<li><a href="host-api.html">Host API Reference</a> — every namespace and function</li>
+<li><a href="toolchain.html">Toolchain</a> — compiler and simulator</li>
+<li><a href="door-packages.html">Door Packages</a> — <code>door.json</code> and install</li>
+<li><code>SPECS/BUCCANEER/Buccaneer_SPEC.md</code> — full platform specification</li>
+</ul></main>
+  <footer class="site-footer">
+    <p>Mutineer BBS — <a href="https://github.com/rickcollette/mutineer">GitHub</a> — MIT License</p>
+  </footer>
+</body>
+</html>

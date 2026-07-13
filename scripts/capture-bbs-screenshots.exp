@@ -1,0 +1,99 @@
+#!/usr/bin/expect -f
+# Capture telnet ANSI transcripts. Render: python3 scripts/ansi-to-screenshots.py
+
+set timeout 60
+set host [lindex $argv 0]
+if {$host eq ""} { set host "127.0.0.1" }
+set port [lindex $argv 1]
+if {$port eq ""} { set port 2929 }
+set outdir "screenshots/raw"
+file mkdir $outdir
+
+proc write_file {path} {
+    global transcript
+    set fd [open $path w]
+    puts -nonewline $fd $transcript
+    close $fd
+    puts "Captured $path ([file size $path] bytes)"
+}
+
+log_user 0
+
+# --- 01 MOTD + login prompts ---
+set transcript ""
+spawn telnet $host $port
+expect -re {ANSI graphics\? \(Y/n\):}
+append transcript $expect_out(buffer)
+send "Y\r"
+expect -re {Handle:}
+append transcript $expect_out(buffer)
+write_file "$outdir/01-motd-login.ansi"
+catch {close}
+catch {wait}
+sleep 2
+
+# --- 02 main menu ---
+set transcript ""
+spawn telnet $host $port
+expect -re {ANSI graphics\? \(Y/n\):}
+append transcript $expect_out(buffer)
+send "Y\r"
+expect -re {Handle:}
+append transcript $expect_out(buffer)
+send "sysop\r"
+expect -re {Password:}
+append transcript $expect_out(buffer)
+send "mutineer\r"
+expect -re {Selection:}
+append transcript $expect_out(buffer)
+write_file "$outdir/02-main-menu.ansi"
+catch {close}
+catch {wait}
+sleep 5
+
+# --- 03 who's online ---
+set transcript ""
+spawn telnet $host $port
+expect -re {ANSI graphics\? \(Y/n\):}
+append transcript $expect_out(buffer)
+send "Y\r"
+expect -re {Handle:}
+append transcript $expect_out(buffer)
+send "sysop\r"
+expect -re {Password:}
+append transcript $expect_out(buffer)
+send "mutineer\r"
+expect -re {\[W\] Who}
+append transcript $expect_out(buffer)
+sleep 1
+send "W\r"
+expect -re {Online|WHO|Node|Selection:}
+append transcript $expect_out(buffer)
+write_file "$outdir/03-whos-online.ansi"
+catch {close}
+catch {wait}
+sleep 2
+
+# --- 04 messages ---
+set transcript ""
+spawn telnet $host $port
+expect -re {ANSI graphics\? \(Y/n\):}
+append transcript $expect_out(buffer)
+send "Y\r"
+expect -re {Handle:}
+append transcript $expect_out(buffer)
+send "sysop\r"
+expect -re {Password:}
+append transcript $expect_out(buffer)
+send "mutineer\r"
+expect -re {Selection:}
+append transcript $expect_out(buffer)
+sleep 0.5
+send "M\r"
+expect -re {Message|Selection:|Command:|Area|\]}
+append transcript $expect_out(buffer)
+write_file "$outdir/04-messages.ansi"
+catch {close}
+catch {wait}
+
+puts "Done — run: python3 scripts/ansi-to-screenshots.py"

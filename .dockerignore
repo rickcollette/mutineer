@@ -1,0 +1,17 @@
+build/
+build_debug/
+dist/
+dist/releases/
+.git/
+.github/
+website/
+screenshots/
+*.db
+*.log
+*.pid
+data/
+logs/
+backups/
+src/buccaneer/build/
+src/buccaneer/bin/
+mutineer-bbs.broken/

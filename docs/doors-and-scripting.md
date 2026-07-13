@@ -108,7 +108,7 @@ Build from `src/buccaneer/Makefile` or integrate via CMake subproject.
 
 ### Integration Status
 
-Buccaneer VM, compiler, and host bridge are implemented but **not fully wired into the main BBS door launcher**. Known issues documented in `BUCC_TODO.md`:
+Buccaneer VM, compiler, and host bridge are implemented but **not fully wired into the main BBS door launcher**. Track open work on [GitHub (label: buccaneer)](https://github.com/rickcollette/mutineer/issues?q=label%3Abuccaneer):
 
 - `DOOR.CHAIN` sets wrong VM status (should be `VM_CHAIN`)
 - `DOOR.EXIT` discards exit code
@@ -117,7 +117,7 @@ Buccaneer VM, compiler, and host bridge are implemented but **not fully wired in
 
 **Current recommendation:** Use Buccaneer via `bucc-simulator` for development. Production doors should use native or DOSBox runners until integration gaps are closed.
 
-See [Buccaneer](buccaneer.md) for language and VM details.
+See the [Buccaneer Programmer's Guide](buccaneer/programmers-guide.md) and [Buccaneer hub](buccaneer/index.md).
 
 ## Plugins
 
@@ -187,7 +187,7 @@ ctest --test-dir build -R doors
 
 ## Related Documentation
 
-- [Buccaneer](buccaneer.md)
+- [Buccaneer Programmer's Guide](buccaneer/programmers-guide.md)
 - [Plugins](plugins.md)
 - [Configuration](configuration.md) — DOSBox settings
 - [Sysop Guide](sysop-guide.md) — door administration

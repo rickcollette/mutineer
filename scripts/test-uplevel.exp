@@ -1,0 +1,19 @@
+#!/usr/bin/expect -f
+proc flush_buf {} {
+    global transcript expect_out
+    catch {append transcript $expect_out(buffer)}
+}
+proc save_session {body} {
+    global transcript
+    set transcript ""
+    spawn telnet 127.0.0.1 2929
+    uplevel 1 $body
+    puts "final len=[string length $transcript]"
+}
+save_session {
+    expect -re {ANSI graphics}
+    flush_buf
+    send "Y\r"
+    expect -re {Handle:}
+    flush_buf
+}

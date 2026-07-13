@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Buccaneer — Mutineer BBS</title>
+  <link rel="stylesheet" href="../../assets/css/site.css">
+</head>
+<body>
+  <header class="site-header">
+    <a href="../index.html" class="logo">MUTINEER BBS</a>
+    <span class="tagline">Documentation</span>
+  </header>
+  <nav class="doc-nav"><a href="../index.html" class="home">← Home</a><a href="../quick-start.html">Quick Start</a><a href="../windows.html">Windows</a><a href="../getting-started.html">Getting Started</a><a href="../deployment.html">Deployment</a><a href="../overview.html">Overview</a><a href="../configuration.html">Configuration</a><a href="../architecture.html">Architecture</a><a href="../menus-and-ui.html">Menus & UI</a><a href="../messages-and-mail.html">Messages & Mail</a><a href="../files-and-protocols.html">Files & Protocols</a><a href="../chat-and-social.html">Chat & Social</a><a href="../doors-and-scripting.html">Doors & Scripting</a><a href="../sysop-guide.html">Sysop Guide</a><a href="../networking-plank.html">PLANK</a><a href="../buccaneer/programmers-guide.html">BUCC Guide</a><a href="../buccaneer/host-api.html">BUCC API</a><a href="../plugins.html">Plugins</a><a href="../developer-guide.html">Developer</a><a href="../cli-tools.html">CLI Tools</a><a href="../reference/menu-actions.html">Menu Actions</a><a href="../reference/message-commands.html">Messages Ref</a><a href="../reference/file-commands.html">Files Ref</a><a href="../reference/acs-mci.html">ACS & MCI</a><a href="../reference/database.html">Database</a></nav>
+  <main class="doc-content"><h1>Buccaneer</h1>
+<p><strong>Buccaneer</strong> is Mutineer&#x27;s embedded language for native BBS doors — structured BASIC-like syntax, compile-to-bytecode, run inside the BBS process with capability-gated host APIs.</p>
+<pre><code class="">
+.bucc source  →  bucc compiler  →  .bc module  →  VM + host bridge  →  caller session
+</code></pre>
+<h2>Documentation</h2>
+<table>
+<tr><th>Guide</th><th>Audience</th><th>Description</th></tr>
+<table>
+<tr><th><a href="programmers-guide.html">Programmer&#x27;s Guide</a></th><th>Door authors</th><th>Language syntax, types, control flow, examples</th></tr>
+<table>
+<tr><th><a href="host-api.html">Host API Reference</a></th><th>Door authors</th><th><code>TERM</code>, <code>USER</code>, <code>DATA</code>, <code>KV</code>, <code>DOOR</code>, … namespaces</th></tr>
+<table>
+<tr><th><a href="toolchain.html">Toolchain</a></th><th>Authors &amp; devs</th><th><code>bucc</code>, linter, formatter, simulator</th></tr>
+<table>
+<tr><th><a href="door-packages.html">Door Packages</a></th><th>Sysops &amp; authors</th><th><code>door.json</code>, capabilities, install layout</th></tr>
+</table>
+<h2>Mutineer integration</h2>
+<table>
+<tr><th>Topic</th><th>Document</th></tr>
+<table>
+<tr><th>Doors overview (native, DOS, BUCC)</th><th><a href="../doors-and-scripting.html">Doors and Scripting</a></th></tr>
+<table>
+<tr><th>Architecture / VM placement</th><th><a href="../architecture.html">Architecture</a></th></tr>
+</table>
+<h2>Implementation status</h2>
+<p>Buccaneer is under active development. The compiler and VM in <code>src/buccaneer/</code> are usable standalone; full BBS launch via <code>runner=bucc</code> and some host functions are still being wired (track <a href="https://github.com/rickcollette/mutineer/issues?q=label%3Abuccaneer">GitHub issues</a>).</p>
+<p>Always test doors with <code>bucc-simulator</code> before deploying to a live BBS.</p>
+<h2>Formal specifications</h2>
+<p>Low-level specs for compiler and VM implementers live under <code>SPECS/BUCCANEER/</code>:</p>
+<table>
+<tr><th>Spec</th><th>Topic</th></tr>
+<table>
+<tr><th><code>Buccaneer_SPEC.md</code></th><th>Language and platform overview</th></tr>
+<table>
+<tr><th><code>BUCCANEER_GRAMMAR_SPEC.md</code></th><th>Lexer and parser grammar</th></tr>
+<table>
+<tr><th><code>BUCCANEER_SEMANTIC_ANALYSIS_SPEC.md</code></th><th>Type checking and symbols</th></tr>
+<table>
+<tr><th><code>BUCCANEER_BYTECODE_VM_SPEC.md</code></th><th>Opcodes and VM behavior</th></tr>
+<table>
+<tr><th><code>BUCCANEER_C_EMBEDDING_API_SPEC.md</code></th><th>C embedding API</th></tr>
+<table>
+<tr><th><code>DOOR_JSON_SCHEMA_SPEC.md</code></th><th>Install manifest</th></tr>
+</table>
+<p>The programmer&#x27;s guide summarizes what door authors need; specs are authoritative for tooling developers.</p></main>
+  <footer class="site-footer">
+    <p>Mutineer BBS — <a href="https://github.com/rickcollette/mutineer">GitHub</a> — MIT License</p>
+  </footer>
+</body>
+</html>

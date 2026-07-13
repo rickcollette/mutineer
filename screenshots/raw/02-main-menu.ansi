@@ -1,0 +1,47 @@
+Trying 127.0.0.1...
+Connected to 127.0.0.1.
+Escape character is '^]'.
+
+Welcome to Mutineer BBS!
+
+ANSI graphics? (Y/n): YANSI enabled.
+[2J[H[0;32m[1;32mWelcome to the Mutineer Telnet BBS![0m
+[32mAll seas are green here—hoist the flag and explore.[0m
+
+Automsg:
+Welcome to Mutineer BBS!
+[32mHandle: [0msysop
+[32mPassword: [0m........
+
+Terminal: DUMB
+Window: 80x24
+
+[1;32m  Mutineer BBS  ~~  Mutineer BBS[0m
+[0;36m+------------------------------------------------------------------------------+[0m
+[0;36m|[1;37m  Main Deck                                                                 [0;36m|[0m
+[0;36m|[0;37m Crew: [1;32msysop[0;37m   Node: [1;35m1[0;37m   Time: [1;33m120 min[0m[0;36m|[0m
+[0;36m+------------------------------------------------------------------------------+[0m
+[0;36m|[0m [W] Who's Online                                                             [0;36m|[0m
+[0;36m|[0m [M] Messages                                                                 [0;36m|[0m
+[0;36m|[0m [F] Files                                                                    [0;36m|[0m
+[0;36m|[0m [C] Chat                                                                     [0;36m|[0m
+[0;36m|[0m [B] Bulletins                                                                [0;36m|[0m
+[0;36m|[0m [P] Page Sysop                                                               [0;36m|[0m
+[0;36m|[0m [O] Doors                                                                    [0;36m|[0m
+[0;36m|[0m [L] Wall Post                                                                [0;36m|[0m
+[0;36m|[0m [S] Whisper                                                                  [0;36m|[0m
+[0;36m|[0m [E] User Editor                                                              [0;36m|[0m
+[0;36m|[0m [V] Vote Booth                                                               [0;36m|[0m
+[0;36m|[0m [T] Time Bank                                                                [0;36m|[0m
+[0;36m|[0m [N] Netmail/QWK                                                              [0;36m|[0m
+[0;36m|[0m [A] Area Admin                                                               [0;36m|[0m
+[0;36m|[0m [R] File Admin                                                               [0;36m|[0m
+[0;36m|[0m [X] Batch Queue                                                              [0;36m|[0m
+[0;36m|[0m [D] Maintenance                                                              [0;36m|[0m
+[0;36m|[0m [1] Hello Plugin                                                             [0;36m|[0m
+[0;36m|[0m [2] Chat Plugin                                                              [0;36m|[0m
+[0;36m|[0m [3] List Plugins                                                             [0;36m|[0m
+[0;36m|[0m [H] Help                                                                     [0;36m|[0m
+[0;36m|[0m [Q] Logoff                                                                   [0;36m|[0m
+[0;36m+------------------------------------------------------------------------------+[0m
+[0;36m|[0;32m [0mSelection:

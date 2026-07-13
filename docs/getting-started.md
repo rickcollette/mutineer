@@ -4,6 +4,8 @@
 
 This guide walks from a fresh clone to a running Mutineer BBS with passing tests.
 
+**Just want it running fast?** See [Quick Start](quick-start.md). **On Windows?** See [Running on Windows](windows.md). **Production Docker/releases:** [Deployment](deployment.md).
+
 ## Prerequisites
 
 | Requirement | Version | Notes |
@@ -276,10 +278,21 @@ door_runtime_path=data/door_runtime
 
 Check door manifest JSON and `doors` DB record. See [Doors and Scripting](doors-and-scripting.md).
 
+## Docker
+
+```bash
+docker compose up -d
+telnet localhost 2929
+```
+
+Default sysop: **sysop** / **mutineer**. See [Deployment](deployment.md) and [Windows](windows.md).
+
 ## Next Steps
 
+- [Quick Start](quick-start.md) — minimal path
 - [Configuration](configuration.md) — all config keys
 - [Sysop Guide](sysop-guide.md) — WFC, user admin, maintenance
 - [Menus and UI](menus-and-ui.md) — customize menus and templates
+- [Buccaneer Programmer's Guide](buccaneer/programmers-guide.md) — door language
 - [Developer Guide](developer-guide.md) — code structure and contributing
 - [CLI Tools](cli-tools.md) — maintenance utilities

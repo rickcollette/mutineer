@@ -74,6 +74,8 @@
   <section id="docs">
     <h2>Documentation</h2>
     <div class="doc-grid">
+      <div class="doc-card"><h3><a href="docs/quick-start.html">Quick Start</a></h3><p>Docker or binary — running in minutes.</p></div>
+      <div class="doc-card"><h3><a href="docs/windows.html">Windows</a></h3><p>Docker Desktop and WSL2 guides.</p></div>
       <div class="doc-card"><h3><a href="docs/getting-started.html">Getting Started</a></h3><p>Install, build, initialize, run, connect.</p></div>
       <div class="doc-card"><h3><a href="docs/configuration.html">Configuration</a></h3><p>All mutineer.conf settings.</p></div>
       <div class="doc-card"><h3><a href="docs/architecture.html">Architecture</a></h3><p>System design, components, workflows.</p></div>
@@ -84,7 +86,7 @@
       <div class="doc-card"><h3><a href="docs/doors-and-scripting.html">Doors &amp; Scripting</a></h3><p>Native, DOSBox, Buccaneer, plugins.</p></div>
       <div class="doc-card"><h3><a href="docs/sysop-guide.html">Sysop Guide</a></h3><p>WFC, user admin, maintenance.</p></div>
       <div class="doc-card"><h3><a href="docs/networking-plank.html">PLANK Networking</a></h3><p>Federation protocol and tools.</p></div>
-      <div class="doc-card"><h3><a href="docs/buccaneer.html">Buccaneer</a></h3><p>Scripting language and VM.</p></div>
+      <div class="doc-card"><h3><a href="docs/buccaneer/programmers-guide.html">Buccaneer Guide</a></h3><p>Full door language for authors.</p></div>
       <div class="doc-card"><h3><a href="docs/developer-guide.html">Developer Guide</a></h3><p>Build, test, contribute.</p></div>
       <div class="doc-card"><h3><a href="docs/cli-tools.html">CLI Tools</a></h3><p>All command-line utilities.</p></div>
       <div class="doc-card"><h3><a href="docs/index.html">Full Index →</a></h3><p>Complete documentation index with reference pages.</p></div>
@@ -94,16 +96,15 @@
   <section id="install">
     <h2>Quick Start</h2>
     <div class="install-box">
-      <code class="comment"># Clone &amp; build</code>
+      <code class="comment"># Docker (Linux, macOS, Windows)</code>
       <code>git clone https://github.com/rickcollette/mutineer.git</code>
-      <code>cd mutineer</code>
+      <code>cd mutineer &amp;&amp; docker compose up -d</code>
+      <code>telnet localhost 2929</code>
+      <code class="comment"># Or build from source (Linux / WSL)</code>
       <code>cmake -S . -B build -DCMAKE_BUILD_TYPE=Release</code>
       <code>cmake --build build</code>
-      <code class="comment"># Initialize &amp; run</code>
-      <code>build/mutineer-initbbs -c conf/mutineer.conf</code>
+      <code>build/mutineer-initbbs -c conf/mutineer.conf -y</code>
       <code>build/mutineer -c conf/mutineer.conf</code>
-      <code class="comment"># Connect</code>
-      <code>telnet localhost 2929</code>
     </div>
   </section>
 

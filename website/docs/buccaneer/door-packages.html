@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Buccaneer Door Packages — Mutineer BBS</title>
+  <link rel="stylesheet" href="../../assets/css/site.css">
+</head>
+<body>
+  <header class="site-header">
+    <a href="../index.html" class="logo">MUTINEER BBS</a>
+    <span class="tagline">Documentation</span>
+  </header>
+  <nav class="doc-nav"><a href="../index.html" class="home">← Home</a><a href="../quick-start.html">Quick Start</a><a href="../windows.html">Windows</a><a href="../getting-started.html">Getting Started</a><a href="../deployment.html">Deployment</a><a href="../overview.html">Overview</a><a href="../configuration.html">Configuration</a><a href="../architecture.html">Architecture</a><a href="../menus-and-ui.html">Menus & UI</a><a href="../messages-and-mail.html">Messages & Mail</a><a href="../files-and-protocols.html">Files & Protocols</a><a href="../chat-and-social.html">Chat & Social</a><a href="../doors-and-scripting.html">Doors & Scripting</a><a href="../sysop-guide.html">Sysop Guide</a><a href="../networking-plank.html">PLANK</a><a href="../buccaneer/programmers-guide.html">BUCC Guide</a><a href="../buccaneer/host-api.html">BUCC API</a><a href="../plugins.html">Plugins</a><a href="../developer-guide.html">Developer</a><a href="../cli-tools.html">CLI Tools</a><a href="../reference/menu-actions.html">Menu Actions</a><a href="../reference/message-commands.html">Messages Ref</a><a href="../reference/file-commands.html">Files Ref</a><a href="../reference/acs-mci.html">ACS & MCI</a><a href="../reference/database.html">Database</a></nav>
+  <main class="doc-content"><h1>Buccaneer Door Packages</h1>
+<p>How to package, declare capabilities, and install multi-program Buccaneer door applications on Mutineer.</p>
+<h2>Package layout</h2>
+<pre><code class="">
+games/scoreboard/
+  door.json              # required manifest
+  programs/
+    main.bucc
+    scores.bucc
+  compiled/              # optional: ship .bc here
+    main.bc
+    scores.bc
+  assets/
+    banner.txt
+</code></pre>
+<h2>door.json (overview)</h2>
+<p>The manifest tells the BBS how to run the door and what it may access. Full schema: <code>SPECS/BUCCANEER/DOOR_JSON_SCHEMA_SPEC.md</code>.</p>
+<p>Typical fields:</p>
+<table>
+<tr><th>Field</th><th>Purpose</th></tr>
+<table>
+<tr><th><code>id</code></th><th>Unique application id</th></tr>
+<table>
+<tr><th><code>name</code></th><th>Display name</th></tr>
+<table>
+<tr><th><code>version</code></th><th>Package version</th></tr>
+<table>
+<tr><th><code>entry</code></th><th>Default program name</th></tr>
+<table>
+<tr><th><code>programs</code></th><th>List of compiled modules / source names</th></tr>
+<table>
+<tr><th><code>capabilities</code></th><th>Host powers granted at runtime</th></tr>
+</table>
+<p>Example:</p>
+<pre><code class="json">
+{
+  &quot;id&quot;: &quot;scoreboard&quot;,
+  &quot;name&quot;: &quot;Scoreboard&quot;,
+  &quot;version&quot;: &quot;1.0.0&quot;,
+  &quot;entry&quot;: &quot;main&quot;,
+  &quot;programs&quot;: [&quot;main&quot;, &quot;scores&quot;],
+  &quot;capabilities&quot;: [
+    &quot;term.io&quot;,
+    &quot;user.read&quot;,
+    &quot;data.read&quot;,
+    &quot;data.write&quot;,
+    &quot;kv.write&quot;
+  ]
+}
+</code></pre>
+<p>Capabilities in <code>door.json</code> must be a superset of <code>CAPABILITY</code> lines in source metadata.</p>
+<h2>Build workflow</h2>
+<ol>
+<li>Write and test <code>.bucc</code> in <code>bucc-simulator</code>.</li>
+<li>Run <code>bucc-linter</code> on all sources.</li>
+<li>Compile: <code>bucc programs/main.bucc -o compiled/main.bc</code></li>
+<li>Validate manifest against schema.</li>
+<li>Install files under the BBS doors directory and register in the <code>doors</code> table.</li>
+</ol>
+<h2>Registering on Mutineer</h2>
+<p>Until <code>runner=bucc</code> is wired in <code>src/doors.c</code> (see GitHub issue WIRE-3), sysops should:</p>
+<ul>
+<li>Track BUCC integration issues on the repo</li>
+<li>Use the simulator for author acceptance testing</li>
+<li>Plan door records with <code>runner=bucc</code> for when launch path lands</li>
+</ul>
+<p>Native and DOSBox doors remain the production runners today — see <a href="../doors-and-scripting.html">Doors and Scripting</a>.</p>
+<h2>Multi-program applications</h2>
+<p>Declare multiple programs in <code>door.json</code> and chain between them:</p>
+<pre><code class="basic">
+CHAIN &quot;scores&quot;
+CHAIN &quot;mail_reader&quot;, argsMap
+</code></pre>
+<p><code>APP</code> state persists across chains in the same package and caller session.</p>
+<h2>Datasets</h2>
+<p>Declare logical datasets in source or manifest:</p>
+<pre><code class="basic">
+DATASET scores SCHEMA (
+    player STRING,
+    points INTEGER,
+    played_at DATETIME
+)
+</code></pre>
+<p>Use <code>DATA.INSERT(&quot;scores&quot;, row)</code> in code. Physical SQLite tables are assigned by the host at install time — authors never hard-code table names.</p>
+<h2>Security model</h2>
+<ol>
+<li><strong>Declared capabilities</strong> — <code>door.json</code> + <code>CAPABILITY</code> headers.</li>
+<li><strong>Host enforcement</strong> — dispatch checks capability bitmask (in progress).</li>
+<li><strong>No raw SQL</strong> — all persistence via <code>DATA</code>, <code>KV</code>, <code>TEXT</code>.</li>
+<li><strong>Throttling</strong> — sensitive calls (<code>USERS.FIND</code>, future <code>MSG.POST</code>, etc.) rate-limited.</li>
+</ol>
+<p>Do not grant <code>data.write</code> or <code>bbs.message</code> unless the door truly needs them.</p>
+<h2>Testing checklist</h2>
+<ul>
+<li>[ ] All programs compile without errors</li>
+<li>[ ] Linter passes with zero policy violations</li>
+<li>[ ] Simulator scenarios cover main menu paths</li>
+<li>[ ] Capabilities are minimal</li>
+<li>[ ] <code>DOOR.EXIT</code> used instead of falling off end of <code>Main</code></li>
+<li>[ ] CHAIN targets exist in <code>door.json</code> <code>programs</code> list</li>
+</ul>
+<h2>See also</h2>
+<ul>
+<li><a href="programmers-guide.html">Programmer&#x27;s Guide</a></li>
+<li><a href="host-api.html">Host API Reference</a></li>
+<li><a href="toolchain.html">Toolchain</a></li>
+</ul></main>
+  <footer class="site-footer">
+    <p>Mutineer BBS — <a href="https://github.com/rickcollette/mutineer">GitHub</a> — MIT License</p>
+  </footer>
+</body>
+</html>

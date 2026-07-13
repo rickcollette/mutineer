@@ -11,7 +11,7 @@
     <a href="index.html" class="logo">MUTINEER BBS</a>
     <span class="tagline">Documentation</span>
   </header>
-  <nav class="doc-nav"><a href="index.html" class="home">← Home</a><a href="overview.html">Overview</a><a href="getting-started.html">Getting Started</a><a href="configuration.html">Configuration</a><a href="architecture.html">Architecture</a><a href="menus-and-ui.html">Menus & UI</a><a href="messages-and-mail.html">Messages & Mail</a><a href="files-and-protocols.html">Files & Protocols</a><a href="chat-and-social.html">Chat & Social</a><a href="doors-and-scripting.html" class="active">Doors & Scripting</a><a href="sysop-guide.html">Sysop Guide</a><a href="networking-plank.html">PLANK Networking</a><a href="buccaneer.html">Buccaneer</a><a href="plugins.html">Plugins</a><a href="developer-guide.html">Developer Guide</a><a href="cli-tools.html">CLI Tools</a><a href="reference/menu-actions.html">Menu Actions</a><a href="reference/message-commands.html">Message Commands</a><a href="reference/file-commands.html">File Commands</a><a href="reference/acs-mci.html">ACS & MCI</a><a href="reference/database.html">Database Schema</a></nav>
+  <nav class="doc-nav"><a href="index.html" class="home">← Home</a><a href="quick-start.html">Quick Start</a><a href="windows.html">Windows</a><a href="getting-started.html">Getting Started</a><a href="deployment.html">Deployment</a><a href="overview.html">Overview</a><a href="configuration.html">Configuration</a><a href="architecture.html">Architecture</a><a href="menus-and-ui.html">Menus & UI</a><a href="messages-and-mail.html">Messages & Mail</a><a href="files-and-protocols.html">Files & Protocols</a><a href="chat-and-social.html">Chat & Social</a><a href="doors-and-scripting.html" class="active">Doors & Scripting</a><a href="sysop-guide.html">Sysop Guide</a><a href="networking-plank.html">PLANK</a><a href="buccaneer/programmers-guide.html">BUCC Guide</a><a href="buccaneer/host-api.html">BUCC API</a><a href="plugins.html">Plugins</a><a href="developer-guide.html">Developer</a><a href="cli-tools.html">CLI Tools</a><a href="reference/menu-actions.html">Menu Actions</a><a href="reference/message-commands.html">Messages Ref</a><a href="reference/file-commands.html">Files Ref</a><a href="reference/acs-mci.html">ACS & MCI</a><a href="reference/database.html">Database</a></nav>
   <main class="doc-content"><p>&lt;!-- generated-by: gsd-doc-writer --&gt;</p>
 <h1>Doors and Scripting</h1>
 <p>Mutineer BBS supports three extension mechanisms for interactive programs: native executable doors, DOSBox-hosted DOS doors, Buccaneer VM scripts, and loadable <code>.so</code> plugins.</p>
@@ -122,7 +122,7 @@ door_keep_failed_runs=0
 <tr><th><code>examples/scoreboard.bucc</code></th><th>Score tracking demo</th></tr>
 </table>
 <h3>Integration Status</h3>
-<p>Buccaneer VM, compiler, and host bridge are implemented but <strong>not fully wired into the main BBS door launcher</strong>. Known issues documented in <code>BUCC_TODO.md</code>:</p>
+<p>Buccaneer VM, compiler, and host bridge are implemented but <strong>not fully wired into the main BBS door launcher</strong>. Track open work on <a href="https://github.com/rickcollette/mutineer/issues?q=label%3Abuccaneer">GitHub (label: buccaneer)</a>:</p>
 <ul>
 <li><code>DOOR.CHAIN</code> sets wrong VM status (should be <code>VM_CHAIN</code>)</li>
 <li><code>DOOR.EXIT</code> discards exit code</li>
@@ -130,7 +130,7 @@ door_keep_failed_runs=0
 <li>Several VM edge cases (array allocation, stack consistency)</li>
 </ul>
 <p><strong>Current recommendation:</strong> Use Buccaneer via <code>bucc-simulator</code> for development. Production doors should use native or DOSBox runners until integration gaps are closed.</p>
-<p>See <a href="buccaneer.html">Buccaneer</a> for language and VM details.</p>
+<p>See the <a href="buccaneer/programmers-guide.html">Buccaneer Programmer&#x27;s Guide</a> and <a href="buccaneer/index.html">Buccaneer hub</a>.</p>
 <h2>Plugins</h2>
 <p>Loadable shared objects providing interactive experiences without modifying core BBS.</p>
 <h3>Configuration</h3>

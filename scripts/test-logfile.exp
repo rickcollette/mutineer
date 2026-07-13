@@ -1,0 +1,10 @@
+#!/usr/bin/expect -f
+set timeout 30
+log_user 1
+log_file -noappend /tmp/teltest.ansi
+spawn telnet 127.0.0.1 2929
+expect -re {ANSI graphics}
+send "Y\r"
+expect -re {Handle:}
+log_file
+puts "size=[file size /tmp/teltest.ansi]"

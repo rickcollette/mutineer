@@ -1,0 +1,13 @@
+#!/usr/bin/expect -f
+set timeout 30
+set transcript ""
+spawn telnet 127.0.0.1 2929
+expect -re {ANSI graphics}
+append transcript $expect_out(buffer)
+send "Y\r"
+expect -re {Handle:}
+append transcript $expect_out(buffer)
+set fd [open /tmp/transcript.ansi w]
+puts -nonewline $fd $transcript
+close $fd
+puts "len=[string length $transcript]"

@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Quick Start — Mutineer BBS</title>
+  <link rel="stylesheet" href="assets/css/site.css">
+</head>
+<body>
+  <header class="site-header">
+    <a href="index.html" class="logo">MUTINEER BBS</a>
+    <span class="tagline">Documentation</span>
+  </header>
+  <nav class="doc-nav"><a href="index.html" class="home">← Home</a><a href="quick-start.html" class="active">Quick Start</a><a href="windows.html">Windows</a><a href="getting-started.html">Getting Started</a><a href="deployment.html">Deployment</a><a href="overview.html">Overview</a><a href="configuration.html">Configuration</a><a href="architecture.html">Architecture</a><a href="menus-and-ui.html">Menus & UI</a><a href="messages-and-mail.html">Messages & Mail</a><a href="files-and-protocols.html">Files & Protocols</a><a href="chat-and-social.html">Chat & Social</a><a href="doors-and-scripting.html">Doors & Scripting</a><a href="sysop-guide.html">Sysop Guide</a><a href="networking-plank.html">PLANK</a><a href="buccaneer/programmers-guide.html">BUCC Guide</a><a href="buccaneer/host-api.html">BUCC API</a><a href="plugins.html">Plugins</a><a href="developer-guide.html">Developer</a><a href="cli-tools.html">CLI Tools</a><a href="reference/menu-actions.html">Menu Actions</a><a href="reference/message-commands.html">Messages Ref</a><a href="reference/file-commands.html">Files Ref</a><a href="reference/acs-mci.html">ACS & MCI</a><a href="reference/database.html">Database</a></nav>
+  <main class="doc-content"><h1>Quick Start</h1>
+<p>Get Mutineer BBS running in a few minutes. For full build options, Windows, and production deployment, see the links at the end.</p>
+<h2>Fastest path: Docker</h2>
+<p>Works on <strong>Linux, macOS, and Windows</strong> (Docker Desktop).</p>
+<pre><code class="bash">
+git clone https://github.com/rickcollette/mutineer.git
+cd mutineer
+docker compose up -d
+</code></pre>
+<p>Wait until the container is healthy, then connect:</p>
+<pre><code class="bash">
+telnet localhost 2929
+</code></pre>
+<p>Or use a BBS client (SyncTERM, mTelnet, etc.) on port <strong>2929</strong>.</p>
+<p><strong>Default sysop account</strong> (created on first container start):</p>
+<table>
+<tr><th>Field</th><th>Value</th></tr>
+<table>
+<tr><th>Handle</th><th><code>sysop</code></th></tr>
+<table>
+<tr><th>Password</th><th><code>mutineer</code></th></tr>
+</table>
+<p>Change the password after first login via the user editor.</p>
+<h3>Useful Docker commands</h3>
+<pre><code class="bash">
+docker compose logs -f          # watch logs
+docker compose restart          # restart BBS
+docker compose down             # stop
+docker compose down -v          # stop and wipe database volume
+</code></pre>
+<p>Data persists in Docker volumes <code>mutineer-bbs_mutineer-data</code> and <code>mutineer-bbs_mutineer-logs</code>.</p>
+<h2>Linux: pre-built release (no compile)</h2>
+<p>Download a tarball from <a href="https://github.com/rickcollette/mutineer/releases">GitHub Releases</a> for your distro, then:</p>
+<pre><code class="bash">
+tar xzf mutineer-*-x86_64-debian.tar.gz
+cd mutineer-*-x86_64-debian
+./bin/mutineer-initbbs -c conf/mutineer.conf -y
+./mutineer -c conf/mutineer.conf
+telnet localhost 2929
+</code></pre>
+<h2>Linux: build from source</h2>
+<pre><code class="bash">
+git clone https://github.com/rickcollette/mutineer.git
+cd mutineer
+sudo apt-get install -y cmake build-essential libsqlite3-dev libssl-dev
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build
+build/mutineer-initbbs -c conf/mutineer.conf -y
+build/mutineer -c conf/mutineer.conf
+</code></pre>
+<h2>After you&#x27;re in</h2>
+<ol>
+<li>Answer <strong>Y</strong> at the ANSI graphics prompt (recommended).</li>
+<li>Log in as <strong>sysop</strong> / <strong>mutineer</strong> (Docker default).</li>
+<li>Explore the main menu — messages, files, chat, sysop tools.</li>
+</ol>
+<h2>WFC console (sysop)</h2>
+<p>The detached Docker service runs without a local TTY, so the <strong>Waiting For Caller</strong> screen is off by default. To open WFC interactively:</p>
+<pre><code class="bash">
+./scripts/open-wfc.sh
+</code></pre>
+<p>See <a href="sysop-guide.html">Sysop Guide</a> for WFC keys and operations.</p>
+<h2>Next steps</h2>
+<table>
+<tr><th>Topic</th><th>Document</th></tr>
+<table>
+<tr><th>Windows (Docker / WSL)</th><th><a href="windows.html">Running on Windows</a></th></tr>
+<table>
+<tr><th>Full install &amp; tests</th><th><a href="getting-started.html">Getting Started</a></th></tr>
+<table>
+<tr><th>Production &amp; Docker details</th><th><a href="deployment.html">Deployment</a></th></tr>
+<table>
+<tr><th>Configuration keys</th><th><a href="configuration.html">Configuration</a></th></tr>
+<table>
+<tr><th>Customize menus &amp; art</th><th><a href="menus-and-ui.html">Menus and UI</a></th></tr>
+<table>
+<tr><th>Buccaneer door language</th><th><a href="buccaneer/programmers-guide.html">Buccaneer Programmer&#x27;s Guide</a></th></tr>
+</table></main>
+  <footer class="site-footer">
+    <p>Mutineer BBS — <a href="https://github.com/rickcollette/mutineer">GitHub</a> — MIT License</p>
+  </footer>
+</body>
+</html>

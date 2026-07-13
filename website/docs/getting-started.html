@@ -11,10 +11,11 @@
     <a href="index.html" class="logo">MUTINEER BBS</a>
     <span class="tagline">Documentation</span>
   </header>
-  <nav class="doc-nav"><a href="index.html" class="home">← Home</a><a href="overview.html">Overview</a><a href="getting-started.html" class="active">Getting Started</a><a href="configuration.html">Configuration</a><a href="architecture.html">Architecture</a><a href="menus-and-ui.html">Menus & UI</a><a href="messages-and-mail.html">Messages & Mail</a><a href="files-and-protocols.html">Files & Protocols</a><a href="chat-and-social.html">Chat & Social</a><a href="doors-and-scripting.html">Doors & Scripting</a><a href="sysop-guide.html">Sysop Guide</a><a href="networking-plank.html">PLANK Networking</a><a href="buccaneer.html">Buccaneer</a><a href="plugins.html">Plugins</a><a href="developer-guide.html">Developer Guide</a><a href="cli-tools.html">CLI Tools</a><a href="reference/menu-actions.html">Menu Actions</a><a href="reference/message-commands.html">Message Commands</a><a href="reference/file-commands.html">File Commands</a><a href="reference/acs-mci.html">ACS & MCI</a><a href="reference/database.html">Database Schema</a></nav>
+  <nav class="doc-nav"><a href="index.html" class="home">← Home</a><a href="quick-start.html">Quick Start</a><a href="windows.html">Windows</a><a href="getting-started.html" class="active">Getting Started</a><a href="deployment.html">Deployment</a><a href="overview.html">Overview</a><a href="configuration.html">Configuration</a><a href="architecture.html">Architecture</a><a href="menus-and-ui.html">Menus & UI</a><a href="messages-and-mail.html">Messages & Mail</a><a href="files-and-protocols.html">Files & Protocols</a><a href="chat-and-social.html">Chat & Social</a><a href="doors-and-scripting.html">Doors & Scripting</a><a href="sysop-guide.html">Sysop Guide</a><a href="networking-plank.html">PLANK</a><a href="buccaneer/programmers-guide.html">BUCC Guide</a><a href="buccaneer/host-api.html">BUCC API</a><a href="plugins.html">Plugins</a><a href="developer-guide.html">Developer</a><a href="cli-tools.html">CLI Tools</a><a href="reference/menu-actions.html">Menu Actions</a><a href="reference/message-commands.html">Messages Ref</a><a href="reference/file-commands.html">Files Ref</a><a href="reference/acs-mci.html">ACS & MCI</a><a href="reference/database.html">Database</a></nav>
   <main class="doc-content"><p>&lt;!-- generated-by: gsd-doc-writer --&gt;</p>
 <h1>Getting Started</h1>
 <p>This guide walks from a fresh clone to a running Mutineer BBS with passing tests.</p>
+<p><strong>Just want it running fast?</strong> See <a href="quick-start.html">Quick Start</a>. <strong>On Windows?</strong> See <a href="windows.html">Running on Windows</a>. <strong>Production Docker/releases:</strong> <a href="deployment.html">Deployment</a>.</p>
 <h2>Prerequisites</h2>
 <table>
 <tr><th>Requirement</th><th>Version</th><th>Notes</th></tr>
@@ -225,11 +226,19 @@ dosbox_path=dosbox
 door_runtime_path=data/door_runtime
 </code></pre>
 <p>Check door manifest JSON and <code>doors</code> DB record. See <a href="doors-and-scripting.html">Doors and Scripting</a>.</p>
+<h2>Docker</h2>
+<pre><code class="bash">
+docker compose up -d
+telnet localhost 2929
+</code></pre>
+<p>Default sysop: <strong>sysop</strong> / <strong>mutineer</strong>. See <a href="deployment.html">Deployment</a> and <a href="windows.html">Windows</a>.</p>
 <h2>Next Steps</h2>
 <ul>
+<li><a href="quick-start.html">Quick Start</a> — minimal path</li>
 <li><a href="configuration.html">Configuration</a> — all config keys</li>
 <li><a href="sysop-guide.html">Sysop Guide</a> — WFC, user admin, maintenance</li>
 <li><a href="menus-and-ui.html">Menus and UI</a> — customize menus and templates</li>
+<li><a href="buccaneer/programmers-guide.html">Buccaneer Programmer&#x27;s Guide</a> — door language</li>
 <li><a href="developer-guide.html">Developer Guide</a> — code structure and contributing</li>
 <li><a href="cli-tools.html">CLI Tools</a> — maintenance utilities</li>
 </ul></main>

@@ -7,19 +7,23 @@ door runner, PLANK store-and-forward networking, and an embedded scripting VM
 
 ## Quick start
 
+**Docker (Linux, macOS, Windows):**
+
 ```bash
-# Build
+docker compose up -d
+telnet localhost 2929   # login: sysop / mutineer
+```
+
+**Build from source:**
+
+```bash
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build
-
-# Initialize fresh database
-build/mutineer-initbbs -c conf/mutineer.conf
-
-# Run
+build/mutineer-initbbs -c conf/mutineer.conf -y
 build/mutineer -c conf/mutineer.conf
 ```
 
-Default telnet port: **2929** (set in `conf/mutineer.conf`).
+Default telnet port: **2929**. See [docs/quick-start.md](docs/quick-start.md), [docs/windows.md](docs/windows.md).
 
 ## Dependencies
 
@@ -123,10 +127,7 @@ A working test door (`TESTDOOR.COM`, real 16-bit DOS COM program) is included in
 
 ## Buccaneer scripting
 
-Buccaneer is an embedded scripting language for writing interactive BBS doors in
-a Pascal-like syntax. The compiler, VM, and host bridge live in `src/buccaneer/`.
-See `SPECS/BUCCANEER/Buccaneer_SPEC.md` for the language reference and
-`BUCC_TODO.md` for known gaps and open implementation work.
+Buccaneer is an embedded language for native BBS doors (structured BASIC-like syntax, bytecode VM). Door authors: **[Programmer's Guide](docs/buccaneer/programmers-guide.md)**. Implementers: `SPECS/BUCCANEER/`. Track gaps via [GitHub issues](https://github.com/rickcollette/mutineer/issues?q=label%3Abuccaneer).
 
 ## PLANK networking
 
@@ -136,7 +137,13 @@ networking protocol for offline packet exchange between BBS nodes. See
 
 ## Documentation
 
-Full documentation: [docs/index.md](docs/index.md)  
+| Guide | Link |
+|-------|------|
+| Documentation index | [docs/index.md](docs/index.md) |
+| Quick start | [docs/quick-start.md](docs/quick-start.md) |
+| Windows (Docker / WSL) | [docs/windows.md](docs/windows.md) |
+| Buccaneer programmer's guide | [docs/buccaneer/programmers-guide.md](docs/buccaneer/programmers-guide.md) |
+
 Website: [rickcollette.github.io/mutineer](https://rickcollette.github.io/mutineer/)
 
 ## License

@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Buccaneer Toolchain — Mutineer BBS</title>
+  <link rel="stylesheet" href="../../assets/css/site.css">
+</head>
+<body>
+  <header class="site-header">
+    <a href="../index.html" class="logo">MUTINEER BBS</a>
+    <span class="tagline">Documentation</span>
+  </header>
+  <nav class="doc-nav"><a href="../index.html" class="home">← Home</a><a href="../quick-start.html">Quick Start</a><a href="../windows.html">Windows</a><a href="../getting-started.html">Getting Started</a><a href="../deployment.html">Deployment</a><a href="../overview.html">Overview</a><a href="../configuration.html">Configuration</a><a href="../architecture.html">Architecture</a><a href="../menus-and-ui.html">Menus & UI</a><a href="../messages-and-mail.html">Messages & Mail</a><a href="../files-and-protocols.html">Files & Protocols</a><a href="../chat-and-social.html">Chat & Social</a><a href="../doors-and-scripting.html">Doors & Scripting</a><a href="../sysop-guide.html">Sysop Guide</a><a href="../networking-plank.html">PLANK</a><a href="../buccaneer/programmers-guide.html">BUCC Guide</a><a href="../buccaneer/host-api.html">BUCC API</a><a href="../plugins.html">Plugins</a><a href="../developer-guide.html">Developer</a><a href="../cli-tools.html">CLI Tools</a><a href="../reference/menu-actions.html">Menu Actions</a><a href="../reference/message-commands.html">Messages Ref</a><a href="../reference/file-commands.html">Files Ref</a><a href="../reference/acs-mci.html">ACS & MCI</a><a href="../reference/database.html">Database</a></nav>
+  <main class="doc-content"><h1>Buccaneer Toolchain</h1>
+<p>Command-line tools for compiling, checking, and running Buccaneer door programs. Sources live in <code>src/buccaneer/</code>.</p>
+<h2>Build the tools</h2>
+<pre><code class="bash">
+cd src/buccaneer
+make
+</code></pre>
+<table>
+<tr><th>Binary</th><th>Purpose</th></tr>
+<table>
+<tr><th><code>bucc</code></th><th>Compile <code>.bucc</code> → bytecode module</th></tr>
+<table>
+<tr><th><code>bucc-linter</code></th><th>Static analysis and policy checks</th></tr>
+<table>
+<tr><th><code>bucc-formatter</code></th><th>Format source consistently</th></tr>
+<table>
+<tr><th><code>bucc-simulator</code></th><th>Run bytecode with terminal UI</th></tr>
+</table>
+<p>Docker-based regression tests: <code>src/buccaneer/tests/run-tests-docker.sh</code>.</p>
+<h2>Compile a program</h2>
+<pre><code class="bash">
+./bucc examples/hello.bucc -o hello.bcm
+</code></pre>
+<p>Typical flags (see <code>./bucc --help</code>):</p>
+<ul>
+<li><code>-o path</code> — output module path</li>
+<li><code>-v</code> — verbose diagnostics</li>
+</ul>
+<h2>Run in the simulator</h2>
+<pre><code class="bash">
+./bucc-simulator hello.bcm
+</code></pre>
+<p>The simulator implements a full <code>TERM</code> API on stdout/stdin — ideal for developing menus and input loops before BBS embedding.</p>
+<h2>Lint and format</h2>
+<pre><code class="bash">
+./bucc-linter examples/hello.bucc
+./bucc-formatter -w examples/hello.bucc
+</code></pre>
+<p>Run both before packaging a door for production.</p>
+<h2>Project layout (door application)</h2>
+<pre><code class="">
+my-door/
+  door.json           # manifest (capabilities, entry program)
+  programs/
+    main.bucc
+    helper.bucc
+  data/               # optional static assets
+  buccaneer.toml      # optional tool config
+</code></pre>
+<p>See <a href="door-packages.html">Door Packages</a>.</p>
+<h2>Examples in the repo</h2>
+<table>
+<tr><th>File</th><th>Demonstrates</th></tr>
+<table>
+<tr><th><code>examples/hello.bucc</code></th><th>Terminal I/O, <code>USER.NAME</code></th></tr>
+<table>
+<tr><th><code>examples/guess.bucc</code></th><th>Input loop, conditionals</th></tr>
+<table>
+<tr><th><code>examples/scoreboard.bucc</code></th><th>Data-oriented door patterns</th></tr>
+</table>
+<h2>CMake integration note</h2>
+<p>Buccaneer currently builds via <code>src/buccaneer/Makefile</code>, not the top-level CMake graph. The main <code>mutineer</code> binary does not yet link BUCC by default — see <a href="https://github.com/rickcollette/mutineer/issues?q=BUILD">GitHub BUCC build issues</a>.</p>
+<h2>Next steps</h2>
+<ul>
+<li><a href="programmers-guide.html">Programmer&#x27;s Guide</a></li>
+<li><a href="host-api.html">Host API Reference</a></li>
+</ul></main>
+  <footer class="site-footer">
+    <p>Mutineer BBS — <a href="https://github.com/rickcollette/mutineer">GitHub</a> — MIT License</p>
+  </footer>
+</body>
+</html>
