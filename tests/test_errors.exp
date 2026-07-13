@@ -22,17 +22,7 @@ run_test "invalid_menu_selection" {
         timeout { return 0 }
     }
     
-    # Should still be at main menu
-    expect {
-        "Selection:" { }
-        timeout { }
-    }
-    
-    send "Q\r"
-    expect {
-        eof { }
-        timeout { }
-    }
+    safe_disconnect
     return 1
 }
 
@@ -57,16 +47,7 @@ run_test "invalid_area_number" {
         timeout { return 0 }
     }
     
-    send "Q\r"
-    expect {
-        "Selection:" { }
-        timeout { }
-    }
-    send "Q\r"
-    expect {
-        eof { }
-        timeout { }
-    }
+    safe_disconnect
     return 1
 }
 
@@ -90,16 +71,7 @@ run_test "non_numeric_input" {
         timeout { return 0 }
     }
     
-    send "Q\r"
-    expect {
-        "Selection:" { }
-        timeout { }
-    }
-    send "Q\r"
-    expect {
-        eof { }
-        timeout { }
-    }
+    safe_disconnect
     return 1
 }
 
@@ -123,16 +95,7 @@ run_test "empty_input" {
         timeout { return 0 }
     }
     
-    send "Q\r"
-    expect {
-        "Selection:" { }
-        timeout { }
-    }
-    send "Q\r"
-    expect {
-        eof { }
-        timeout { }
-    }
+    safe_disconnect
     return 1
 }
 
@@ -158,11 +121,7 @@ run_test "access_denied_regular_user" {
                 "Selection:" { }
                 timeout { }
             }
-            send "Q\r"
-            expect {
-                eof { }
-                timeout { }
-            }
+            safe_disconnect
             return 0
         }
         "Selection:" { }
@@ -173,20 +132,7 @@ run_test "access_denied_regular_user" {
         timeout { return 0 }
     }
     
-    # Try to quit cleanly
-    expect {
-        "Selection:" { }
-        eof { 
-            return 1
-        }
-        timeout { }
-    }
-    
-    send "Q\r"
-    expect {
-        eof { }
-        timeout { }
-    }
+    safe_disconnect
     return 1
 }
 
@@ -217,16 +163,7 @@ run_test "nonexistent_message" {
         timeout { return 0 }
     }
     
-    send "Q\r"
-    expect {
-        "Selection:" { }
-        timeout { }
-    }
-    send "Q\r"
-    expect {
-        eof { }
-        timeout { }
-    }
+    safe_disconnect
     return 1
 }
 

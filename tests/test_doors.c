@@ -12,6 +12,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <sys/stat.h>
+#include <sys/socket.h>
 #include <fcntl.h>
 #include <errno.h>
 
@@ -26,6 +27,16 @@
  * ========================================================================= */
 
 void send_str(Session* s, const char* str) { (void)s; (void)str; }
+int session_readline(Session* s, uint8_t* buf, size_t cap, int timeout) {
+  (void)s; (void)timeout;
+  if (buf && cap) buf[0] = '\0';
+  return 0;
+}
+int prompt_line(Session* s, const char* prompt, char* out, size_t cap) {
+  (void)s; (void)prompt;
+  if (out && cap) out[0] = '\0';
+  return 0;
+}
 size_t online_list(char* out, size_t cap) { (void)out; (void)cap; return 0; }
 void online_broadcast(const char* msg) { (void)msg; }
 
@@ -478,6 +489,80 @@ static void test_native_door_regression(void) {
   rm_rf(s.cfg.dropfile_path);
 }
 
+static void test_native_door_argv_and_rejection(void) {
+  printf("\n[native door: argv parser and metachar rejection]\n");
+
+  char out_path[256];
+  snprintf(out_path, sizeof(out_path), "/tmp/test_native_argv_%d.txt", (int)getpid());
+  unlink(out_path);
+
+  Session s;
+  memset(&s, 0, sizeof(s));
+  s.alive = 1;
+  s.node_num = 1;
+  s.fd = STDIN_FILENO;
+  snprintf(s.cfg.dropfile_path, sizeof(s.cfg.dropfile_path), "/tmp/test_native_drop_%d", (int)getpid());
+  snprintf(s.ip, sizeof(s.ip), "127.0.0.1");
+  snprintf(s.user.handle, sizeof(s.user.handle), "testuser");
+
+  DbDoor door;
+  memset(&door, 0, sizeof(door));
+  snprintf(door.name, sizeof(door.name), "argvdoor");
+  snprintf(door.runner, sizeof(door.runner), "native");
+  snprintf(door.command, sizeof(door.command), "/bin/sh -c \"printf %%s 'hello world' > %s\"", out_path);
+  door.enabled = 1;
+
+  bool ok = door_launch(&s, &door);
+  CHECK(!ok, "native door rejects shell redirection metacharacter");
+
+  snprintf(door.command, sizeof(door.command), "/bin/echo \"hello world\"");
+  ok = door_launch(&s, &door);
+  CHECK(ok, "native door accepts quoted argv command");
+
+  rm_rf(s.cfg.dropfile_path);
+  unlink(out_path);
+}
+
+static void test_protocol_argv_and_rejection(void) {
+  printf("\n[protocol: argv parser, percent-f, and metachar rejection]\n");
+
+  int fds[2];
+  if (socketpair(AF_UNIX, SOCK_STREAM, 0, fds) != 0) {
+    printf("  SKIP: socketpair failed: %s\n", strerror(errno));
+    return;
+  }
+
+  char filepath[256];
+  snprintf(filepath, sizeof(filepath), "/tmp/test_protocol_file_%d.dat", (int)getpid());
+  unlink(filepath);
+
+  Session s;
+  memset(&s, 0, sizeof(s));
+  s.fd = fds[0];
+  s.node_num = 1;
+  snprintf(s.ip, sizeof(s.ip), "127.0.0.1");
+  snprintf(s.user.handle, sizeof(s.user.handle), "testuser");
+
+  DbProtocol proto;
+  memset(&proto, 0, sizeof(proto));
+  snprintf(proto.name, sizeof(proto.name), "touchproto");
+  snprintf(proto.direction, sizeof(proto.direction), "up");
+  snprintf(proto.command, sizeof(proto.command), "/usr/bin/touch %s", "%f");
+  proto.active = 1;
+
+  bool ok = protocol_launch(&s, &proto, filepath, "up");
+  CHECK(ok, "protocol argv command with %f succeeds");
+  CHECK(access(filepath, F_OK) == 0, "protocol %f created exact filepath argument");
+
+  snprintf(proto.command, sizeof(proto.command), "/bin/true; /bin/false");
+  ok = protocol_launch(&s, &proto, filepath, "up");
+  CHECK(!ok, "protocol rejects shell metacharacter");
+
+  close(fds[0]);
+  close(fds[1]);
+  unlink(filepath);
+}
+
 /* =========================================================================
  * main
  * ========================================================================= */
@@ -495,6 +580,8 @@ int main(void) {
   test_dosbox_launch_fake();
   test_disabled_door();
   test_native_door_regression();
+  test_native_door_argv_and_rejection();
+  test_protocol_argv_and_rejection();
 
   printf("\n=== Results: %d passed, %d failed ===\n", g_pass, g_fail);
   return g_fail > 0 ? 1 : 0;

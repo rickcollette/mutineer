@@ -1,8 +1,10 @@
+#define _XOPEN_SOURCE 700
 #include "bbs_session.h"
 #include "bbs_db.h"
 #include "bbs_acs.h"
 #include "bbs_flags.h"
 #include "bbs_util.h"
+#include "bbs_archive.h"
 #include "bbs_doors.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -379,17 +381,7 @@ void cmd_file_upload(Session* s, const char* data) {
   
   bool transfer_ok = false;
   if (selected) {
-    /* For uploads, rz/rb/rx write to current directory, so we need to cd first */
-    char upload_dir[512];
-    snprintf(upload_dir, sizeof(upload_dir), "%s", area.path);
-    
-    /* Create a temp protocol with cd prefix */
-    DbProtocol temp_proto = *selected;
-    char temp_cmd[512];
-    snprintf(temp_cmd, sizeof(temp_cmd), "cd '%s' && %s", upload_dir, selected->command);
-    strncpy(temp_proto.command, temp_cmd, sizeof(temp_proto.command) - 1);
-    
-    transfer_ok = protocol_launch(s, &temp_proto, filename, "up");
+    transfer_ok = protocol_launch(s, selected, filepath, "up");
   } else {
     send_str(s, "\r\nProtocol not configured. Contact sysop.\r\n");
     return;
@@ -624,36 +616,6 @@ void cmd_file_new_scan(Session* s, const char* data) {
   send_str(s, buf);
 }
 
-/* Helper to run archive listing command and send output to session */
-static void run_archive_cmd(Session* s, const char* cmd) {
-  FILE* fp = popen(cmd, "r");
-  if (!fp) {
-    send_str(s, "Failed to run archive tool.\r\n");
-    return;
-  }
-  
-  char line[256];
-  int lines = 0;
-  while (fgets(line, sizeof(line), fp) != NULL && lines < 100) {
-    /* Convert LF to CRLF for telnet */
-    size_t len = strlen(line);
-    if (len > 0 && line[len-1] == '\n') {
-      line[len-1] = '\0';
-      send_str(s, line);
-      send_str(s, "\r\n");
-    } else {
-      send_str(s, line);
-    }
-    lines++;
-  }
-  
-  if (lines >= 100) {
-    send_str(s, "... (output truncated)\r\n");
-  }
-  
-  pclose(fp);
-}
-
 /* FV - View archive contents */
 void cmd_file_view_archive(Session* s, const char* data) {
   int file_id = 0;
@@ -701,48 +663,16 @@ void cmd_file_view_archive(Session* s, const char* data) {
     send_str(s, "\r\n--------------------------------------------------------------\r\n");
   }
   
-  /* Check file extension */
-  const char* ext = strrchr(rec.filename, '.');
-  if (!ext) {
-    send_str(s, "Cannot determine archive type for listing.\r\n");
-    return;
-  }
-  
   send_str(s, "\x1b[1;33mArchive Contents:\x1b[0m\r\n");
-  
-  char cmd[768];
-  if (strcasecmp(ext, ".zip") == 0) {
-    snprintf(cmd, sizeof(cmd), "unzip -l '%s' 2>&1", filepath);
-    run_archive_cmd(s, cmd);
-  } else if (strcasecmp(ext, ".tar") == 0) {
-    snprintf(cmd, sizeof(cmd), "tar -tvf '%s' 2>&1", filepath);
-    run_archive_cmd(s, cmd);
-  } else if (strcasecmp(ext, ".tgz") == 0 || strcasecmp(ext, ".tar.gz") == 0) {
-    snprintf(cmd, sizeof(cmd), "tar -tzvf '%s' 2>&1", filepath);
-    run_archive_cmd(s, cmd);
-  } else if (strcasecmp(ext, ".gz") == 0 && strstr(rec.filename, ".tar") == NULL) {
-    snprintf(cmd, sizeof(cmd), "gzip -l '%s' 2>&1", filepath);
-    run_archive_cmd(s, cmd);
-  } else if (strcasecmp(ext, ".rar") == 0) {
-    snprintf(cmd, sizeof(cmd), "unrar l '%s' 2>&1", filepath);
-    run_archive_cmd(s, cmd);
-  } else if (strcasecmp(ext, ".7z") == 0) {
-    snprintf(cmd, sizeof(cmd), "7z l '%s' 2>&1", filepath);
-    run_archive_cmd(s, cmd);
-  } else if (strcasecmp(ext, ".arj") == 0) {
-    snprintf(cmd, sizeof(cmd), "arj l '%s' 2>&1", filepath);
-    run_archive_cmd(s, cmd);
-  } else if (strcasecmp(ext, ".lzh") == 0 || strcasecmp(ext, ".lha") == 0) {
-    snprintf(cmd, sizeof(cmd), "lha l '%s' 2>&1", filepath);
-    run_archive_cmd(s, cmd);
-  } else if (strcasecmp(ext, ".bz2") == 0) {
-    snprintf(cmd, sizeof(cmd), "bzip2 -l '%s' 2>&1", filepath);
-    run_archive_cmd(s, cmd);
-  } else if (strcasecmp(ext, ".xz") == 0) {
-    snprintf(cmd, sizeof(cmd), "xz -l '%s' 2>&1", filepath);
-    run_archive_cmd(s, cmd);
+
+  char listing[8192];
+  char errbuf[256];
+  if (bbs_archive_list_to_text(filepath, listing, sizeof(listing), 100, errbuf, sizeof(errbuf))) {
+    send_str(s, listing[0] ? listing : "(archive is empty)\r\n");
   } else {
-    send_str(s, "Unknown or unsupported archive format.\r\n");
+    send_str(s, "Unable to read archive: ");
+    send_str(s, errbuf);
+    send_str(s, "\r\n");
   }
 }
 
@@ -914,35 +844,19 @@ void cmd_file_archive_test(Session* s, const char* data) {
   DbFileRec rec;
   if (!resolve_file_path_for_cmd(s, file_id, filepath, sizeof(filepath), &rec)) return;
 
-  const char* ext = strrchr(rec.filename, '.');
-  if (!ext) { send_str(s, "\r\nCannot determine archive type.\r\n"); return; }
-
   char buf[256];
   snprintf(buf, sizeof(buf), "\r\n\x1b[1;36mTesting archive: %s\x1b[0m\r\n", rec.filename);
   send_str(s, buf);
   send_str(s, "--------------------------------------------------------------\r\n");
 
-  char cmd[768];
-  if (strcasecmp(ext, ".zip") == 0)
-    snprintf(cmd, sizeof(cmd), "unzip -t '%s' 2>&1", filepath);
-  else if (strcasecmp(ext, ".rar") == 0)
-    snprintf(cmd, sizeof(cmd), "unrar t '%s' 2>&1", filepath);
-  else if (strcasecmp(ext, ".7z") == 0)
-    snprintf(cmd, sizeof(cmd), "7z t '%s' 2>&1", filepath);
-  else if (strcasecmp(ext, ".arj") == 0)
-    snprintf(cmd, sizeof(cmd), "arj t '%s' 2>&1", filepath);
-  else if (strcasecmp(ext, ".lzh") == 0 || strcasecmp(ext, ".lha") == 0)
-    snprintf(cmd, sizeof(cmd), "lha t '%s' 2>&1", filepath);
-  else if (strcasecmp(ext, ".tar") == 0)
-    snprintf(cmd, sizeof(cmd), "tar -tf '%s' > /dev/null 2>&1 && echo 'Archive OK'", filepath);
-  else if (strcasecmp(ext, ".tgz") == 0)
-    snprintf(cmd, sizeof(cmd), "tar -tzf '%s' > /dev/null 2>&1 && echo 'Archive OK'", filepath);
+  char errbuf[256];
+  if (bbs_archive_test(filepath, errbuf, sizeof(errbuf)))
+    send_str(s, "Archive OK\r\n");
   else {
-    send_str(s, "Unsupported archive format for testing.\r\n");
-    return;
+    send_str(s, "Archive test failed: ");
+    send_str(s, errbuf);
+    send_str(s, "\r\n");
   }
-
-  run_archive_cmd(s, cmd);
 }
 
 /* FQ - Extract archive to temp directory */
@@ -961,13 +875,11 @@ void cmd_file_archive_extract(Session* s, const char* data) {
   DbFileRec rec;
   if (!resolve_file_path_for_cmd(s, file_id, filepath, sizeof(filepath), &rec)) return;
 
-  const char* ext = strrchr(rec.filename, '.');
-  if (!ext) { send_str(s, "\r\nCannot determine archive type.\r\n"); return; }
-
-  /* Create isolated temp directory: /tmp/mutineer_<uid>_<ts> */
-  char tmpdir[128];
-  snprintf(tmpdir, sizeof(tmpdir), "/tmp/mutineer_%d_%ld", s->user.id, (long)time(NULL));
-  if (mkdir(tmpdir, 0700) != 0) {
+  char tmpdir[512];
+  const char* base = getenv("TMPDIR");
+  if (!base || !base[0]) base = s->cfg.data_path[0] ? s->cfg.data_path : "data";
+  snprintf(tmpdir, sizeof(tmpdir), "%s/archive_XXXXXX", base);
+  if (!mkdtemp(tmpdir)) {
     send_str(s, "\r\nCould not create temp directory.\r\n");
     return;
   }
@@ -979,42 +891,35 @@ void cmd_file_archive_extract(Session* s, const char* data) {
   send_str(s, buf);
   send_str(s, "--------------------------------------------------------------\r\n");
 
-  char cmd[768];
-  if (strcasecmp(ext, ".zip") == 0)
-    snprintf(cmd, sizeof(cmd), "unzip -o '%s' -d '%s' 2>&1", filepath, tmpdir);
-  else if (strcasecmp(ext, ".rar") == 0)
-    snprintf(cmd, sizeof(cmd), "unrar e '%s' '%s/' 2>&1", filepath, tmpdir);
-  else if (strcasecmp(ext, ".7z") == 0)
-    snprintf(cmd, sizeof(cmd), "7z e '%s' -o'%s' 2>&1", filepath, tmpdir);
-  else if (strcasecmp(ext, ".arj") == 0)
-    snprintf(cmd, sizeof(cmd), "arj e '%s' '%s/' 2>&1", filepath, tmpdir);
-  else if (strcasecmp(ext, ".lzh") == 0 || strcasecmp(ext, ".lha") == 0)
-    snprintf(cmd, sizeof(cmd), "lha e '%s' '%s/' 2>&1", filepath, tmpdir);
-  else if (strcasecmp(ext, ".tar") == 0)
-    snprintf(cmd, sizeof(cmd), "tar -xf '%s' -C '%s' 2>&1", filepath, tmpdir);
-  else if (strcasecmp(ext, ".tgz") == 0)
-    snprintf(cmd, sizeof(cmd), "tar -xzf '%s' -C '%s' 2>&1", filepath, tmpdir);
-  else {
-    send_str(s, "Unsupported archive format for extraction.\r\n");
-    rmdir(tmpdir);
+  char errbuf[256];
+  if (!bbs_archive_extract_to_dir(filepath, tmpdir, errbuf, sizeof(errbuf))) {
+    send_str(s, "Extraction failed: ");
+    send_str(s, errbuf);
+    send_str(s, "\r\n");
+    bbs_remove_tree(tmpdir);
     return;
   }
 
-  run_archive_cmd(s, cmd);
-
-  /* List what was extracted */
   send_str(s, "--------------------------------------------------------------\r\n");
   send_str(s, "Extracted files:\r\n");
-  char lscmd[256];
-  snprintf(lscmd, sizeof(lscmd), "ls -lh '%s' 2>&1", tmpdir);
-  run_archive_cmd(s, lscmd);
+  DIR* d = opendir(tmpdir);
+  if (d) {
+    struct dirent* ent;
+    while ((ent = readdir(d)) != NULL) {
+      if (ent->d_name[0] == '.') continue;
+      char outpath[1024];
+      path_join(tmpdir, ent->d_name, outpath, sizeof(outpath));
+      struct stat st;
+      if (stat(outpath, &st) == 0) {
+        snprintf(buf, sizeof(buf), "%-40s %10ld bytes\r\n", ent->d_name, (long)st.st_size);
+        send_str(s, buf);
+      }
+    }
+    closedir(d);
+  }
 
-  send_str(s, "\r\nExtraction complete. Temp files will be cleaned up on session end.\r\n");
-
-  /* Best-effort cleanup note: we remove now; caller can re-extract if needed */
-  char rmcmd[256];
-  snprintf(rmcmd, sizeof(rmcmd), "rm -rf '%s'", tmpdir);
-  system(rmcmd);
+  send_str(s, "\r\nExtraction complete. Temp files cleaned up.\r\n");
+  bbs_remove_tree(tmpdir);
 }
 
 /* FK - Remove specific entry from batch queue */

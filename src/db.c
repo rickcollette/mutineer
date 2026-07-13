@@ -421,6 +421,35 @@ bool db_init_schema(BbsDb *db, const char *schema_path)
     ok = db_exec(db, sql);
   if (ok)
     ok = db_apply_core_migrations(db);
+  if (ok)
+  {
+    char plank_path[512];
+    snprintf(plank_path, sizeof(plank_path), "%s", schema_path);
+    char *slash = strrchr(plank_path, '/');
+    if (slash)
+      snprintf(slash + 1, sizeof(plank_path) - (size_t)(slash + 1 - plank_path), "plank_schema.sql");
+    else
+      snprintf(plank_path, sizeof(plank_path), "plank_schema.sql");
+
+    if (strcmp(plank_path, schema_path) != 0)
+    {
+      size_t plank_n = 0;
+      char *plank_sql = read_file(plank_path, &plank_n);
+      if (!plank_sql)
+      {
+        char err[512];
+        snprintf(err, sizeof(err), "failed to read PLANK schema file '%s': %s",
+                 plank_path, strerror(errno));
+        set_err(db, err);
+        ok = false;
+      }
+      else
+      {
+        ok = db_exec(db, plank_sql);
+        free(plank_sql);
+      }
+    }
+  }
 
   if (ok)
   {
@@ -5478,7 +5507,18 @@ bool db_fido_echolink_delete(BbsDb *db, int id)
   if (!db)
     return false;
 #ifdef HAVE_SQLITE
-  db_exec(db, "DELETE FROM fido_echomail_queue WHERE echolink_id = ?1");
+  sqlite3_stmt *child = NULL;
+  if (sqlite3_prepare_v2(db->db, "DELETE FROM fido_echomail_queue WHERE echolink_id = ?1", -1, &child, NULL) != SQLITE_OK)
+  {
+    set_err(db, sqlite3_errmsg(db->db));
+    return false;
+  }
+  sqlite3_bind_int(child, 1, id);
+  int child_rc = sqlite3_step(child);
+  sqlite3_finalize(child);
+  if (child_rc != SQLITE_DONE)
+    return false;
+
   const char *sql = "DELETE FROM fido_echolinks WHERE id = ?1";
   sqlite3_stmt *st = NULL;
   if (sqlite3_prepare_v2(db->db, sql, -1, &st, NULL) != SQLITE_OK)
@@ -5973,8 +6013,30 @@ bool db_qwk_hub_delete(BbsDb *db, int id)
   if (!db)
     return false;
 #ifdef HAVE_SQLITE
-  db_exec(db, "DELETE FROM qwk_area_links WHERE hub_id = ?1");
-  db_exec(db, "DELETE FROM qwk_packet_queue WHERE hub_id = ?1");
+  sqlite3_stmt *child = NULL;
+  if (sqlite3_prepare_v2(db->db, "DELETE FROM qwk_area_links WHERE hub_id = ?1", -1, &child, NULL) != SQLITE_OK)
+  {
+    set_err(db, sqlite3_errmsg(db->db));
+    return false;
+  }
+  sqlite3_bind_int(child, 1, id);
+  int child_rc = sqlite3_step(child);
+  sqlite3_finalize(child);
+  if (child_rc != SQLITE_DONE)
+    return false;
+
+  child = NULL;
+  if (sqlite3_prepare_v2(db->db, "DELETE FROM qwk_packet_queue WHERE hub_id = ?1", -1, &child, NULL) != SQLITE_OK)
+  {
+    set_err(db, sqlite3_errmsg(db->db));
+    return false;
+  }
+  sqlite3_bind_int(child, 1, id);
+  child_rc = sqlite3_step(child);
+  sqlite3_finalize(child);
+  if (child_rc != SQLITE_DONE)
+    return false;
+
   const char *sql = "DELETE FROM qwk_hubs WHERE id = ?1";
   sqlite3_stmt *st = NULL;
   if (sqlite3_prepare_v2(db->db, sql, -1, &st, NULL) != SQLITE_OK)

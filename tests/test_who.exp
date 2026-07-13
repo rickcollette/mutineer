@@ -31,7 +31,7 @@ run_test "view_whos_online" {
     # Press enter to continue if needed
     expect {
         "Selection:" { }
-        -re "Press|continue|\\?" {
+        -nocase -re "press|continue|\\?" {
             send "\r"
             expect {
                 "Selection:" { }
@@ -65,7 +65,7 @@ run_test "self_in_who_list" {
     # Press enter to continue if needed
     expect {
         "Selection:" { }
-        -re "Press|continue|\\?" {
+        -nocase -re "press|continue|\\?" {
             send "\r"
             expect {
                 "Selection:" { }

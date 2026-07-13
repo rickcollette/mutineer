@@ -3,8 +3,16 @@
 # Source this file at the beginning of each test script
 
 # Default configuration
-set default_host "127.0.0.1"
-set default_port 2929
+if {[info exists env(MUTINEER_EXPECT_HOST)]} {
+    set default_host $env(MUTINEER_EXPECT_HOST)
+} else {
+    set default_host "127.0.0.1"
+}
+if {[info exists env(MUTINEER_EXPECT_PORT)]} {
+    set default_port $env(MUTINEER_EXPECT_PORT)
+} else {
+    set default_port 2929
+}
 set default_timeout 30
 
 # Test state tracking

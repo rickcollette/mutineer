@@ -29,6 +29,7 @@ static struct {
 /* Forward declarations */
 extern const bbs_host_api_t* plugin_host_api_get(void);
 extern void plugin_host_api_shutdown(void);
+extern void plugin_host_api_configure(const BbsConfig* cfg);
 
 /* Check if plugin ID is in a comma-separated list */
 static bool id_in_list(const char* id, const char* list) {
@@ -134,8 +135,8 @@ static bool load_plugin(const char* path) {
   }
   
   /* Validate required fields */
-  if (!desc.id || !desc.id[0]) {
-    log_error("plugin %s has no ID", path);
+  if (!desc.id || !bbs_safe_identifier(desc.id, 96)) {
+    log_error("plugin %s has missing or unsafe ID", path);
     dlclose(handle);
     return false;
   }
@@ -226,29 +227,35 @@ bool plugin_loader_init(const BbsConfig* cfg) {
   
   /* Initialize registry first */
   plugin_registry_init();
+  plugin_host_api_configure(cfg);
   
-  /* Check if plugins are enabled - for now, default to enabled if plugins/ exists */
-  struct stat st;
-  const char* plugin_dir = "plugins";
-  
-  if (stat(plugin_dir, &st) != 0 || !S_ISDIR(st.st_mode)) {
-    log_info("plugin directory not found, plugins disabled");
+  g_plugin_cfg.enabled = cfg ? (cfg->plugins_enabled != 0) : true;
+  snprintf(g_plugin_cfg.dir, sizeof(g_plugin_cfg.dir), "%s",
+           (cfg && cfg->plugins_dir[0]) ? cfg->plugins_dir : "plugins");
+  snprintf(g_plugin_cfg.allowlist, sizeof(g_plugin_cfg.allowlist), "%s",
+           cfg ? cfg->plugins_allowlist : "");
+  snprintf(g_plugin_cfg.denylist, sizeof(g_plugin_cfg.denylist), "%s",
+           cfg ? cfg->plugins_denylist : "");
+
+  if (!g_plugin_cfg.enabled) {
+    log_info("plugins disabled by config");
     g_plugin_cfg.enabled = false;
     g_plugin_cfg.initialized = true;
     return true;
   }
-  
-  g_plugin_cfg.enabled = true;
-  strncpy(g_plugin_cfg.dir, plugin_dir, sizeof(g_plugin_cfg.dir) - 1);
-  g_plugin_cfg.allowlist[0] = '\0';
-  g_plugin_cfg.denylist[0] = '\0';
+
+  struct stat st;
+  if (stat(g_plugin_cfg.dir, &st) != 0 || !S_ISDIR(st.st_mode)) {
+    log_info("plugin directory not found: %s", g_plugin_cfg.dir);
+    g_plugin_cfg.initialized = true;
+    return true;
+  }
   
   /* Scan and load plugins */
   int loaded = scan_and_load_plugins(g_plugin_cfg.dir);
   log_info("plugin loader initialized: %d plugin(s) loaded from %s", loaded, g_plugin_cfg.dir);
   
   g_plugin_cfg.initialized = true;
-  (void)cfg;  /* May use config fields in future */
   return true;
 }
 

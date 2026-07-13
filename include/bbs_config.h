@@ -41,6 +41,11 @@ typedef struct BbsConfig
   char doors_path[256];
   char dropfile_path[256];
   char protocol_path[256];
+  int protocol_timeout_sec;       /* protocol child timeout, 0=no timeout */
+  int plugins_enabled;            /* 0 disables all plugin loading */
+  char plugins_dir[256];          /* plugin directory */
+  char plugins_allowlist[512];    /* comma-separated plugin ids, empty=all */
+  char plugins_denylist[512];     /* comma-separated plugin ids, deny wins */
   /* multi-login */
   int allow_multi_login; /* 0=block duplicate logins, 1=allow */
   /* guest account */

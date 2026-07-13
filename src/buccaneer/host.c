@@ -31,14 +31,19 @@ static bucc_host_function_t host_functions[] = {
     { "TERM", "GOTOXY",   "term.output", NULL, 2, 2, false },
     { "TERM", "GETKEY",   "term.input",  NULL, 0, 0, false },
     { "TERM", "INPUT",    "term.input",  NULL, 0, 2, false },
+    { "TERM", "INPUT_PASSWORD", "term.input", NULL, 0, 1, false },
+    { "TERM", "PAUSE",    "term.input",  NULL, 0, 1, false },
     { "TERM", "WIDTH",    "term.query",  NULL, 0, 0, false },
     { "TERM", "HEIGHT",   "term.query",  NULL, 0, 0, false },
+    { "TERM", "SUPPORTS_ANSI", "term.query", NULL, 0, 0, false },
     
     { "USER", "NAME",     "user.read",   NULL, 0, 0, false },
     { "USER", "ALIAS",    "user.read",   NULL, 0, 0, false },
     { "USER", "ID",       "user.read",   NULL, 0, 0, false },
     { "USER", "SECURITY", "user.read",   NULL, 0, 0, false },
     { "USER", "TIMELEFT", "user.read",   NULL, 0, 0, false },
+    { "USER", "TIME_LEFT", "user.read",  NULL, 0, 0, false },
+    { "USER", "TIME_REMAINING", "user.read", NULL, 0, 0, false },
     
     { "DATA", "INSERT",   "data.write",  NULL, 2, 2, true  },
     { "DATA", "UPDATE",   "data.write",  NULL, 3, 3, true  },
@@ -88,6 +93,8 @@ static bucc_host_function_t host_functions[] = {
     
     { "SESSION", "GET",   "session.read",NULL, 1, 2, false },
     { "SESSION", "SET",   "session.write",NULL, 2, 2, false },
+    { "SESSION", "NODE",  "session.read",NULL, 0, 0, false },
+    { "SESSION", "ELAPSED_MS", "session.read", NULL, 0, 0, false },
     
     { "DOOR", "EXIT",     NULL,          NULL, 0, 1, false },
     { "DOOR", "CHAIN",    "door.chain",  NULL, 1, 2, false },
@@ -102,6 +109,7 @@ bucc_host_context_t* bucc_host_context_new(void) {
     ctx->app_state = bucc_map_new(16);
     ctx->shared_state = bucc_map_new(16);
     ctx->session_state = bucc_map_new(16);
+    ctx->allowed_capabilities = BUCC_CAP_ALL;
     ctx->throttle_limit = 1000;
     ctx->throttle_window_start = 0;
     ctx->throttle_count = 0;
@@ -123,6 +131,11 @@ void bucc_host_context_free(bucc_host_context_t* ctx) {
     }
     
     free(ctx);
+}
+
+void bucc_host_set_allowed_capabilities(bucc_host_context_t* ctx, uint64_t capabilities) {
+    if (!ctx) return;
+    ctx->allowed_capabilities = capabilities;
 }
 
 void bucc_host_set_term_api(bucc_host_context_t* ctx, bucc_term_api_t* api, void* session_ctx) {
@@ -187,6 +200,30 @@ static bucc_host_function_t* find_host_function(const char* ns, const char* fn) 
         }
     }
     return NULL;
+}
+
+static uint64_t capability_from_string(const char* cap) {
+    if (!cap) return 0;
+
+    if (strcmp(cap, "term.output") == 0) return BUCC_CAP_TERM_OUTPUT;
+    if (strcmp(cap, "term.input") == 0) return BUCC_CAP_TERM_INPUT;
+    if (strcmp(cap, "term.query") == 0) return BUCC_CAP_TERM_QUERY;
+    if (strcmp(cap, "user.read") == 0) return BUCC_CAP_USER_READ;
+    if (strcmp(cap, "data.read") == 0) return BUCC_CAP_DATA_READ;
+    if (strcmp(cap, "data.write") == 0) return BUCC_CAP_DATA_WRITE;
+    if (strcmp(cap, "kv.read") == 0) return BUCC_CAP_KV_READ;
+    if (strcmp(cap, "kv.write") == 0) return BUCC_CAP_KV_WRITE;
+    if (strcmp(cap, "text.read") == 0) return BUCC_CAP_TEXT_READ;
+    if (strcmp(cap, "text.write") == 0) return BUCC_CAP_TEXT_WRITE;
+    if (strcmp(cap, "bbs.message") == 0) return BUCC_CAP_BBS_MESSAGE;
+    if (strcmp(cap, "bbs.query") == 0) return BUCC_CAP_BBS_QUERY;
+    if (strcmp(cap, "shared.read") == 0) return BUCC_CAP_SHARED_READ;
+    if (strcmp(cap, "shared.write") == 0) return BUCC_CAP_SHARED_WRITE;
+    if (strcmp(cap, "session.read") == 0) return BUCC_CAP_SESSION_READ;
+    if (strcmp(cap, "session.write") == 0) return BUCC_CAP_SESSION_WRITE;
+    if (strcmp(cap, "door.chain") == 0) return BUCC_CAP_DOOR_CHAIN;
+
+    return 0;
 }
 
 bucc_value_t bucc_host_term_print(bucc_host_context_t* ctx, bucc_value_t* args, int argc) {
@@ -286,6 +323,41 @@ bucc_value_t bucc_host_term_input(bucc_host_context_t* ctx, bucc_value_t* args, 
     return result;
 }
 
+bucc_value_t bucc_host_term_gotoxy(bucc_host_context_t* ctx, bucc_value_t* args, int argc) {
+    if (!ctx || !ctx->term || !ctx->term->gotoxy) {
+        return bucc_make_error("TERM.GOTOXY not available");
+    }
+    if (argc < 2) {
+        return bucc_make_error("TERM.GOTOXY requires x and y");
+    }
+    ctx->term->gotoxy(ctx->session_ctx, (int)bucc_value_to_int(args[0]),
+                      (int)bucc_value_to_int(args[1]));
+    return BUCC_NULL_VAL;
+}
+
+bucc_value_t bucc_host_term_input_password(bucc_host_context_t* ctx, bucc_value_t* args, int argc) {
+    if (!ctx || !ctx->term || !ctx->term->input_password) {
+        return bucc_make_error("TERM.INPUT_PASSWORD not available");
+    }
+    const char* prompt = "";
+    if (argc > 0 && BUCC_IS_STRING(args[0])) prompt = args[0].as.str->data;
+    char* input = ctx->term->input_password(ctx->session_ctx, prompt);
+    if (!input) return bucc_make_string("");
+    bucc_value_t result = bucc_make_string(input);
+    free(input);
+    return result;
+}
+
+bucc_value_t bucc_host_term_pause(bucc_host_context_t* ctx, bucc_value_t* args, int argc) {
+    if (!ctx || !ctx->term || !ctx->term->pause) {
+        return bucc_make_error("TERM.PAUSE not available");
+    }
+    const char* prompt = NULL;
+    if (argc > 0 && BUCC_IS_STRING(args[0])) prompt = args[0].as.str->data;
+    ctx->term->pause(ctx->session_ctx, prompt);
+    return BUCC_NULL_VAL;
+}
+
 bucc_value_t bucc_host_term_width(bucc_host_context_t* ctx, bucc_value_t* args, int argc) {
     (void)args;
     (void)argc;
@@ -306,6 +378,15 @@ bucc_value_t bucc_host_term_height(bucc_host_context_t* ctx, bucc_value_t* args,
     }
     
     return BUCC_I64_VAL(ctx->term->get_height(ctx->session_ctx));
+}
+
+bucc_value_t bucc_host_term_supports_ansi(bucc_host_context_t* ctx, bucc_value_t* args, int argc) {
+    (void)args;
+    (void)argc;
+    if (!ctx || !ctx->term || !ctx->term->supports_ansi) {
+        return BUCC_BOOL_VAL(true);
+    }
+    return BUCC_BOOL_VAL(ctx->term->supports_ansi(ctx->session_ctx));
 }
 
 bucc_value_t bucc_host_user_name(bucc_host_context_t* ctx, bucc_value_t* args, int argc) {
@@ -715,10 +796,9 @@ bucc_value_t bucc_host_door_exit(bucc_host_context_t* ctx, bucc_value_t* args, i
         code = (int)bucc_value_to_int(args[0]);
     }
     
+    ctx->vm->exit_code = code;
     ctx->vm->status = VM_HALT;
     ctx->vm->running = false;
-    
-    (void)code;
     
     return BUCC_NULL_VAL;
 }
@@ -742,7 +822,7 @@ bucc_value_t bucc_host_door_chain(bucc_host_context_t* ctx, bucc_value_t* args, 
         ctx->vm->chain_args = BUCC_NULL_VAL;
     }
 
-    ctx->vm->status = VM_HALT;
+    ctx->vm->status = VM_CHAIN;
     ctx->vm->running = false;
     return BUCC_NULL_VAL;
 }
@@ -892,6 +972,20 @@ bucc_value_t bucc_host_session_set(bucc_host_context_t* ctx, bucc_value_t* args,
     bucc_map_set_cstr(ctx->session_state, key, args[1]);
     
     return BUCC_NULL_VAL;
+}
+
+bucc_value_t bucc_host_session_node(bucc_host_context_t* ctx, bucc_value_t* args, int argc) {
+    (void)args;
+    (void)argc;
+    if (!ctx || !ctx->bbs || !ctx->bbs->get_node) return BUCC_I64_VAL(1);
+    return BUCC_I64_VAL(ctx->bbs->get_node(ctx->bbs_ctx));
+}
+
+bucc_value_t bucc_host_session_elapsed_ms(bucc_host_context_t* ctx, bucc_value_t* args, int argc) {
+    (void)args;
+    (void)argc;
+    if (!ctx || !ctx->vm) return BUCC_I64_VAL(0);
+    return BUCC_I64_VAL(ctx->vm->counters.elapsed_ms);
 }
 
 bucc_value_t bucc_host_bbs_send_msg(bucc_host_context_t* ctx, bucc_value_t* args, int argc) {
@@ -1120,11 +1214,28 @@ bucc_value_t bucc_host_dispatch(bucc_vm_t* vm, const char* ns, const char* fn,
         snprintf(msg, sizeof(msg), "Unknown host function: %s.%s", ns, fn);
         return bucc_make_error(msg);
     }
+
+    if (func->capability) {
+        uint64_t cap = capability_from_string(func->capability);
+        if (cap && !(ctx->allowed_capabilities & cap)) {
+            char msg[256];
+            snprintf(msg, sizeof(msg), "Capability denied: %s.%s requires %s",
+                     ns, fn, func->capability);
+            return bucc_make_error(msg);
+        }
+    }
     
     if (argc < func->min_args) {
         char msg[256];
         snprintf(msg, sizeof(msg), "%s.%s requires at least %d arguments", 
                  ns, fn, func->min_args);
+        return bucc_make_error(msg);
+    }
+
+    if (func->max_args >= 0 && argc > func->max_args) {
+        char msg[256];
+        snprintf(msg, sizeof(msg), "%s.%s accepts at most %d arguments",
+                 ns, fn, func->max_args);
         return bucc_make_error(msg);
     }
     
@@ -1133,17 +1244,23 @@ bucc_value_t bucc_host_dispatch(bucc_vm_t* vm, const char* ns, const char* fn,
         if (strcasecmp_local(fn, "PRINTLN") == 0) return bucc_host_term_println(ctx, args, argc);
         if (strcasecmp_local(fn, "CLS") == 0) return bucc_host_term_cls(ctx, args, argc);
         if (strcasecmp_local(fn, "COLOR") == 0) return bucc_host_term_color(ctx, args, argc);
+        if (strcasecmp_local(fn, "GOTOXY") == 0) return bucc_host_term_gotoxy(ctx, args, argc);
         if (strcasecmp_local(fn, "GETKEY") == 0) return bucc_host_term_getkey(ctx, args, argc);
         if (strcasecmp_local(fn, "INPUT") == 0) return bucc_host_term_input(ctx, args, argc);
+        if (strcasecmp_local(fn, "INPUT_PASSWORD") == 0) return bucc_host_term_input_password(ctx, args, argc);
+        if (strcasecmp_local(fn, "PAUSE") == 0) return bucc_host_term_pause(ctx, args, argc);
         if (strcasecmp_local(fn, "WIDTH") == 0) return bucc_host_term_width(ctx, args, argc);
         if (strcasecmp_local(fn, "HEIGHT") == 0) return bucc_host_term_height(ctx, args, argc);
+        if (strcasecmp_local(fn, "SUPPORTS_ANSI") == 0) return bucc_host_term_supports_ansi(ctx, args, argc);
     }
     else if (strcasecmp_local(ns, "USER") == 0) {
         if (strcasecmp_local(fn, "NAME") == 0) return bucc_host_user_name(ctx, args, argc);
         if (strcasecmp_local(fn, "ALIAS") == 0) return bucc_host_user_alias(ctx, args, argc);
         if (strcasecmp_local(fn, "ID") == 0) return bucc_host_user_id(ctx, args, argc);
         if (strcasecmp_local(fn, "SECURITY") == 0) return bucc_host_user_security(ctx, args, argc);
-        if (strcasecmp_local(fn, "TIMELEFT") == 0) return bucc_host_user_time_left(ctx, args, argc);
+        if (strcasecmp_local(fn, "TIMELEFT") == 0 ||
+            strcasecmp_local(fn, "TIME_LEFT") == 0 ||
+            strcasecmp_local(fn, "TIME_REMAINING") == 0) return bucc_host_user_time_left(ctx, args, argc);
     }
     else if (strcasecmp_local(ns, "DATA") == 0) {
         if (strcasecmp_local(fn, "INSERT") == 0) return bucc_host_data_insert(ctx, args, argc);
@@ -1186,6 +1303,8 @@ bucc_value_t bucc_host_dispatch(bucc_vm_t* vm, const char* ns, const char* fn,
     else if (strcasecmp_local(ns, "SESSION") == 0) {
         if (strcasecmp_local(fn, "GET") == 0) return bucc_host_session_get(ctx, args, argc);
         if (strcasecmp_local(fn, "SET") == 0) return bucc_host_session_set(ctx, args, argc);
+        if (strcasecmp_local(fn, "NODE") == 0) return bucc_host_session_node(ctx, args, argc);
+        if (strcasecmp_local(fn, "ELAPSED_MS") == 0) return bucc_host_session_elapsed_ms(ctx, args, argc);
     }
     else if (strcasecmp_local(ns, "BBS") == 0) {
         if (strcasecmp_local(fn, "SENDMSG") == 0) return bucc_host_bbs_send_msg(ctx, args, argc);

@@ -19,6 +19,8 @@
   if (!(cond)) { fprintf(stderr, "FAIL: %s\n", msg); return 1; } \
 } while(0)
 
+static const char* g_hello_plugin_path = "build/plugins/hello.so";
+
 /* Test ABI constants */
 static int test_abi_constants(void) {
   TEST_ASSERT(BBS_PLUGIN_ABI_VERSION == 0x00010000u, "ABI version should be 1.0");
@@ -187,8 +189,7 @@ static int test_registry_list(void) {
 
 /* Test loading actual plugin */
 static int test_plugin_load(void) {
-  /* Check if hello.so exists in build/plugins */
-  const char* plugin_path = "build/plugins/hello.so";
+  const char* plugin_path = g_hello_plugin_path;
   
   if (access(plugin_path, F_OK) != 0) {
     printf("  (skipping - hello.so not built yet)\n");
@@ -226,7 +227,7 @@ static int test_plugin_load(void) {
 
 /* Test ABI version mismatch */
 static int test_abi_mismatch(void) {
-  const char* plugin_path = "build/plugins/hello.so";
+  const char* plugin_path = g_hello_plugin_path;
   
   if (access(plugin_path, F_OK) != 0) {
     printf("  (skipping - hello.so not built yet)\n");
@@ -314,9 +315,18 @@ static int test_loader_init(void) {
   return 0;
 }
 
-int main(void) {
+int main(int argc, char** argv) {
   int failures = 0;
   int total = 0;
+
+  if (argc > 1 && argv[1][0]) {
+    g_hello_plugin_path = argv[1];
+  } else {
+    const char* env_path = getenv("MUTINEER_HELLO_PLUGIN");
+    if (env_path && env_path[0]) {
+      g_hello_plugin_path = env_path;
+    }
+  }
   
   printf("Running plugin subsystem tests...\n\n");
   

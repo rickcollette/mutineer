@@ -8,6 +8,7 @@
 #include <sys/select.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <dirent.h>
 
 void str_trim(char* s) {
   if (!s) return;
@@ -129,4 +130,62 @@ bool file_copy(const char* src, const char* dst, int* size_out) {
   close(out);
   if (size_out) *size_out = total;
   return r == 0;
+}
+
+bool bbs_safe_identifier(const char* value, size_t max_len) {
+  if (!value || !value[0]) return false;
+  size_t len = strlen(value);
+  if (len == 0 || len > max_len) return false;
+  if (!strcmp(value, ".") || !strcmp(value, "..")) return false;
+  for (size_t i = 0; i < len; i++) {
+    unsigned char c = (unsigned char)value[i];
+    if (c == '/' || c == '\\') return false;
+    if (!(isalnum(c) || c == '.' || c == '_' || c == '-')) return false;
+  }
+  return true;
+}
+
+bool bbs_safe_filename(const char* value, size_t max_len) {
+  if (!bbs_safe_identifier(value, max_len)) return false;
+  if (strchr(value, '/')) return false;
+  if (strchr(value, '\\')) return false;
+  return true;
+}
+
+bool bbs_mkdir_p(const char* path, int mode) {
+  if (!path || !path[0]) return false;
+  char tmp[1024];
+  snprintf(tmp, sizeof(tmp), "%s", path);
+  size_t len = strlen(tmp);
+  if (len == 0) return false;
+  if (tmp[len - 1] == '/') tmp[len - 1] = '\0';
+
+  for (char* p = tmp + 1; *p; p++) {
+    if (*p != '/') continue;
+    *p = '\0';
+    if (mkdir(tmp, (mode_t)mode) != 0 && errno != EEXIST) return false;
+    *p = '/';
+  }
+  return mkdir(tmp, (mode_t)mode) == 0 || errno == EEXIST;
+}
+
+bool bbs_remove_tree(const char* path) {
+  struct stat st;
+  if (!path || !path[0]) return false;
+  if (lstat(path, &st) != 0) return errno == ENOENT;
+  if (S_ISDIR(st.st_mode)) {
+    DIR* d = opendir(path);
+    if (!d) return false;
+    bool ok = true;
+    struct dirent* ent;
+    while ((ent = readdir(d)) != NULL) {
+      if (!strcmp(ent->d_name, ".") || !strcmp(ent->d_name, "..")) continue;
+      char child[1024];
+      path_join(path, ent->d_name, child, sizeof(child));
+      if (!bbs_remove_tree(child)) ok = false;
+    }
+    closedir(d);
+    return rmdir(path) == 0 && ok;
+  }
+  return unlink(path) == 0;
 }

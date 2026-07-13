@@ -2,7 +2,7 @@
 
 # Doors and Scripting
 
-Mutineer BBS supports three extension mechanisms for interactive programs: native executable doors, DOSBox-hosted DOS doors, Buccaneer VM scripts, and loadable `.so` plugins.
+Mutineer BBS supports four extension mechanisms for interactive programs: native executable doors, DOSBox-hosted DOS doors, Buccaneer scripts, and loadable `.so` plugins.
 
 ## Door Types Comparison
 
@@ -19,12 +19,14 @@ Mutineer BBS supports three extension mechanisms for interactive programs: nativ
 
 Native doors are executables launched via `fork`/`exec` from `src/doors.c`.
 
+Native door commands are argv templates, not shell scripts. Mutineer parses quoted arguments and backslash escapes, then launches the child directly with `execvp()`. Shell metacharacters such as pipes, redirects, command substitution, `;`, `&&`, and `||` are rejected.
+
 ### Database Record (`doors` table)
 
 | Field | Purpose |
 |-------|---------|
 | `name` | Door display name |
-| `command` | Executable command line |
+| `command` | Executable argv template |
 | `dropfile` | Dropfile format (DOOR.SYS, DORINFO1.DEF) |
 | `workdir` | Working directory |
 | `acs` | Access control |
@@ -85,7 +87,7 @@ Flat JSON in door directory (see `doors/testdoor/testdoor.json`):
 
 ## Buccaneer Scripting
 
-Buccaneer is an embedded Pascal-like language compiled to bytecode and executed in-process. Sources in `src/buccaneer/`.
+Buccaneer is Mutineer's interpreted language for BBS addons, games, and extensions. Source modules compile to bytecode and execute in-process through the Buccaneer runtime in `src/buccaneer/`.
 
 ### Toolchain
 
@@ -96,7 +98,7 @@ Buccaneer is an embedded Pascal-like language compiled to bytecode and executed 
 | `bucc-formatter` | Source formatting |
 | `bucc-simulator` | Standalone VM testing |
 
-Build from `src/buccaneer/Makefile` or integrate via CMake subproject.
+Build with the top-level CMake project. The standalone `src/buccaneer/Makefile` remains useful for focused language work.
 
 ### Example Scripts
 
@@ -106,16 +108,18 @@ Build from `src/buccaneer/Makefile` or integrate via CMake subproject.
 | `examples/guess.bucc` | Number guessing game |
 | `examples/scoreboard.bucc` | Score tracking demo |
 
-### Integration Status
+### BBS Launch
 
-Buccaneer VM, compiler, and host bridge are implemented but **not fully wired into the main BBS door launcher**. Track open work on [GitHub (label: buccaneer)](https://github.com/rickcollette/mutineer/issues?q=label%3Abuccaneer):
+Door records can use `runner=bucc`. The door's `manifest` field is treated as the Buccaneer door manifest path, and the BBS binds session, terminal, user, and BBS host APIs before running the package. Manifest capabilities are enforced at host dispatch time.
+
+Known remaining Buccaneer runtime work:
 
 - `DOOR.CHAIN` sets wrong VM status (should be `VM_CHAIN`)
 - `DOOR.EXIT` discards exit code
 - `OP_DISPATCH_CALL` emits incorrect proc IDs
 - Several VM edge cases (array allocation, stack consistency)
 
-**Current recommendation:** Use Buccaneer via `bucc-simulator` for development. Production doors should use native or DOSBox runners until integration gaps are closed.
+Use `bucc-simulator` during development, then register the package as a `runner=bucc` door for BBS launch testing.
 
 See the [Buccaneer Programmer's Guide](buccaneer/programmers-guide.md) and [Buccaneer hub](buccaneer/index.md).
 

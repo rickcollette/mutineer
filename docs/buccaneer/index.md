@@ -1,6 +1,6 @@
 # Buccaneer
 
-**Buccaneer** is Mutineer's embedded language for native BBS doors — structured BASIC-like syntax, compile-to-bytecode, run inside the BBS process with capability-gated host APIs.
+**Buccaneer** is Mutineer's interpreted language for BBS addons, games, and extensions — structured BASIC-like syntax, compile-to-bytecode, run inside the BBS process with capability-gated host APIs.
 
 ```
 .bucc source  →  bucc compiler  →  .bc module  →  VM + host bridge  →  caller session
@@ -24,7 +24,7 @@
 
 ## Implementation status
 
-Buccaneer is under active development. The compiler and VM in `src/buccaneer/` are usable standalone; full BBS launch via `runner=bucc` and some host functions are still being wired (track [GitHub issues](https://github.com/rickcollette/mutineer/issues?q=label%3Abuccaneer)).
+Buccaneer is under active development. The compiler, runtime, host bridge, and BBS door launch path are built by the top-level CMake project; some host functions and runtime semantics still have open follow-up work (track [GitHub issues](https://github.com/rickcollette/mutineer/issues?q=label%3Abuccaneer)).
 
 Always test doors with `bucc-simulator` before deploying to a live BBS.
 

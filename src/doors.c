@@ -1,6 +1,8 @@
 #include "bbs_doors.h"
 #include "bbs_util.h"
+#include "bbs_process.h"
 #include "bbs_log.h"
+#include "include/bucc_bbs.h"
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <sys/types.h>
@@ -17,6 +19,28 @@
 
 static bool ensure_dir(const char* path) {
   return mkdir(path, 0755) == 0 || errno == EEXIST;
+}
+
+static bool remove_tree_recursive(const char* path) {
+  struct stat st;
+  if (lstat(path, &st) != 0) return errno == ENOENT;
+
+  if (S_ISDIR(st.st_mode)) {
+    DIR* d = opendir(path);
+    if (!d) return false;
+    bool ok = true;
+    struct dirent* ent;
+    while ((ent = readdir(d)) != NULL) {
+      if (!strcmp(ent->d_name, ".") || !strcmp(ent->d_name, "..")) continue;
+      char child[1024];
+      snprintf(child, sizeof(child), "%s/%s", path, ent->d_name);
+      if (!remove_tree_recursive(child)) ok = false;
+    }
+    closedir(d);
+    return rmdir(path) == 0 && ok;
+  }
+
+  return unlink(path) == 0;
 }
 
 /* =========================================================================
@@ -283,10 +307,8 @@ void dosbox_cleanup_runtime(const char* runtime_root) {
     log_warn("dosbox cleanup: refusing relative path: %s", runtime_root);
     return;
   }
-  char cmd[1024];
-  snprintf(cmd, sizeof(cmd), "rm -rf '%s'", runtime_root);
-  if (system(cmd) != 0)
-    log_warn("dosbox cleanup: rm -rf failed for %s", runtime_root);
+  if (!remove_tree_recursive(runtime_root))
+    log_warn("dosbox cleanup: recursive remove failed for %s: %s", runtime_root, strerror(errno));
   else
     log_info("dosbox cleanup: removed runtime tree %s", runtime_root);
 }
@@ -637,7 +659,7 @@ static bool write_sfdoors(Session* s, const char* dir) {
 }
 
 /* =========================================================================
- * Native door launcher (original behavior)
+ * Native door launcher
  * ========================================================================= */
 
 static bool door_launch_native(Session* s, const DbDoor* door) {
@@ -654,16 +676,27 @@ static bool door_launch_native(Session* s, const DbDoor* door) {
   write_callinfo(s, dir);
   write_sfdoors(s, dir);
 
-  char cmd[1024];
-  if (door->workdir[0])
-    snprintf(cmd, sizeof(cmd), "cd '%s' && %s", door->workdir, door->command);
-  else
-    snprintf(cmd, sizeof(cmd), "%s", door->command);
+  char errbuf[256];
+  char** argv = NULL;
+  if (!bbs_argv_parse_template(door->command, NULL, &argv, errbuf, sizeof(errbuf))) {
+    log_error("native door %s: invalid command template: %s", door->name, errbuf);
+    send_str(s, "\r\nDoor command is invalid. Contact the sysop.\r\n");
+    return false;
+  }
 
-  log_info("launching native door %s: %s", door->name, cmd);
-  int rc = system(cmd);
-  if (rc != 0) log_warn("native door %s exited with code %d", door->name, rc);
-  return rc == 0;
+  char activity[128];
+  snprintf(activity, sizeof(activity), "door:%s", door->name);
+  if (s->db) db_node_upsert(s->db, s->node_num, s->user.id, "online", activity, s->ip);
+
+  log_info("launching native door %s: %s", door->name, argv[0]);
+  int timeout = door->timeout_sec > 0 ? door->timeout_sec : s->cfg.door_default_timeout_sec;
+  BbsProcessResult pres;
+  bool ok = bbs_exec_argv(argv, door->name, door->workdir,
+                          -1, -1, -1, timeout, &pres, errbuf, sizeof(errbuf));
+  if (!ok && errbuf[0]) log_error("native door %s: %s", door->name, errbuf);
+  bbs_argv_free(argv);
+  if (s->db) db_node_upsert(s->db, s->node_num, s->user.id, "online", "menu", s->ip);
+  return ok;
 }
 
 /* =========================================================================
@@ -867,6 +900,234 @@ static bool door_launch_dosbox(Session* s, const DbDoor* door) {
 }
 
 /* =========================================================================
+ * Buccaneer door launcher
+ * ========================================================================= */
+
+static void bucc_term_print_cb(void* ctx, const char* text) {
+  Session* s = (Session*)ctx;
+  if (s && text) send_str(s, text);
+}
+
+static void bucc_term_println_cb(void* ctx, const char* text) {
+  Session* s = (Session*)ctx;
+  if (!s) return;
+  if (text) send_str(s, text);
+  send_str(s, "\r\n");
+}
+
+static void bucc_term_cls_cb(void* ctx) {
+  Session* s = (Session*)ctx;
+  if (s) send_str(s, "\x1b[2J\x1b[H");
+}
+
+static void bucc_term_color_cb(void* ctx, int fg, int bg) {
+  Session* s = (Session*)ctx;
+  if (!s) return;
+  char buf[64];
+  int fg_code = 30 + (fg % 8);
+  int bg_code = 40 + (bg % 8);
+  snprintf(buf, sizeof(buf), "\x1b[%d;%dm", fg_code, bg_code);
+  send_str(s, buf);
+}
+
+static void bucc_term_gotoxy_cb(void* ctx, int x, int y) {
+  Session* s = (Session*)ctx;
+  if (!s) return;
+  char buf[64];
+  if (x < 1) x = 1;
+  if (y < 1) y = 1;
+  snprintf(buf, sizeof(buf), "\x1b[%d;%dH", y, x);
+  send_str(s, buf);
+}
+
+static char* bucc_term_getkey_cb(void* ctx) {
+  Session* s = (Session*)ctx;
+  uint8_t ch = 0;
+  if (!s || session_readline(s, &ch, sizeof(ch), 300) <= 0) return strdup("");
+  char out[2] = { (char)ch, '\0' };
+  return strdup(out);
+}
+
+static char* bucc_term_input_cb(void* ctx, const char* prompt, int maxlen) {
+  Session* s = (Session*)ctx;
+  if (!s) return strdup("");
+  if (maxlen <= 0 || maxlen > 512) maxlen = 512;
+  char* out = calloc((size_t)maxlen + 1, 1);
+  if (!out) return NULL;
+  if (prompt_line(s, prompt ? prompt : "", out, (size_t)maxlen + 1) <= 0) out[0] = '\0';
+  return out;
+}
+
+static char* bucc_term_input_password_cb(void* ctx, const char* prompt) {
+  return bucc_term_input_cb(ctx, prompt, 128);
+}
+
+static void bucc_term_pause_cb(void* ctx, const char* prompt) {
+  Session* s = (Session*)ctx;
+  if (!s) return;
+  char line[8];
+  prompt_line(s, prompt ? prompt : "\r\nPress Enter to continue...", line, sizeof(line));
+}
+
+static int bucc_term_width_cb(void* ctx) {
+  Session* s = (Session*)ctx;
+  return (s && s->tn.cols > 0) ? s->tn.cols : 80;
+}
+
+static int bucc_term_height_cb(void* ctx) {
+  Session* s = (Session*)ctx;
+  return (s && s->tn.rows > 0) ? s->tn.rows : 24;
+}
+
+static bool bucc_term_supports_ansi_cb(void* ctx) {
+  Session* s = (Session*)ctx;
+  return s ? s->ansi != 0 : true;
+}
+
+static const char* bucc_user_name_cb(void* ctx) {
+  Session* s = (Session*)ctx;
+  return s ? s->user.real_name : "";
+}
+
+static const char* bucc_user_alias_cb(void* ctx) {
+  Session* s = (Session*)ctx;
+  return s ? s->user.handle : "";
+}
+
+static int64_t bucc_user_id_cb(void* ctx) {
+  Session* s = (Session*)ctx;
+  return s ? s->user.id : 0;
+}
+
+static int bucc_user_security_cb(void* ctx) {
+  Session* s = (Session*)ctx;
+  return s ? s->user.level : 0;
+}
+
+static int bucc_user_time_left_cb(void* ctx) {
+  Session* s = (Session*)ctx;
+  return s ? s->time_left_min : 0;
+}
+
+static int bucc_user_flags_cb(void* ctx) {
+  Session* s = (Session*)ctx;
+  return s ? (int)s->user.flags : 0;
+}
+
+static int bucc_bbs_node_cb(void* ctx) {
+  Session* s = (Session*)ctx;
+  return s ? s->node_num : 1;
+}
+
+static bool bucc_bbs_send_msg_cb(void* ctx, int node, const char* msg) {
+  (void)node;
+  Session* s = (Session*)ctx;
+  if (!s || !msg) return false;
+  send_str(s, msg);
+  return true;
+}
+
+static bucc_array_t* bucc_bbs_online_cb(void* ctx) {
+  (void)ctx;
+  return bucc_array_new(1);
+}
+
+static bool door_launch_bucc(Session* s, const DbDoor* door) {
+  if (!door->manifest[0]) {
+    log_error("door %s: no Buccaneer manifest path set", door->name);
+    send_str(s, "\r\nDoor manifest is missing. Contact the sysop.\r\n");
+    return false;
+  }
+
+  bucc_door_runner_t* runner = bucc_door_runner_new();
+  if (!runner) {
+    send_str(s, "\r\nUnable to start Buccaneer door.\r\n");
+    return false;
+  }
+
+  bucc_door_status_t load_status = bucc_door_load(runner, door->manifest);
+  if (load_status != DOOR_OK) {
+    log_error("door %s: Buccaneer load failed: %s", door->name, bucc_door_status_string(load_status));
+    send_str(s, "\r\nDoor configuration error. Contact the sysop.\r\n");
+    bucc_door_runner_free(runner);
+    return false;
+  }
+
+  bucc_session_info_t info = {
+    .user_id = s->user.id,
+    .user_name = s->user.real_name[0] ? s->user.real_name : s->user.handle,
+    .user_alias = s->user.handle,
+    .user_security = s->user.level,
+    .time_remaining = s->time_left_min,
+    .node_number = s->node_num,
+    .ansi_enabled = s->ansi != 0,
+    .term_width = s->tn.cols > 0 ? s->tn.cols : 80,
+    .term_height = s->tn.rows > 0 ? s->tn.rows : 24
+  };
+  bucc_door_set_session(runner, &info);
+
+  bucc_term_api_t term_api = {
+    .print = bucc_term_print_cb,
+    .println = bucc_term_println_cb,
+    .cls = bucc_term_cls_cb,
+    .color = bucc_term_color_cb,
+    .gotoxy = bucc_term_gotoxy_cb,
+    .getkey = bucc_term_getkey_cb,
+    .input = bucc_term_input_cb,
+    .input_password = bucc_term_input_password_cb,
+    .pause = bucc_term_pause_cb,
+    .get_width = bucc_term_width_cb,
+    .get_height = bucc_term_height_cb,
+    .supports_ansi = bucc_term_supports_ansi_cb
+  };
+  bucc_user_api_t user_api = {
+    .get_name = bucc_user_name_cb,
+    .get_alias = bucc_user_alias_cb,
+    .get_id = bucc_user_id_cb,
+    .get_security = bucc_user_security_cb,
+    .get_time_left = bucc_user_time_left_cb,
+    .get_flags = bucc_user_flags_cb
+  };
+  bucc_bbs_api_t bbs_api = {
+    .send_msg = bucc_bbs_send_msg_cb,
+    .get_online = bucc_bbs_online_cb,
+    .get_node = bucc_bbs_node_cb
+  };
+
+  bucc_host_set_term_api(runner->host_ctx, &term_api, s);
+  bucc_host_set_user_api(runner->host_ctx, &user_api, s);
+  bucc_host_set_bbs_api(runner->host_ctx, &bbs_api, s);
+
+  char activity[128];
+  snprintf(activity, sizeof(activity), "door:%s", door->name);
+  if (s->db) db_node_upsert(s->db, s->node_num, s->user.id, "online", activity, s->ip);
+
+  bucc_door_result_t result = bucc_door_run(runner);
+  bool ok = result.status == DOOR_OK || result.status == DOOR_CHAIN_REQUESTED;
+
+  if (result.status == DOOR_CHAIN_REQUESTED) {
+    log_info("door %s: Buccaneer chain requested: %s", door->name,
+             result.chain_target ? result.chain_target : "(none)");
+  } else if (result.status != DOOR_OK) {
+    log_error("door %s: Buccaneer error: %s%s%s", door->name,
+              bucc_door_status_string(result.status),
+              result.error_message ? ": " : "",
+              result.error_message ? result.error_message : "");
+    send_str(s, "\r\nBuccaneer door error: ");
+    send_str(s, result.error_message ? result.error_message : bucc_door_status_string(result.status));
+    send_str(s, "\r\n");
+  }
+
+  free(result.error_message);
+  free(result.chain_target);
+  bucc_value_release(&result.chain_args);
+  bucc_door_runner_free(runner);
+
+  if (s->db) db_node_upsert(s->db, s->node_num, s->user.id, "online", "menu", s->ip);
+  return ok;
+}
+
+/* =========================================================================
  * Dispatcher
  * ========================================================================= */
 
@@ -882,6 +1143,9 @@ bool door_launch(Session* s, const DbDoor* door) {
   if (strcasecmp(door->runner, "dosbox") == 0) {
     return door_launch_dosbox(s, door);
   }
+  if (strcasecmp(door->runner, "bucc") == 0) {
+    return door_launch_bucc(s, door);
+  }
 
   /* Default: native runner */
   if (!door->command[0]) {
@@ -895,69 +1159,27 @@ bool protocol_launch(Session* s, const DbProtocol* proto, const char* filepath, 
   if (!s || !proto || !filepath) return false;
   
   log_info("launch protocol %s (%s): %s", proto->name, direction, filepath);
-  
-  pid_t pid = fork();
-  if (pid < 0) {
-    log_error("fork failed for protocol");
+
+  char errbuf[256];
+  char** argv = NULL;
+  if (!bbs_argv_parse_template(proto->command, filepath, &argv, errbuf, sizeof(errbuf))) {
+    log_error("protocol %s: invalid command template: %s", proto->name, errbuf);
     return false;
   }
-  
-  if (pid == 0) {
-    /* Child process - redirect socket to stdin/stdout */
-    dup2(s->fd, STDIN_FILENO);
-    dup2(s->fd, STDOUT_FILENO);
-    dup2(s->fd, STDERR_FILENO);
-    
-    /* Close original fd */
-    if (s->fd > STDERR_FILENO) close(s->fd);
-    
-    /* Build command with filepath substitution */
-    char cmd[1024];
-    const char* base_cmd = proto->command;
-    
-    /* Check if command contains %f placeholder for filepath */
-    if (strstr(base_cmd, "%f")) {
-      /* Replace %f with filepath */
-      char* p = cmd;
-      char* end = cmd + sizeof(cmd) - 1;
-      while (*base_cmd && p < end) {
-        if (base_cmd[0] == '%' && base_cmd[1] == 'f') {
-          size_t flen = strlen(filepath);
-          if (p + flen < end) {
-            memcpy(p, filepath, flen);
-            p += flen;
-          }
-          base_cmd += 2;
-        } else {
-          *p++ = *base_cmd++;
-        }
-      }
-      *p = '\0';
-    } else {
-      /* Append filepath as argument */
-      snprintf(cmd, sizeof(cmd), "%s '%s'", proto->command, filepath);
-    }
-    
-    /* Execute via shell */
-    execl("/bin/sh", "sh", "-c", cmd, (char*)NULL);
-    _exit(127);
-  }
-  
-  /* Parent - wait for child */
-  int status;
-  waitpid(pid, &status, 0);
-  
-  if (WIFEXITED(status)) {
-    int rc = WEXITSTATUS(status);
-    if (rc == 0) {
-      log_info("protocol %s completed successfully", proto->name);
-      return true;
-    } else {
-      log_error("protocol %s exited with code %d", proto->name, rc);
-      return false;
-    }
-  }
-  
-  log_error("protocol %s terminated abnormally", proto->name);
-  return false;
+
+  char activity[128];
+  snprintf(activity, sizeof(activity), "protocol:%s:%s", proto->name, direction ? direction : "");
+  if (s->db) db_node_upsert(s->db, s->node_num, s->user.id, "online", activity, s->ip);
+
+  int timeout = s->cfg.protocol_timeout_sec > 0
+              ? s->cfg.protocol_timeout_sec
+              : s->cfg.door_default_timeout_sec;
+  BbsProcessResult pres;
+  bool ok = bbs_exec_argv(argv, proto->name, NULL,
+                          s->fd, s->fd, s->fd, timeout, &pres,
+                          errbuf, sizeof(errbuf));
+  if (!ok && errbuf[0]) log_error("protocol %s: %s", proto->name, errbuf);
+  bbs_argv_free(argv);
+  if (s->db) db_node_upsert(s->db, s->node_num, s->user.id, "online", "menu", s->ip);
+  return ok;
 }

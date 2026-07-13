@@ -1,3 +1,4 @@
+#define _XOPEN_SOURCE 700
 /*
  * mutineer-qwkgen - Generate QWK mail packets for offline reading
  *
@@ -33,6 +34,7 @@
 #include "bbs_config.h"
 #include "bbs_acs.h"
 #include "bbs_util.h"
+#include "bbs_archive.h"
 
 #define QWK_BLOCK_SIZE 128
 #define DEFAULT_MAX_MSGS 500
@@ -413,8 +415,15 @@ int main(int argc, char **argv)
     }
 
     char temp_dir[512];
-    snprintf(temp_dir, sizeof(temp_dir), "/tmp/qwk_%d", (int)getpid());
-    mkdir(temp_dir, 0755);
+    const char* tmpbase = getenv("TMPDIR");
+    if (!tmpbase || !tmpbase[0]) tmpbase = cfg.data_path[0] ? cfg.data_path : "data";
+    snprintf(temp_dir, sizeof(temp_dir), "%s/qwkgen_XXXXXX", tmpbase);
+    if (!mkdtemp(temp_dir))
+    {
+        fprintf(stderr, "Failed to create temp directory\n");
+        db_close(db);
+        return 3;
+    }
 
     char control_path[512], messages_path[512], door_path[512];
     snprintf(control_path, sizeof(control_path), "%s/CONTROL.DAT", temp_dir);
@@ -453,22 +462,15 @@ int main(int argc, char **argv)
         snprintf(qwk_path, sizeof(qwk_path), "%s.QWK", user.handle);
     }
 
-    char cmd[1024];
-    snprintf(cmd, sizeof(cmd), "cd '%s' && zip -q '%s' CONTROL.DAT MESSAGES.DAT DOOR.ID 2>/dev/null",
-             temp_dir, qwk_path);
-    int rc = system(cmd);
-
-    unlink(control_path);
-    unlink(messages_path);
-    unlink(door_path);
-    rmdir(temp_dir);
-
-    if (rc != 0)
+    char errbuf[256];
+    if (!bbs_archive_create_zip_from_dir(temp_dir, qwk_path, errbuf, sizeof(errbuf)))
     {
-        fprintf(stderr, "Failed to create QWK archive\n");
+        fprintf(stderr, "Failed to create QWK archive: %s\n", errbuf);
+        bbs_remove_tree(temp_dir);
         db_close(db);
         return 3;
     }
+    bbs_remove_tree(temp_dir);
 
     struct stat st;
     if (stat(qwk_path, &st) == 0)

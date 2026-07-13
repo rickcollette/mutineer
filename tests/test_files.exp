@@ -18,28 +18,13 @@ run_test "access_files" {
     expect {
         -re "File Areas:|Choose area|Area|Files" { }
         "restricted" { 
-            send "Q\r"
-            expect {
-                eof { }
-                timeout { }
-            }
+            safe_disconnect
             return 0 
         }
         timeout { return 0 }
     }
     
-    # Return to main menu
-    send "Q\r"
-    expect {
-        "Selection:" { }
-        timeout { }
-    }
-    
-    send "Q\r"
-    expect {
-        eof { }
-        timeout { }
-    }
+    safe_disconnect
     return 1
 }
 
@@ -55,16 +40,7 @@ run_test "list_file_areas" {
         timeout { return 0 }
     }
     
-    send "Q\r"
-    expect {
-        "Selection:" { }
-        timeout { }
-    }
-    send "Q\r"
-    expect {
-        eof { }
-        timeout { }
-    }
+    safe_disconnect
     return 1
 }
 
@@ -88,16 +64,7 @@ run_test "select_file_area" {
         timeout { return 0 }
     }
     
-    send "Q\r"
-    expect {
-        "Selection:" { }
-        timeout { }
-    }
-    send "Q\r"
-    expect {
-        eof { }
-        timeout { }
-    }
+    safe_disconnect
     return 1
 }
 
@@ -121,16 +88,7 @@ run_test "view_file_list" {
         timeout { return 0 }
     }
     
-    send "Q\r"
-    expect {
-        "Selection:" { }
-        timeout { }
-    }
-    send "Q\r"
-    expect {
-        eof { }
-        timeout { }
-    }
+    safe_disconnect
     return 1
 }
 
@@ -161,16 +119,7 @@ run_test "batch_queue" {
         timeout { }
     }
     
-    send "Q\r"
-    expect {
-        "Selection:" { }
-        timeout { }
-    }
-    send "Q\r"
-    expect {
-        eof { }
-        timeout { }
-    }
+    safe_disconnect
     return 1
 }
 

@@ -63,13 +63,9 @@ Capabilities in `door.json` must be a superset of `CAPABILITY` lines in source m
 
 ## Registering on Mutineer
 
-Until `runner=bucc` is wired in `src/doors.c` (see GitHub issue WIRE-3), sysops should:
+Register the package as a door record with `runner=bucc` and set the record's `manifest` field to the Buccaneer `door.json` path. At launch, Mutineer loads that manifest, grants only the declared capabilities, binds the caller session context, and runs the package through the Buccaneer runtime.
 
-- Track BUCC integration issues on the repo
-- Use the simulator for author acceptance testing
-- Plan door records with `runner=bucc` for when launch path lands
-
-Native and DOSBox doors remain the production runners today — see [Doors and Scripting](../doors-and-scripting.md).
+Use the simulator for author acceptance testing before installing the package on a live BBS. See [Doors and Scripting](../doors-and-scripting.md).
 
 ## Multi-program applications
 

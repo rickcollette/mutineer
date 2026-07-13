@@ -31,19 +31,13 @@ run_test "access_timebank" {
     expect {
         "Selection:" { }
         -re "Deposit|Withdraw" {
-            send "0\r"
+            send "Q\r"
             exp_continue
         }
         timeout { }
     }
-    
-    expect {
-        "Selection:" { }
-        timeout { }
-    }
-    
-    send "Q\r"
-    expect eof
+
+    safe_disconnect
     return 1
 }
 
@@ -71,19 +65,13 @@ run_test "check_balance" {
     expect {
         "Selection:" { }
         -re "Deposit|Withdraw" {
-            send "0\r"
+            send "Q\r"
             exp_continue
         }
         timeout { }
     }
-    
-    expect {
-        "Selection:" { }
-        timeout { }
-    }
-    
-    send "Q\r"
-    expect eof
+
+    safe_disconnect
     return 1
 }
 
@@ -115,19 +103,7 @@ run_test "deposit_time" {
         timeout { return 0 }
     }
     
-    # May already be at menu or need to quit
-    expect {
-        "Selection:" { }
-        timeout { }
-    }
-    
-    send "Q\r"
-    expect {
-        eof { }
-        timeout { }
-    }
-    catch { close }
-    catch { wait }
+    safe_disconnect
     return 1
 }
 
@@ -159,19 +135,7 @@ run_test "withdraw_time" {
         timeout { return 0 }
     }
     
-    # May already be at menu or need to quit
-    expect {
-        "Selection:" { }
-        timeout { }
-    }
-    
-    send "Q\r"
-    expect {
-        eof { }
-        timeout { }
-    }
-    catch { close }
-    catch { wait }
+    safe_disconnect
     return 1
 }
 

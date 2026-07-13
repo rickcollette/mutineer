@@ -85,6 +85,13 @@ bool startup_sanity_check(const BbsConfig* cfg) {
     missing_count++;
     ok = false;
   }
+
+  if (!file_exists("sql/plank_schema.sql")) {
+    log_error("Missing file: sql/plank_schema.sql");
+    fprintf(stderr, "  [MISSING] sql/plank_schema.sql\n");
+    missing_count++;
+    ok = false;
+  }
   
   /* Check main menu exists */
   if (!file_exists(cfg->menu_main)) {
@@ -129,6 +136,13 @@ bool startup_init_database(BbsDb* db, const BbsConfig* cfg) {
     log_error("No sysop user found in database");
     fprintf(stderr, "  [MISSING] Sysop user not found\n");
     fprintf(stderr, "\nRun 'mutineer-initbbs' to create the sysop user.\n");
+    return false;
+  }
+
+  if (!db_exec(db, "SELECT 1 FROM plank_node_identity LIMIT 1")) {
+    log_error("PLANK schema not applied");
+    fprintf(stderr, "  [MISSING] PLANK database schema not initialized\n");
+    fprintf(stderr, "\nRun 'mutineer-initbbs' to initialize the database.\n");
     return false;
   }
   

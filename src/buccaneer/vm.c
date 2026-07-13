@@ -705,8 +705,12 @@ bucc_vm_status_t bucc_vm_step(bucc_vm_t* vm) {
             bucc_module_import_t* import = &vm->module->imports[import_id];
             
             if (vm->host_handler) {
+                if (argc > 16) {
+                    vm_error(vm, VM_ERROR, "host call has too many arguments");
+                    break;
+                }
                 bucc_value_t args[16];
-                int actual_argc = argc < 16 ? argc : 16;
+                int actual_argc = argc;
                 
                 for (int i = actual_argc - 1; i >= 0; i--) {
                     args[i] = bucc_vm_pop(vm);
@@ -803,8 +807,13 @@ bucc_vm_status_t bucc_vm_step(bucc_vm_t* vm) {
         case OP_ARRAY_NEW: {
             uint16_t count = read_u16(vm);
             bucc_array_t* arr = bucc_array_new(count > 0 ? count : 8);
-            
-            bucc_value_t* items = malloc(count * sizeof(bucc_value_t));
+
+            bucc_value_t* items = count > 0 ? malloc(count * sizeof(bucc_value_t)) : NULL;
+            if (count > 0 && !items) {
+                bucc_array_release(arr);
+                vm_error(vm, VM_ERROR, "out of memory creating array");
+                break;
+            }
             for (int i = count - 1; i >= 0; i--) {
                 items[i] = bucc_vm_pop(vm);
             }
@@ -1073,7 +1082,7 @@ bucc_vm_status_t bucc_vm_step(bucc_vm_t* vm) {
             if (index >= 1 && index <= target_count) {
                 uint32_t proc_id = base_proc + (uint32_t)(index - 1);
                 if (proc_id < vm->module->proc_count) {
-                    bucc_module_proc_t* proc = &((bucc_module_t*)vm->module)->procedures[proc_id];
+                    bucc_module_proc_t* proc = &vm->module->procedures[proc_id];
                     if (vm->fp >= BUCC_FRAMES_MAX) {
                         vm_error(vm, VM_FRAME_OVERFLOW, "call stack overflow");
                         break;
@@ -1084,7 +1093,11 @@ bucc_vm_status_t bucc_vm_step(bucc_vm_t* vm) {
                     vm->frames[vm->fp].local_base = vm->local_count;
                     vm->fp++;
                     vm->ip = proc->code_offset;
+                } else {
+                    vm_error(vm, VM_ERROR, "dispatch target procedure out of range");
                 }
+            } else {
+                vm_error(vm, VM_ERROR, "invalid dispatch selector");
             }
             break;
         }

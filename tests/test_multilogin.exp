@@ -6,7 +6,7 @@ source [file dirname [info script]]/expect_helpers.exp
 set timeout 10
 
 # First, login with sysop
-spawn nc localhost 2929
+spawn nc $default_host $default_port
 expect "ANSI graphics"
 send "y\r"
 expect "Handle:"
@@ -19,7 +19,7 @@ expect "Menu"
 set session1 $spawn_id
 
 # Now try to login again with same user
-spawn nc localhost 2929
+spawn nc $default_host $default_port
 expect "ANSI graphics"
 send "y\r"
 expect "Handle:"

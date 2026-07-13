@@ -1,7 +1,9 @@
 #define _XOPEN_SOURCE 700
 #include "bbs_scheduler.h"
 #include "bbs_session.h"
+#include "bbs_acs.h"
 #include "bbs_log.h"
+#include "bbs_process.h"
 #include <pthread.h>
 #include <time.h>
 #include <string.h>
@@ -15,6 +17,8 @@ extern volatile sig_atomic_t g_stop;
 typedef struct {
   BbsConfig cfg;
   BbsDb* db;
+  int warned_ids[64];
+  char warned_next[64][32];
 } SchedCtx;
 
 static int parse_day_of_week(const char* day) {
@@ -108,13 +112,39 @@ static time_t parse_schedule(const char* sched, time_t now) {
 static void run_event(BbsDb* db, int id, const char* command, const char* name) {
   log_info("scheduler: running event %s", name ? name : "");
   if (command && command[0]) {
-    int rc = system(command);
-    if (rc != 0) log_warn("event %s exited with %d", name ? name : "", rc);
+    char errbuf[256] = {0};
+    char** argv = NULL;
+    if (!bbs_argv_parse_template(command, NULL, &argv, errbuf, sizeof(errbuf))) {
+      log_warn("event %s command rejected: %s", name ? name : "", errbuf);
+    } else {
+      BbsProcessResult result;
+      if (!bbs_exec_argv(argv, name ? name : "event", NULL, -1, -1, -1,
+                         0, &result, errbuf, sizeof(errbuf)) && errbuf[0]) {
+        log_warn("event %s failed: %s", name ? name : "", errbuf);
+      }
+      bbs_argv_free(argv);
+    }
   }
-  /* update last_run/next_run */
-  char sql[256];
-  snprintf(sql, sizeof(sql), "UPDATE events SET last_run=datetime('now'), next_run=NULL WHERE id=%d", id);
-  db_exec(db, sql);
+  db_event_mark_ran(db, id);
+}
+
+static bool warning_already_sent(SchedCtx* ctx, const DbEvent* ev) {
+  for (size_t i = 0; i < 64; i++) {
+    if (ctx->warned_ids[i] == ev->id && strcmp(ctx->warned_next[i], ev->next_run) == 0) return true;
+  }
+  return false;
+}
+
+static void warning_mark_sent(SchedCtx* ctx, const DbEvent* ev) {
+  size_t slot = 0;
+  for (size_t i = 0; i < 64; i++) {
+    if (ctx->warned_ids[i] == 0 || ctx->warned_ids[i] == ev->id) {
+      slot = i;
+      break;
+    }
+  }
+  ctx->warned_ids[slot] = ev->id;
+  snprintf(ctx->warned_next[slot], sizeof(ctx->warned_next[slot]), "%s", ev->next_run);
 }
 
 static void* sched_thread(void* arg) {
@@ -144,12 +174,13 @@ static void* sched_thread(void* arg) {
       /* Check for pre-event warning */
       if (evs[i].warning_min > 0) {
         double diff = difftime(next_ts, now);
-        if (diff > 0 && diff <= evs[i].warning_min * 60) {
+        if (diff > 0 && diff <= evs[i].warning_min * 60 && !warning_already_sent(ctx, &evs[i])) {
           char warn_msg[256];
           snprintf(warn_msg, sizeof(warn_msg), 
                    "\r\n*** Event '%s' will run in %d minute(s) ***\r\n",
                    evs[i].name, (int)(diff / 60));
           online_broadcast(warn_msg);
+          warning_mark_sent(ctx, &evs[i]);
         }
       }
       
@@ -176,26 +207,39 @@ void scheduler_start(const BbsConfig* cfg, BbsDb* db) {
   }
 }
 
-void scheduler_run_logon_events(BbsDb* db, int user_id, const char* handle) {
-  if (!db) return;
+void scheduler_run_logon_events(Session* s) {
+  if (!s || !s->db) return;
   DbEvent evs[32];
-  int count = db_events_list(db, evs, 32);
+  int count = db_events_list(s->db, evs, 32);
   for (int i = 0; i < count; i++) {
     if (!evs[i].enabled) continue;
-    if (strcmp(evs[i].event_type, "logon") != 0) continue;
+    bool is_logon = strcmp(evs[i].event_type, "logon") == 0;
+    bool is_permission = strcmp(evs[i].event_type, "permission") == 0;
+    if (!is_logon && !is_permission) continue;
+    if (is_permission && !acs_allows(s, evs[i].acs)) continue;
     
-    log_info("scheduler: running logon event %s for user %s", evs[i].name, handle ? handle : "");
+    log_info("scheduler: running %s event %s for user %s",
+             evs[i].event_type, evs[i].name, s->user.handle);
     if (evs[i].command[0]) {
-      /* Set environment variables for the command */
       char user_id_str[16], handle_str[64];
-      snprintf(user_id_str, sizeof(user_id_str), "%d", user_id);
-      snprintf(handle_str, sizeof(handle_str), "%s", handle ? handle : "");
+      snprintf(user_id_str, sizeof(user_id_str), "%d", s->user.id);
+      snprintf(handle_str, sizeof(handle_str), "%s", s->user.handle);
       setenv("BBS_USER_ID", user_id_str, 1);
       setenv("BBS_USER_HANDLE", handle_str, 1);
-      
-      int rc = system(evs[i].command);
-      if (rc != 0) log_warn("logon event %s exited with %d", evs[i].name, rc);
-      
+
+      char errbuf[256] = {0};
+      char** argv = NULL;
+      if (!bbs_argv_parse_template(evs[i].command, NULL, &argv, errbuf, sizeof(errbuf))) {
+        log_warn("%s event %s command rejected: %s", evs[i].event_type, evs[i].name, errbuf);
+      } else {
+        BbsProcessResult result;
+        if (!bbs_exec_argv(argv, evs[i].name, NULL, -1, -1, -1,
+                           0, &result, errbuf, sizeof(errbuf)) && errbuf[0]) {
+          log_warn("%s event %s failed: %s", evs[i].event_type, evs[i].name, errbuf);
+        }
+        bbs_argv_free(argv);
+      }
+
       unsetenv("BBS_USER_ID");
       unsetenv("BBS_USER_HANDLE");
     }

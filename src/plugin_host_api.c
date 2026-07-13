@@ -6,6 +6,7 @@
  */
 
 #include "bbs_plugin_api.h"
+#include "bbs_config.h"
 #include "bbs_session.h"
 #include "bbs_log.h"
 #include "bbs_util.h"
@@ -22,6 +23,15 @@
 
 /* Cast opaque session to internal Session type */
 #define TO_SESSION(s) ((Session*)(s))
+
+static char g_plugin_data_root[512] = "data/plugins";
+static char g_plugin_kv_root[512] = "data/plugin_kv";
+
+void plugin_host_api_configure(const BbsConfig* cfg) {
+  const char* data_root = (cfg && cfg->data_path[0]) ? cfg->data_path : "data";
+  snprintf(g_plugin_data_root, sizeof(g_plugin_data_root), "%s/plugins", data_root);
+  snprintf(g_plugin_kv_root, sizeof(g_plugin_kv_root), "%s/plugin_kv", data_root);
+}
 
 /* ============================================================================
  * PLUGIN TASK SCHEDULER
@@ -318,15 +328,15 @@ static const char* host_session_remote_addr(bbs_session_t* s) {
 
 static bbs_rc_t host_kv_get(const char* ns, const char* key, char* out, size_t out_sz) {
   if (!ns || !key || !out || out_sz == 0) return BBS_EINVAL;
+  if (!bbs_safe_identifier(ns, 96) || !bbs_safe_identifier(key, 160)) return BBS_EINVAL;
   
   out[0] = '\0';
   
-  /* Use a simple file-based KV store in data/plugin_kv/ */
   char path[512];
-  snprintf(path, sizeof(path), "data/plugin_kv/%s", ns);
+  path_join(g_plugin_kv_root, ns, path, sizeof(path));
   
   char filepath[768];
-  snprintf(filepath, sizeof(filepath), "%s/%s", path, key);
+  path_join(path, key, filepath, sizeof(filepath));
   
   FILE* f = fopen(filepath, "r");
   if (!f) return BBS_EINVAL;  /* Key not found */
@@ -340,17 +350,18 @@ static bbs_rc_t host_kv_get(const char* ns, const char* key, char* out, size_t o
 
 static bbs_rc_t host_kv_set(const char* ns, const char* key, const char* val) {
   if (!ns || !key) return BBS_EINVAL;
+  if (!bbs_safe_identifier(ns, 96) || !bbs_safe_identifier(key, 160)) return BBS_EINVAL;
   
   /* Create namespace directory if needed */
   char path[512];
-  snprintf(path, sizeof(path), "data/plugin_kv");
-  mkdir(path, 0755);
+  snprintf(path, sizeof(path), "%s", g_plugin_kv_root);
+  if (!bbs_mkdir_p(path, 0755)) return BBS_EIO;
   
-  snprintf(path, sizeof(path), "data/plugin_kv/%s", ns);
-  mkdir(path, 0755);
+  path_join(g_plugin_kv_root, ns, path, sizeof(path));
+  if (!bbs_mkdir_p(path, 0755)) return BBS_EIO;
   
   char filepath[768];
-  snprintf(filepath, sizeof(filepath), "%s/%s", path, key);
+  path_join(path, key, filepath, sizeof(filepath));
   
   if (!val) {
     /* Delete key */
@@ -371,14 +382,14 @@ static bbs_rc_t host_kv_set(const char* ns, const char* key, const char* val) {
 
 static bbs_rc_t host_plugin_data_dir(const char* plugin_id, char* out, size_t out_sz) {
   if (!plugin_id || !out || out_sz == 0) return BBS_EINVAL;
+  if (!bbs_safe_identifier(plugin_id, 96)) return BBS_EINVAL;
   
-  /* Create data/plugins/<plugin_id>/ directory */
   char path[512];
-  snprintf(path, sizeof(path), "data/plugins");
-  mkdir(path, 0755);
+  snprintf(path, sizeof(path), "%s", g_plugin_data_root);
+  if (!bbs_mkdir_p(path, 0755)) return BBS_EIO;
   
-  snprintf(path, sizeof(path), "data/plugins/%s", plugin_id);
-  mkdir(path, 0755);
+  path_join(g_plugin_data_root, plugin_id, path, sizeof(path));
+  if (!bbs_mkdir_p(path, 0755)) return BBS_EIO;
   
   snprintf(out, out_sz, "%s", path);
   return BBS_OK;

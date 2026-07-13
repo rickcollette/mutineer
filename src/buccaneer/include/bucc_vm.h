@@ -115,6 +115,7 @@ struct bucc_vm {
     
     char*           chain_target;
     bucc_value_t    chain_args;
+    int             exit_code;
     
     bool            running;
     bool            debug_enabled;

@@ -107,32 +107,32 @@ void bucc_door_set_session(bucc_door_runner_t* runner,
 
 void bucc_door_set_term_api(bucc_door_runner_t* runner, bucc_term_api_t* api) {
     if (!runner || !runner->host_ctx) return;
-    bucc_host_set_term_api(runner->host_ctx, api, NULL);
+    bucc_host_set_term_api(runner->host_ctx, api, runner->host_ctx->session_ctx);
 }
 
 void bucc_door_set_user_api(bucc_door_runner_t* runner, bucc_user_api_t* api) {
     if (!runner || !runner->host_ctx) return;
-    bucc_host_set_user_api(runner->host_ctx, api, NULL);
+    bucc_host_set_user_api(runner->host_ctx, api, runner->host_ctx->user_ctx);
 }
 
 void bucc_door_set_data_api(bucc_door_runner_t* runner, bucc_data_api_t* api) {
     if (!runner || !runner->host_ctx) return;
-    bucc_host_set_data_api(runner->host_ctx, api, NULL);
+    bucc_host_set_data_api(runner->host_ctx, api, runner->host_ctx->data_ctx);
 }
 
 void bucc_door_set_kv_api(bucc_door_runner_t* runner, bucc_kv_api_t* api) {
     if (!runner || !runner->host_ctx) return;
-    bucc_host_set_kv_api(runner->host_ctx, api, NULL);
+    bucc_host_set_kv_api(runner->host_ctx, api, runner->host_ctx->kv_ctx);
 }
 
 void bucc_door_set_text_api(bucc_door_runner_t* runner, bucc_text_api_t* api) {
     if (!runner || !runner->host_ctx) return;
-    bucc_host_set_text_api(runner->host_ctx, api, NULL);
+    bucc_host_set_text_api(runner->host_ctx, api, runner->host_ctx->text_ctx);
 }
 
 void bucc_door_set_bbs_api(bucc_door_runner_t* runner, bucc_bbs_api_t* api) {
     if (!runner || !runner->host_ctx) return;
-    bucc_host_set_bbs_api(runner->host_ctx, api, NULL);
+    bucc_host_set_bbs_api(runner->host_ctx, api, runner->host_ctx->bbs_ctx);
 }
 
 void bucc_door_set_limits(bucc_door_runner_t* runner, const bucc_limits_t* limits) {
@@ -214,6 +214,7 @@ bucc_door_result_t bucc_door_run(bucc_door_runner_t* runner) {
         return result;
     }
     
+    bucc_host_set_allowed_capabilities(runner->host_ctx, runner->allowed_capabilities);
     bucc_vm_set_host_handler(runner->vm, bucc_host_dispatch, runner->host_ctx);
     bucc_vm_set_limits(runner->vm, &runner->limits);
     runner->vm->debug_enabled = runner->debug;
@@ -224,6 +225,7 @@ bucc_door_result_t bucc_door_run(bucc_door_runner_t* runner) {
     
     result.instructions_executed = runner->vm->counters.instructions;
     result.host_calls_made = runner->vm->counters.host_calls;
+    result.exit_code = runner->vm->exit_code;
     
     switch (vm_status) {
         case VM_OK:
@@ -299,8 +301,6 @@ bucc_door_result_t bucc_door_run_simple(const char* path,
     if (term) {
         bucc_host_set_term_api(runner->host_ctx, term, term_ctx);
     }
-    
-    runner->allowed_capabilities = BUCC_CAP_ALL;
     
     result = bucc_door_run(runner);
     

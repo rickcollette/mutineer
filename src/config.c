@@ -45,6 +45,9 @@ static void cfg_defaults(BbsConfig *c)
   snprintf(c->doors_path, sizeof(c->doors_path), "doors");
   snprintf(c->dropfile_path, sizeof(c->dropfile_path), "data/dropfiles");
   snprintf(c->protocol_path, sizeof(c->protocol_path), "conf/protocols.conf");
+  c->protocol_timeout_sec = 300;
+  c->plugins_enabled = 1;
+  snprintf(c->plugins_dir, sizeof(c->plugins_dir), "plugins");
   c->allow_multi_login = 0; /* block duplicate logins by default */
   c->guest_enabled = 0;
   snprintf(c->guest_handle, sizeof(c->guest_handle), "GUEST");
@@ -214,6 +217,26 @@ bool cfg_load(const char *path, BbsConfig *out)
     else if (!strcmp(k, "protocol_path"))
     {
       snprintf(out->protocol_path, sizeof(out->protocol_path), "%s", v);
+    }
+    else if (!strcmp(k, "protocol_timeout_sec"))
+    {
+      out->protocol_timeout_sec = atoi(v);
+    }
+    else if (!strcmp(k, "plugins_enabled"))
+    {
+      out->plugins_enabled = atoi(v) != 0;
+    }
+    else if (!strcmp(k, "plugins_dir"))
+    {
+      snprintf(out->plugins_dir, sizeof(out->plugins_dir), "%s", v);
+    }
+    else if (!strcmp(k, "plugins_allowlist"))
+    {
+      snprintf(out->plugins_allowlist, sizeof(out->plugins_allowlist), "%s", v);
+    }
+    else if (!strcmp(k, "plugins_denylist"))
+    {
+      snprintf(out->plugins_denylist, sizeof(out->plugins_denylist), "%s", v);
     }
     else if (!strcmp(k, "allow_multi_login"))
     {

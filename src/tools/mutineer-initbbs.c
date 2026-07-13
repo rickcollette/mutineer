@@ -372,12 +372,20 @@ static int check_schema(const InitOptions* opts) {
     
     printf("\nSchema:\n");
     
-    if (file_exists("sql/schema.sql")) {
-        printf("  %s sql/schema.sql\n", STATUS_OK);
-    } else {
-        printf("  %s sql/schema.sql\n", STATUS_MISSING);
-        printf("         (Cannot auto-create - copy from distribution)\n");
-        missing++;
+    const char* schemas[] = {
+        "sql/schema.sql",
+        "sql/plank_schema.sql",
+        NULL
+    };
+
+    for (int i = 0; schemas[i]; i++) {
+        if (file_exists(schemas[i])) {
+            printf("  %s %s\n", STATUS_OK, schemas[i]);
+        } else {
+            printf("  %s %s\n", STATUS_MISSING, schemas[i]);
+            printf("         (Cannot auto-create - copy from distribution)\n");
+            missing++;
+        }
     }
     
     return missing;
@@ -458,8 +466,8 @@ static int check_database(const BbsConfig* cfg, const InitOptions* opts) {
         return missing;
     }
     
-    if (!file_exists("sql/schema.sql")) {
-        printf("  %s Cannot initialize database - sql/schema.sql not found\n", STATUS_FAILED);
+    if (!file_exists("sql/schema.sql") || !file_exists("sql/plank_schema.sql")) {
+        printf("  %s Cannot initialize database - required SQL schema file missing\n", STATUS_FAILED);
         return missing;
     }
     
@@ -476,20 +484,28 @@ static int check_database(const BbsConfig* cfg, const InitOptions* opts) {
     
     printf("\nDatabase Schema:\n");
     
-    bool schema_ok = db_exec(db, "SELECT 1 FROM users LIMIT 1");
-    if (schema_ok) {
-        printf("  %s Schema applied\n", STATUS_OK);
+    bool core_schema_ok = db_exec(db, "SELECT 1 FROM users LIMIT 1");
+    bool plank_schema_ok = db_exec(db, "SELECT 1 FROM plank_node_identity LIMIT 1");
+    if (core_schema_ok && plank_schema_ok) {
+        printf("  %s Core schema applied\n", STATUS_OK);
+        printf("  %s PLANK schema applied\n", STATUS_OK);
     } else {
-        printf("  %s Schema not applied\n", STATUS_MISSING);
+        if (!core_schema_ok) {
+            printf("  %s Core schema not applied\n", STATUS_MISSING);
+        }
+        if (!plank_schema_ok) {
+            printf("  %s PLANK schema not applied\n", STATUS_MISSING);
+        }
         
-        if (!opts->yes && !prompt_yes_no("Apply database schema?", false)) {
+        if (!opts->yes && !prompt_yes_no("Apply database schemas?", false)) {
             printf("  %s Schema (user declined)\n", STATUS_SKIPPED);
             db_close(db);
             return missing + 1;
         }
         
         if (db_init_schema(db, "sql/schema.sql")) {
-            printf("  %s Schema applied\n", STATUS_CREATED);
+            printf("  %s Core schema applied\n", core_schema_ok ? STATUS_OK : STATUS_CREATED);
+            printf("  %s PLANK schema applied\n", plank_schema_ok ? STATUS_OK : STATUS_CREATED);
         } else {
             printf("  %s Schema: %s\n", STATUS_FAILED, db_last_error(db));
             db_close(db);

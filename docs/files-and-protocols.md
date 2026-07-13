@@ -167,10 +167,10 @@ Protocols defined in `protocols` table and optionally `conf/protocols.conf`:
 |-------|---------|
 | `name` | Protocol name (ZModem, YModem, etc.) |
 | `direction` | `up`, `down`, or `both` |
-| `command` | External program command line |
+| `command` | External program argv template |
 | `active` | Enabled flag |
 
-`protocol_launch()` in session.c executes the configured protocol with the file path.
+`protocol_launch()` executes the configured protocol without a shell. Protocol commands are argv templates: quoted arguments and backslash escapes are supported, `%f` is replaced with the transfer file path as argument text, and the file path is appended as a separate argument when `%f` is omitted. Shell metacharacters such as pipes, redirects, command substitution, `;`, `&&`, and `||` are rejected.
 
 ## File Validation
 

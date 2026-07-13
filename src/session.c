@@ -113,6 +113,17 @@ typedef struct
 static LoginAttempt g_attempts[MAX_ATTEMPTS];
 static pthread_mutex_t g_attempts_mu = PTHREAD_MUTEX_INITIALIZER;
 
+typedef struct
+{
+  char ip[64];
+  char handle[64];
+  int attempts;
+  time_t window_start;
+} RecoveryAttempt;
+
+static RecoveryAttempt g_recovery_attempts[MAX_ATTEMPTS];
+static pthread_mutex_t g_recovery_attempts_mu = PTHREAD_MUTEX_INITIALIZER;
+
 static bool login_throttled(const BbsConfig *cfg, const char *ip, const char *handle)
 {
   time_t now = time(NULL);
@@ -181,6 +192,76 @@ static void login_record(const BbsConfig *cfg, const char *ip, const char *handl
   pthread_mutex_unlock(&g_attempts_mu);
 }
 
+static bool recovery_throttled(const BbsConfig *cfg, const char *ip, const char *handle)
+{
+  int window = cfg->login_window_sec > 0 ? cfg->login_window_sec : 120;
+  time_t now = time(NULL);
+  pthread_mutex_lock(&g_recovery_attempts_mu);
+  for (int i = 0; i < MAX_ATTEMPTS; i++)
+  {
+    RecoveryAttempt *a = &g_recovery_attempts[i];
+    if (a->attempts == 0)
+      continue;
+    if (difftime(now, a->window_start) > window)
+    {
+      a->attempts = 0;
+      continue;
+    }
+    if (!strcmp(a->ip, ip) || (handle && handle[0] && !strcmp(a->handle, handle)))
+    {
+      if (a->attempts >= 3)
+      {
+        pthread_mutex_unlock(&g_recovery_attempts_mu);
+        return true;
+      }
+    }
+  }
+  pthread_mutex_unlock(&g_recovery_attempts_mu);
+  return false;
+}
+
+static void recovery_record(const BbsConfig *cfg, const char *ip, const char *handle, bool success)
+{
+  if (success)
+    return;
+  int window = cfg->login_window_sec > 0 ? cfg->login_window_sec : 120;
+  time_t now = time(NULL);
+  pthread_mutex_lock(&g_recovery_attempts_mu);
+  int slot = -1;
+  for (int i = 0; i < MAX_ATTEMPTS; i++)
+  {
+    RecoveryAttempt *a = &g_recovery_attempts[i];
+    if (a->attempts == 0)
+    {
+      if (slot < 0) slot = i;
+      continue;
+    }
+    if (!strcmp(a->ip, ip) || (handle && handle[0] && !strcmp(a->handle, handle)))
+    {
+      if (difftime(now, a->window_start) > window)
+      {
+        a->attempts = 0;
+        slot = i;
+      }
+      else
+      {
+        a->attempts++;
+        pthread_mutex_unlock(&g_recovery_attempts_mu);
+        return;
+      }
+    }
+  }
+  if (slot >= 0)
+  {
+    RecoveryAttempt *a = &g_recovery_attempts[slot];
+    snprintf(a->ip, sizeof(a->ip), "%s", ip ? ip : "");
+    snprintf(a->handle, sizeof(a->handle), "%s", handle ? handle : "");
+    a->attempts = 1;
+    a->window_start = now;
+  }
+  pthread_mutex_unlock(&g_recovery_attempts_mu);
+}
+
 void online_add(Session *s)
 {
   pthread_mutex_lock(&g_online_mu);
@@ -245,6 +326,53 @@ void online_broadcast(const char *msg)
     }
   }
   pthread_mutex_unlock(&g_online_mu);
+}
+
+static bool online_send_user_id(int user_id, const char *msg)
+{
+  bool sent = false;
+  pthread_mutex_lock(&g_online_mu);
+  for (int i = 0; i < MAX_ONLINE; i++)
+  {
+    if (g_online[i] && g_online[i]->user.id == user_id)
+    {
+      fd_write_all(g_online[i]->fd, msg, strlen(msg));
+      sent = true;
+    }
+  }
+  pthread_mutex_unlock(&g_online_mu);
+  return sent;
+}
+
+static bool online_send_node(int node_num, const char *msg)
+{
+  bool sent = false;
+  pthread_mutex_lock(&g_online_mu);
+  if (node_num > 0 && node_num <= MAX_ONLINE && g_online[node_num - 1])
+  {
+    fd_write_all(g_online[node_num - 1]->fd, msg, strlen(msg));
+    sent = true;
+  }
+  pthread_mutex_unlock(&g_online_mu);
+  return sent;
+}
+
+static bool online_mark_node_dead(int node_num, const Session *except, const char *msg)
+{
+  bool marked = false;
+  pthread_mutex_lock(&g_online_mu);
+  if (node_num > 0 && node_num <= MAX_ONLINE)
+  {
+    Session *target = g_online[node_num - 1];
+    if (target && target != except)
+    {
+      target->alive = 0;
+      if (msg) fd_write_all(target->fd, msg, strlen(msg));
+      marked = true;
+    }
+  }
+  pthread_mutex_unlock(&g_online_mu);
+  return marked;
 }
 
 void broadcast_check(const char *data_path)
@@ -563,12 +691,9 @@ static bool handle_fkey(Session *s, int fnum)
         if (prompt_line(s, NULL, ns, sizeof(ns)) > 0) {
           int node = atoi(ns);
           if (node > 0) {
-            Session *target = online_get_node(node);
-            if (target && target != s) {
-              target->alive = 0;
-              snprintf(buf, sizeof(buf),
-                       "\r\nYou have been disconnected by the sysop.\r\n");
-              send_str(target, buf);
+            snprintf(buf, sizeof(buf),
+                     "\r\nYou have been disconnected by the sysop.\r\n");
+            if (online_mark_node_dead(node, s, buf)) {
               send_str(s, "Node kicked.\r\n");
             } else {
               send_str(s, "Node not found.\r\n");
@@ -601,10 +726,7 @@ static bool handle_fkey(Session *s, int fnum)
         if (prompt_line(s, NULL, ns, sizeof(ns)) > 0) {
           int node = atoi(ns);
           if (node > 0) {
-            Session *target = online_get_node(node);
-            if (target && target != s) {
-              target->alive = 0;
-              send_str(target, "\r\nReturning you to the BBS.\r\n");
+            if (online_mark_node_dead(node, s, "\r\nReturning you to the BBS.\r\n")) {
               send_str(s, "User twittered.\r\n");
             } else {
               send_str(s, "Node not found.\r\n");
@@ -821,6 +943,12 @@ static int authenticate(Session *s, DbUser *user_out)
         int r = session_readline(s, line, sizeof(line), 30);
         if (r > 0 && (line[0] == 'Y' || line[0] == 'y'))
         {
+          if (recovery_throttled(&s->cfg, s->ip, handle))
+          {
+            send_str(s, "\r\nToo many recovery attempts. Please wait and try again.\r\n");
+            log_audit(user.handle, "password_recovery_failed", "throttled");
+            return -1;
+          }
           send_str(s, "\r\nSecurity Question: ");
           send_str(s, question);
           send_str(s, "\r\nAnswer: ");
@@ -828,29 +956,50 @@ static int authenticate(Session *s, DbUser *user_out)
           r = session_readline(s, (uint8_t *)answer, sizeof(answer), 60);
           if (r > 0 && answer[0])
           {
-            char input_hash[256];
-            if (pw_hash_make(answer, input_hash, sizeof(input_hash)) &&
-                pw_hash_verify(answer, answer_hash))
+            if (pw_hash_verify(answer, answer_hash))
             {
               /* Correct answer - allow password reset */
-              send_str(s, "\r\nCorrect! Enter new password: ");
-              char newpw[64] = {0};
-              r = prompt_password(s, NULL, newpw, sizeof(newpw));
-              if (r > 0 && newpw[0])
+              char newpw[64] = {0}, confirm[64] = {0};
+              r = prompt_password(s, "\r\nCorrect! Enter new password: ", newpw, sizeof(newpw));
+              if (r <= 0 || strlen(newpw) < 8)
               {
-                char newhash[256];
-                if (pw_hash_make(newpw, newhash, sizeof(newhash)))
-                {
-                  db_user_set_pw(s->db, user.id, newhash);
-                  send_str(s, "\r\nPassword changed. Please log in again.\r\n");
-                  log_audit(user.handle, "password_recovery", "Password reset via security question");
-                }
+                send_str(s, "\r\nPassword must be at least 8 characters. Please log in again.\r\n");
+                recovery_record(&s->cfg, s->ip, handle, false);
+                log_audit(user.handle, "password_recovery_failed", "password too short");
+                return -1;
               }
+              r = prompt_password(s, "Confirm new password: ", confirm, sizeof(confirm));
+              if (r <= 0 || strcmp(newpw, confirm) != 0)
+              {
+                send_str(s, "\r\nPasswords do not match. Please log in again.\r\n");
+                recovery_record(&s->cfg, s->ip, handle, false);
+                log_audit(user.handle, "password_recovery_failed", "confirmation mismatch");
+                return -1;
+              }
+
+              char newhash[256];
+              if (pw_hash_make(newpw, newhash, sizeof(newhash)) &&
+                  db_user_set_pw_with_timestamp(s->db, user.id, newhash))
+              {
+                send_str(s, "\r\nPassword changed. Please log in again.\r\n");
+                log_audit(user.handle, "password_recovery", "Password reset via security question");
+                return -1;
+              }
+              send_str(s, "\r\nPassword reset failed. Please contact the sysop.\r\n");
+              recovery_record(&s->cfg, s->ip, handle, false);
+              log_audit(user.handle, "password_recovery_failed", "password update failed");
             }
             else
             {
               send_str(s, "\r\nIncorrect answer.\r\n");
+              recovery_record(&s->cfg, s->ip, handle, false);
+              log_audit(user.handle, "password_recovery_failed", "incorrect answer");
             }
+          }
+          else
+          {
+            recovery_record(&s->cfg, s->ip, handle, false);
+            log_audit(user.handle, "password_recovery_failed", "answer read failed");
           }
         }
       }
@@ -1324,12 +1473,12 @@ static void handle_action(Session *s, const char *action)
     prompt_line(s, "Node #: ", nodebuf, sizeof(nodebuf));
     prompt_line(s, "Message: ", msg, sizeof(msg));
     int node = atoi(nodebuf);
-    Session *dest = online_get_node(node);
-    if (dest)
+    if (node > 0)
     {
       char out[320];
       snprintf(out, sizeof(out), "\r\n[Whisper from %s] %s\r\n", s->user.handle, msg);
-      fd_write_all(dest->fd, out, strlen(out));
+      if (!online_send_node(node, out))
+        send_str(s, "\r\nNode not online.\r\n");
     }
     else
     {
@@ -1624,69 +1773,11 @@ static void handle_action(Session *s, const char *action)
         }
       }
     }
-    send_str(s, "\r\nUpload (enter path to local file, or leave blank to skip): ");
+    send_str(s, "\r\nUpload a file using configured transfer protocol? (Y/N): ");
     n = session_readline(s, line, sizeof(line), s->cfg.idle_timeout_sec);
-    if (n > 0 && line[0])
+    if (n > 0 && (line[0] == 'Y' || line[0] == 'y'))
     {
-      char srcpath[256];
-      snprintf(srcpath, sizeof(srcpath), "%s", line);
-      char fname[128] = {0}, desc[256] = {0};
-      const char *base = strrchr(srcpath, '/');
-      snprintf(fname, sizeof(fname), "%s", base ? base + 1 : srcpath);
-      prompt_line(s, "Description: ", desc, sizeof(desc));
-
-      char dst[512];
-      if (!file_area_resolve(area.path, fname, dst, sizeof(dst)))
-      {
-        send_str(s, "\r\nInvalid filename.\r\n");
-        return;
-      }
-      int size_bytes = 0;
-      if (!file_store_copy(srcpath, dst, &size_bytes))
-      {
-        send_str(s, "\r\nUpload failed (cannot store file).\r\n");
-      }
-      else if (db_file_add(s->db, area.id, fname, desc, size_bytes, s->user.id))
-      {
-        /* checksum duplicate detection using EVP API */
-        unsigned char hash[EVP_MAX_MD_SIZE];
-        unsigned int hash_len = 0;
-        FILE *f = fopen(dst, "rb");
-        if (f)
-        {
-          EVP_MD_CTX *ctx = EVP_MD_CTX_new();
-          if (ctx)
-          {
-            EVP_DigestInit_ex(ctx, EVP_sha256(), NULL);
-            char bufh[8192];
-            size_t r;
-            while ((r = fread(bufh, 1, sizeof(bufh), f)) > 0)
-              EVP_DigestUpdate(ctx, bufh, r);
-            EVP_DigestFinal_ex(ctx, hash, &hash_len);
-            EVP_MD_CTX_free(ctx);
-          }
-          fclose(f);
-          char hex[65];
-          for (unsigned int i = 0; i < hash_len && i < 32; i++)
-            sprintf(hex + i * 2, "%02x", hash[i]);
-          hex[64] = '\0';
-          int new_id = db_last_insert_id(s->db);
-          db_file_mark_hash(s->db, new_id, hex);
-          int dup_id = 0;
-          if (db_file_exists_hash(s->db, hex, &dup_id) && dup_id != new_id)
-          {
-            send_str(s, "\r\nDuplicate detected!\r\n");
-          }
-        }
-        send_str(s, "\r\nFile stored and entry added.\r\n");
-        s->file_points += size_bytes / 1024;
-        db_user_update_time_credit(s->db, s->user.id, s->time_left_min, s->credits, s->file_points);
-        db_stats_inc(s->db, "uploads");
-      }
-      else
-      {
-        send_str(s, "\r\nDB add failed (file was copied).\r\n");
-      }
+      cmd_file_upload(s, NULL);
     }
   }
   else if (!strcmp(action, "chat"))
@@ -1762,30 +1853,20 @@ static void handle_action(Session *s, const char *action)
   }
   else if (!strcmp(action, "splitchat"))
   {
-    /* emulate split-screen by rapidly refreshing chat buffer */
     char nodebuf[8] = {0};
     prompt_line(s, "Node to split-chat with: ", nodebuf, sizeof(nodebuf));
     int node = atoi(nodebuf);
     if (node <= 0)
       return;
-    int chan = 200 + node;
-    s->chat_channel = chan;
-    send_str(s, "\r\nSplit chat started (/quit to end).\r\n");
-    while (s->alive && !g_stop)
+    Session *target = online_get_node(node);
+    if (!target || target == s)
     {
-      char buf[512];
-      chat_dump(chan, time(NULL) - 5, buf, sizeof(buf));
-      send_str(s, buf);
-      send_str(s, "\r\n> ");
-      uint8_t line[256];
-      int r = session_readline(s, line, sizeof(line), 10);
-      if (r <= 0)
-        break;
-      if (!strcmp((char *)line, "/quit"))
-        break;
-      chat_post(chan, s->user.handle, (char *)line);
-      db_node_upsert(s->db, s->node_num, s->user.id, "chat", "splitchat", s->ip);
+      send_str(s, "\r\nNode not online.\r\n");
+      return;
     }
+    db_node_upsert(s->db, s->node_num, s->user.id, "chat", "splitchat", s->ip);
+    split_chat_start(s, target);
+    db_node_upsert(s->db, s->node_num, s->user.id, "online", "menu", s->ip);
   }
   else if (!strcmp(action, "bulletins"))
   {
@@ -2324,24 +2405,9 @@ static void handle_action(Session *s, const char *action)
       if (db_smw_send(s->db, s->user.id, s->user.handle, to_user.id, to_user.handle, message))
       {
         send_str(s, "\r\nMessage sent!\r\n");
-        /* Notify if user is online */
-        Session *target = NULL;
-        pthread_mutex_lock(&g_online_mu);
-        for (int i = 0; i < MAX_ONLINE; i++)
-        {
-          if (g_online[i] && g_online[i]->user.id == to_user.id)
-          {
-            target = g_online[i];
-            break;
-          }
-        }
-        pthread_mutex_unlock(&g_online_mu);
-        if (target)
-        {
-          char notify[256];
-          snprintf(notify, sizeof(notify), "\r\n\a\x1b[1;33m*** Short message from %s ***\x1b[0m\r\n", s->user.handle);
-          fd_write_all(target->fd, notify, strlen(notify));
-        }
+        char notify[256];
+        snprintf(notify, sizeof(notify), "\r\n\a\x1b[1;33m*** Short message from %s ***\x1b[0m\r\n", s->user.handle);
+        online_send_user_id(to_user.id, notify);
       }
       else
       {
@@ -5023,7 +5089,7 @@ void *session_thread_main(void *arg)
   }
   db_stats_inc(s->db, "calls");
   s->call_id = db_call_log_start(s->db, s->user.id, s->user.handle, s->node_num, s->ip);
-  scheduler_run_logon_events(s->db, s->user.id, s->user.handle);
+  scheduler_run_logon_events(s);
   send_str(s, "\r\n"); /* newline after login */
   if (s->tn.term_type[0])
   {

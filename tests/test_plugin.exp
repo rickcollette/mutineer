@@ -40,21 +40,13 @@ run_test "bbs_connection" {
 # Test 2: Login and access main menu
 run_test "login_and_menu" {
     if {![connect_bbs]} { return 0 }
-    if {![login_as "sysop" "sysop"]} { 
+    if {![login_as "sysop" "mutineer"]} { 
         # May fail due to rate limiting in test suite
         safe_disconnect
         return 1  
     }
-    
-    # Verify we see the main menu
-    expect {
-        "Selection:" { }
-        timeout { 
-            safe_disconnect
-            return 0 
-        }
-    }
-    
+
+    # login_as consumes the main menu prompt before returning.
     safe_disconnect
     return 1
 }
@@ -62,20 +54,11 @@ run_test "login_and_menu" {
 # Test 3: Run hello plugin (key 1)
 run_test "hello_plugin_run" {
     if {![connect_bbs]} { return 0 }
-    if {![login_as "sysop" "sysop"]} { 
+    if {![login_as "sysop" "mutineer"]} { 
         safe_disconnect
         return 1  
     }
-    
-    # Wait for menu
-    expect {
-        "Selection:" { }
-        timeout { 
-            safe_disconnect
-            return 0 
-        }
-    }
-    
+
     # Try to run hello plugin (key 1)
     send "1\r"
     
@@ -101,20 +84,11 @@ run_test "hello_plugin_run" {
 # Test 4: Run chat plugin (key 2)
 run_test "chat_plugin_run" {
     if {![connect_bbs]} { return 0 }
-    if {![login_as "sysop" "sysop"]} { 
+    if {![login_as "sysop" "mutineer"]} { 
         safe_disconnect
         return 1  
     }
-    
-    # Wait for menu
-    expect {
-        "Selection:" { }
-        timeout { 
-            safe_disconnect
-            return 0 
-        }
-    }
-    
+
     # Try to run chat plugin (key 2)
     send "2\r"
     
@@ -140,20 +114,11 @@ run_test "chat_plugin_run" {
 # Test 5: List plugins (key 3, sysop only)
 run_test "list_plugins" {
     if {![connect_bbs]} { return 0 }
-    if {![login_as "sysop" "sysop"]} { 
+    if {![login_as "sysop" "mutineer"]} { 
         safe_disconnect
         return 1  
     }
-    
-    # Wait for menu
-    expect {
-        "Selection:" { }
-        timeout { 
-            safe_disconnect
-            return 0 
-        }
-    }
-    
+
     # Try to list plugins (key 3)
     send "3\r"
     

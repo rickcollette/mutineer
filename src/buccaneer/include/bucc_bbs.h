@@ -100,28 +100,6 @@ bucc_door_result_t bucc_door_run_simple(const char* path,
 
 const char* bucc_door_status_string(bucc_door_status_t status);
 
-#define BUCC_CAP_TERM_OUTPUT    (1ULL << 0)
-#define BUCC_CAP_TERM_INPUT     (1ULL << 1)
-#define BUCC_CAP_TERM_QUERY     (1ULL << 2)
-#define BUCC_CAP_USER_READ      (1ULL << 3)
-#define BUCC_CAP_DATA_READ      (1ULL << 4)
-#define BUCC_CAP_DATA_WRITE     (1ULL << 5)
-#define BUCC_CAP_KV_READ        (1ULL << 6)
-#define BUCC_CAP_KV_WRITE       (1ULL << 7)
-#define BUCC_CAP_TEXT_READ      (1ULL << 8)
-#define BUCC_CAP_TEXT_WRITE     (1ULL << 9)
-#define BUCC_CAP_BBS_MESSAGE    (1ULL << 10)
-#define BUCC_CAP_BBS_QUERY      (1ULL << 11)
-#define BUCC_CAP_SHARED_READ    (1ULL << 12)
-#define BUCC_CAP_SHARED_WRITE   (1ULL << 13)
-#define BUCC_CAP_SESSION_READ   (1ULL << 14)
-#define BUCC_CAP_SESSION_WRITE  (1ULL << 15)
-#define BUCC_CAP_DOOR_CHAIN     (1ULL << 16)
-
-#define BUCC_CAP_ALL            0xFFFFFFFFFFFFFFFFULL
-#define BUCC_CAP_SAFE           (BUCC_CAP_TERM_OUTPUT | BUCC_CAP_TERM_INPUT | \
-                                 BUCC_CAP_TERM_QUERY | BUCC_CAP_USER_READ)
-
 #ifdef __cplusplus
 }
 #endif

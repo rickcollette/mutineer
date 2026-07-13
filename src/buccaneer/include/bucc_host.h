@@ -19,6 +19,28 @@ extern "C" {
 
 typedef struct bucc_host_context bucc_host_context_t;
 
+#define BUCC_CAP_TERM_OUTPUT    (1ULL << 0)
+#define BUCC_CAP_TERM_INPUT     (1ULL << 1)
+#define BUCC_CAP_TERM_QUERY     (1ULL << 2)
+#define BUCC_CAP_USER_READ      (1ULL << 3)
+#define BUCC_CAP_DATA_READ      (1ULL << 4)
+#define BUCC_CAP_DATA_WRITE     (1ULL << 5)
+#define BUCC_CAP_KV_READ        (1ULL << 6)
+#define BUCC_CAP_KV_WRITE       (1ULL << 7)
+#define BUCC_CAP_TEXT_READ      (1ULL << 8)
+#define BUCC_CAP_TEXT_WRITE     (1ULL << 9)
+#define BUCC_CAP_BBS_MESSAGE    (1ULL << 10)
+#define BUCC_CAP_BBS_QUERY      (1ULL << 11)
+#define BUCC_CAP_SHARED_READ    (1ULL << 12)
+#define BUCC_CAP_SHARED_WRITE   (1ULL << 13)
+#define BUCC_CAP_SESSION_READ   (1ULL << 14)
+#define BUCC_CAP_SESSION_WRITE  (1ULL << 15)
+#define BUCC_CAP_DOOR_CHAIN     (1ULL << 16)
+
+#define BUCC_CAP_ALL            0xFFFFFFFFFFFFFFFFULL
+#define BUCC_CAP_SAFE           (BUCC_CAP_TERM_OUTPUT | BUCC_CAP_TERM_INPUT | \
+                                 BUCC_CAP_TERM_QUERY | BUCC_CAP_USER_READ)
+
 typedef bucc_value_t (*bucc_native_fn_t)(bucc_host_context_t* ctx,
                                          bucc_value_t* args, int argc);
 
@@ -132,6 +154,8 @@ struct bucc_host_context {
     bucc_map_t*     session_state;
     
     bucc_vm_t*      vm;
+
+    uint64_t        allowed_capabilities;
     
     uint32_t        throttle_count;
     uint32_t        throttle_limit;
@@ -140,6 +164,7 @@ struct bucc_host_context {
 
 bucc_host_context_t* bucc_host_context_new(void);
 void bucc_host_context_free(bucc_host_context_t* ctx);
+void bucc_host_set_allowed_capabilities(bucc_host_context_t* ctx, uint64_t capabilities);
 
 void bucc_host_set_term_api(bucc_host_context_t* ctx, bucc_term_api_t* api, void* session_ctx);
 void bucc_host_set_user_api(bucc_host_context_t* ctx, bucc_user_api_t* api, void* user_ctx);
@@ -158,10 +183,14 @@ bucc_value_t bucc_host_term_print(bucc_host_context_t* ctx, bucc_value_t* args, 
 bucc_value_t bucc_host_term_println(bucc_host_context_t* ctx, bucc_value_t* args, int argc);
 bucc_value_t bucc_host_term_cls(bucc_host_context_t* ctx, bucc_value_t* args, int argc);
 bucc_value_t bucc_host_term_color(bucc_host_context_t* ctx, bucc_value_t* args, int argc);
+bucc_value_t bucc_host_term_gotoxy(bucc_host_context_t* ctx, bucc_value_t* args, int argc);
 bucc_value_t bucc_host_term_getkey(bucc_host_context_t* ctx, bucc_value_t* args, int argc);
 bucc_value_t bucc_host_term_input(bucc_host_context_t* ctx, bucc_value_t* args, int argc);
+bucc_value_t bucc_host_term_input_password(bucc_host_context_t* ctx, bucc_value_t* args, int argc);
+bucc_value_t bucc_host_term_pause(bucc_host_context_t* ctx, bucc_value_t* args, int argc);
 bucc_value_t bucc_host_term_width(bucc_host_context_t* ctx, bucc_value_t* args, int argc);
 bucc_value_t bucc_host_term_height(bucc_host_context_t* ctx, bucc_value_t* args, int argc);
+bucc_value_t bucc_host_term_supports_ansi(bucc_host_context_t* ctx, bucc_value_t* args, int argc);
 
 bucc_value_t bucc_host_user_name(bucc_host_context_t* ctx, bucc_value_t* args, int argc);
 bucc_value_t bucc_host_user_alias(bucc_host_context_t* ctx, bucc_value_t* args, int argc);
@@ -203,6 +232,8 @@ bucc_value_t bucc_host_sys_sleep(bucc_host_context_t* ctx, bucc_value_t* args, i
 
 bucc_value_t bucc_host_session_get(bucc_host_context_t* ctx, bucc_value_t* args, int argc);
 bucc_value_t bucc_host_session_set(bucc_host_context_t* ctx, bucc_value_t* args, int argc);
+bucc_value_t bucc_host_session_node(bucc_host_context_t* ctx, bucc_value_t* args, int argc);
+bucc_value_t bucc_host_session_elapsed_ms(bucc_host_context_t* ctx, bucc_value_t* args, int argc);
 
 bucc_value_t bucc_host_bbs_send_msg(bucc_host_context_t* ctx, bucc_value_t* args, int argc);
 bucc_value_t bucc_host_bbs_online(bucc_host_context_t* ctx, bucc_value_t* args, int argc);

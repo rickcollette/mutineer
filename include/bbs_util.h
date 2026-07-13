@@ -20,3 +20,14 @@ void path_join(const char* dir, const char* leaf, char* out, size_t out_cap);
 
 /* Copy file; returns true on success. size_out optional. */
 bool file_copy(const char* src, const char* dst, int* size_out);
+
+/* Stable relative identifiers: non-empty [A-Za-z0-9._-], no "."/"..", no slashes. */
+bool bbs_safe_identifier(const char* value, size_t max_len);
+
+/* Basename-only safe filenames for user-visible file objects. */
+bool bbs_safe_filename(const char* value, size_t max_len);
+
+/* mkdir -p for simple directory trees. */
+bool bbs_mkdir_p(const char* path, int mode);
+
+bool bbs_remove_tree(const char* path);

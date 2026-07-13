@@ -8,6 +8,8 @@ add_executable(mutineer
   src/main.c
   src/config.c
   src/util.c
+  src/process.c
+  src/archive_util.c
   src/net_listener.c
   src/session.c
   src/telnet.c
@@ -54,6 +56,12 @@ endfunction()
 
 target_require_sqlite(mutineer)
 
+find_library(LIBARCHIVE_LIBRARY
+  NAMES archive libarchive.so.13
+  PATHS /usr/lib /usr/lib/x86_64-linux-gnu /lib /lib/x86_64-linux-gnu
+  REQUIRED)
+target_link_libraries(mutineer PRIVATE ${LIBARCHIVE_LIBRARY})
+
 # pthread
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
@@ -85,6 +93,40 @@ endif()
 target_link_libraries(mutineer PRIVATE ${CMAKE_DL_LIBS})
 
 enable_testing()
+
+# ============================================================================
+# Buccaneer interpreted language runtime
+# ============================================================================
+# Built as an internal static library for BBS door/addon execution.
+
+set(BUCCANEER_SOURCES
+  src/buccaneer/value.c
+  src/buccaneer/diag.c
+  src/buccaneer/lexer.c
+  src/buccaneer/ast.c
+  src/buccaneer/parser.c
+  src/buccaneer/semantic.c
+  src/buccaneer/emit.c
+  src/buccaneer/module.c
+  src/buccaneer/vm.c
+  src/buccaneer/host.c
+  src/buccaneer/package.c
+  src/buccaneer/bbs.c
+)
+
+add_library(buccaneer STATIC ${BUCCANEER_SOURCES})
+target_include_directories(buccaneer PUBLIC src/buccaneer)
+target_compile_options(buccaneer PRIVATE -Wall -Wextra -Wpedantic)
+target_link_libraries(buccaneer PUBLIC m)
+
+target_include_directories(mutineer PRIVATE src/buccaneer)
+target_link_libraries(mutineer PRIVATE buccaneer)
+
+add_executable(test_buccaneer_host tests/test_buccaneer_host.c)
+target_include_directories(test_buccaneer_host PRIVATE src/buccaneer)
+target_link_libraries(test_buccaneer_host PRIVATE buccaneer)
+add_test(NAME buccaneer_host COMMAND test_buccaneer_host)
+
 add_executable(test_acs tests/test_acs.c src/acs.c src/util.c src/db.c src/hash.c)
 target_include_directories(test_acs PRIVATE include)
 target_link_libraries(test_acs PRIVATE OpenSSL::Crypto)
@@ -94,6 +136,7 @@ add_test(NAME acs COMMAND test_acs)
 add_executable(test_doors
   tests/test_doors.c
   src/doors.c
+  src/process.c
   src/util.c
   src/log.c
   src/db.c
@@ -102,7 +145,9 @@ add_executable(test_doors
   src/acs.c
 )
 target_include_directories(test_doors PRIVATE include)
+target_include_directories(test_doors PRIVATE src/buccaneer)
 target_link_libraries(test_doors PRIVATE OpenSSL::Crypto Threads::Threads)
+target_link_libraries(test_doors PRIVATE buccaneer)
 target_require_sqlite(test_doors)
 add_test(NAME doors COMMAND test_doors WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 
@@ -143,7 +188,7 @@ add_test(NAME file_cmds COMMAND test_file_cmds WORKING_DIRECTORY ${CMAKE_SOURCE_
 
 # CLI tests for tools (shell script)
 add_test(NAME tools_cli
-         COMMAND ${CMAKE_SOURCE_DIR}/tests/test_tools_cli.sh
+         COMMAND ${CMAKE_SOURCE_DIR}/tests/test_tools_cli.sh ${CMAKE_BINARY_DIR}
          WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 set_tests_properties(tools_cli PROPERTIES
   DEPENDS tools
@@ -154,7 +199,7 @@ set_tests_properties(tools_cli PROPERTIES
 find_program(EXPECT_EXECUTABLE expect)
 if(EXPECT_EXECUTABLE)
   add_test(NAME expect_suite 
-           COMMAND ${CMAKE_SOURCE_DIR}/tests/run_expect_tests.sh
+           COMMAND ${CMAKE_SOURCE_DIR}/tests/run_expect_tests.sh ${CMAKE_BINARY_DIR}
            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
   set_tests_properties(expect_suite PROPERTIES 
     TIMEOUT 300
@@ -185,11 +230,13 @@ function(add_mutineer_tool name)
   target_compile_options(${name} PRIVATE -Wall -Wextra -Wpedantic)
 
   target_require_sqlite(${name})
-  target_link_libraries(${name} PRIVATE OpenSSL::Crypto)
+  target_link_libraries(${name} PRIVATE OpenSSL::Crypto ${LIBARCHIVE_LIBRARY})
 endfunction()
 
 # Build all tools
 add_mutineer_tool(mutineer-qwkgen)
+target_sources(mutineer-qwkgen PRIVATE src/archive_util.c)
+target_link_libraries(mutineer-qwkgen PRIVATE ${LIBARCHIVE_LIBRARY})
 add_mutineer_tool(mutineer-msgpack)
 add_mutineer_tool(mutineer-userpack)
 add_mutineer_tool(mutineer-filepack)
@@ -412,5 +459,14 @@ target_include_directories(test_plugin PRIVATE include)
 target_compile_options(test_plugin PRIVATE -Wall -Wextra -Wpedantic)
 target_link_libraries(test_plugin PRIVATE ${CMAKE_DL_LIBS} Threads::Threads OpenSSL::Crypto)
 target_require_sqlite(test_plugin)
-add_test(NAME plugin COMMAND test_plugin WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+add_test(NAME plugin COMMAND test_plugin ${CMAKE_BINARY_DIR}/plugins/hello.so WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 set_tests_properties(plugin PROPERTIES DEPENDS "hello;chat_plugin")
+
+add_executable(bucc
+  src/buccaneer/tools/bucc.c
+  src/buccaneer/tools/formatter.c
+  src/buccaneer/tools/linter.c
+  src/buccaneer/tools/simulator.c
+)
+target_include_directories(bucc PRIVATE src/buccaneer)
+target_link_libraries(bucc PRIVATE buccaneer)

@@ -91,6 +91,14 @@ int net_run_listener(const BbsConfig* cfg, BbsDb* db, volatile sig_atomic_t* sto
     s->fd = cfd;
     (void)db;
     s->db = db_open(cfg->db_path);
+    if (!s->db) {
+      const char* msg = "\r\nSystem is temporarily unavailable. Please try again later.\r\n";
+      (void)write(cfd, msg, strlen(msg));
+      fprintf(stderr, "session db_open failed for %s\n", cfg->db_path);
+      close(cfd);
+      free(s);
+      continue;
+    }
     s->alive = 1;
     s->cfg = *cfg;
     s->tn.cols = 80;

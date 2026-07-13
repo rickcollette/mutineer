@@ -22,17 +22,20 @@ static void on_sigint(int sig) { (void)sig; g_stop = 1; }
 static void on_sigusr1(int sig) { (void)sig; g_broadcast_pending = 1; }
 
 static void usage(const char* argv0) {
-  fprintf(stderr, "Usage: %s --config conf/mutineer.conf\n", argv0);
+  fprintf(stderr, "Usage: %s [-c|--config conf/mutineer.conf]\n", argv0);
 }
 
 int main(int argc, char** argv) {
   const char* cfg_path = "conf/mutineer.conf";
   for (int i = 1; i < argc; i++) {
-    if (!strcmp(argv[i], "--config") && i + 1 < argc) {
+    if ((!strcmp(argv[i], "--config") || !strcmp(argv[i], "-c")) && i + 1 < argc) {
       cfg_path = argv[++i];
     } else if (!strcmp(argv[i], "--help")) {
       usage(argv[0]);
       return 0;
+    } else {
+      usage(argv[0]);
+      return 1;
     }
   }
 

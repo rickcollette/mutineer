@@ -1,7 +1,9 @@
+#define _XOPEN_SOURCE 700
 #include "bbs_session.h"
 #include "bbs_db.h"
 #include "bbs_acs.h"
 #include "bbs_util.h"
+#include "bbs_archive.h"
 #include "bbs_doors.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -17,6 +19,13 @@ extern void send_str(Session* s, const char* str);
 extern int prompt_line(Session* s, const char* prompt, char* out, size_t cap);
 
 #define QWK_BLOCK_SIZE 128
+
+static bool qwk_make_temp_dir(Session* s, const char* prefix, char* out, size_t cap) {
+  const char* base = getenv("TMPDIR");
+  if (!base || !base[0]) base = (s && s->cfg.data_path[0]) ? s->cfg.data_path : "data";
+  snprintf(out, cap, "%s/%sXXXXXX", base, prefix ? prefix : "qwk_");
+  return mkdtemp(out) != NULL;
+}
 
 static bool protocol_matches_key(const DbProtocol* proto, char key) {
   if (!proto || !proto->active) return false;
@@ -344,8 +353,7 @@ bool qwk_generate_packet(Session* s, const char* output_path, const char* last_q
   if (!s || !output_path) return false;
 
   char temp_dir[512];
-  snprintf(temp_dir, sizeof(temp_dir), "/tmp/qwk_%d_%d", (int)getpid(), s->node_num);
-  mkdir(temp_dir, 0755);
+  if (!qwk_make_temp_dir(s, "qwk_", temp_dir, sizeof(temp_dir))) return false;
 
   char control_path[512], messages_path[512], door_path[512], newfiles_path[512];
   snprintf(control_path,  sizeof(control_path),  "%s/CONTROL.DAT",    temp_dir);
@@ -397,19 +405,10 @@ bool qwk_generate_packet(Session* s, const char* output_path, const char* last_q
     fclose(f);
   }
 
-  char cmd[1024];
-  snprintf(cmd, sizeof(cmd),
-           "cd '%s' && zip -q '%s' CONTROL.DAT MESSAGES.DAT DOOR.ID NEWFILES.DAT *.NDX 2>/dev/null",
-           temp_dir, output_path);
-  int rc = system(cmd);
-
-  snprintf(cmd, sizeof(cmd),
-           "rm -f '%s'/*.NDX '%s'/CONTROL.DAT '%s'/MESSAGES.DAT '%s'/DOOR.ID '%s'/NEWFILES.DAT 2>/dev/null",
-           temp_dir, temp_dir, temp_dir, temp_dir, temp_dir);
-  system(cmd);
-  rmdir(temp_dir);
-
-  return rc == 0;
+  char errbuf[256];
+  bool ok = bbs_archive_create_zip_from_dir(temp_dir, output_path, errbuf, sizeof(errbuf));
+  bbs_remove_tree(temp_dir);
+  return ok;
 }
 
 void cmd_qwk_download(Session* s, const char* data) {
@@ -445,7 +444,12 @@ void cmd_qwk_download(Session* s, const char* data) {
   send_str(s, "\r\nGenerating QWK packet...\r\n");
 
   char qwk_path[512];
-  snprintf(qwk_path, sizeof(qwk_path), "/tmp/%s.QWK", s->user.handle);
+  char qwk_dir[512];
+  if (!qwk_make_temp_dir(s, "qwkout_", qwk_dir, sizeof(qwk_dir))) {
+    send_str(s, "\r\nCould not create temp directory.\r\n");
+    return;
+  }
+  path_join(qwk_dir, "MUTINEER.QWK", qwk_path, sizeof(qwk_path));
 
   const char* last_qwk = s->user.last_qwk[0] ? s->user.last_qwk : NULL;
   if (qwk_generate_packet(s, qwk_path, last_qwk)) {
@@ -460,6 +464,7 @@ void cmd_qwk_download(Session* s, const char* data) {
       if (proto_key != 'Z' && proto_key != 'Y' && proto_key != 'X') {
         send_str(s, "\r\nInvalid protocol.\r\n");
         unlink(qwk_path);
+        bbs_remove_tree(qwk_dir);
         return;
       }
 
@@ -468,6 +473,7 @@ void cmd_qwk_download(Session* s, const char* data) {
       if (!selected) {
         send_str(s, "\r\nProtocol not configured. Contact sysop.\r\n");
         unlink(qwk_path);
+        bbs_remove_tree(qwk_dir);
         return;
       }
 
@@ -486,25 +492,23 @@ void cmd_qwk_download(Session* s, const char* data) {
       }
 
       unlink(qwk_path);
+      bbs_remove_tree(qwk_dir);
     }
   } else {
     send_str(s, "\r\nFailed to generate QWK packet.\r\n");
   }
+  bbs_remove_tree(qwk_dir);
 }
 
 bool qwk_import_rep(Session* s, const char* rep_path) {
   if (!s || !rep_path) return false;
   
-  /* Create temp directory for extraction */
   char temp_dir[512];
-  snprintf(temp_dir, sizeof(temp_dir), "/tmp/rep_%d_%d", (int)getpid(), s->node_num);
-  mkdir(temp_dir, 0755);
+  if (!qwk_make_temp_dir(s, "rep_", temp_dir, sizeof(temp_dir))) return false;
   
-  /* Extract REP packet */
-  char cmd[1024];
-  snprintf(cmd, sizeof(cmd), "unzip -q -o '%s' -d '%s' 2>/dev/null", rep_path, temp_dir);
-  if (system(cmd) != 0) {
-    rmdir(temp_dir);
+  char errbuf[256];
+  if (!bbs_archive_extract_to_dir(rep_path, temp_dir, errbuf, sizeof(errbuf))) {
+    bbs_remove_tree(temp_dir);
     return false;
   }
   
@@ -520,9 +524,7 @@ bool qwk_import_rep(Session* s, const char* rep_path) {
   }
   
   if (!f) {
-    /* Clean up and fail */
-    snprintf(cmd, sizeof(cmd), "rm -rf '%s'", temp_dir);
-    system(cmd);
+    bbs_remove_tree(temp_dir);
     return false;
   }
   
@@ -604,9 +606,7 @@ bool qwk_import_rep(Session* s, const char* rep_path) {
   
   fclose(f);
   
-  /* Clean up temp directory */
-  snprintf(cmd, sizeof(cmd), "rm -rf '%s'", temp_dir);
-  system(cmd);
+  bbs_remove_tree(temp_dir);
   
   snprintf(buf, sizeof(buf), "\r\nImported %d message(s).\r\n", imported);
   send_str(s, buf);
@@ -644,28 +644,25 @@ void cmd_qwk_upload(Session* s, const char* data) {
   }
 
   char temp_dir[512];
-  snprintf(temp_dir, sizeof(temp_dir), "/tmp/qwk_rep_%d_%d", (int)getpid(), s->node_num);
-  mkdir(temp_dir, 0755);
+  if (!qwk_make_temp_dir(s, "qwkrep_", temp_dir, sizeof(temp_dir))) {
+    send_str(s, "\r\nCould not create temp directory.\r\n");
+    return;
+  }
 
   char rep_path[512];
-  snprintf(rep_path, sizeof(rep_path), "%s/%s_%d.REP", temp_dir, s->user.handle, s->node_num);
-
-  DbProtocol temp_proto = *selected;
-  char temp_cmd[512];
-  snprintf(temp_cmd, sizeof(temp_cmd), "cd '%s' && %s", temp_dir, selected->command);
-  snprintf(temp_proto.command, sizeof(temp_proto.command), "%s", temp_cmd);
+  path_join(temp_dir, "MUTINEER.REP", rep_path, sizeof(rep_path));
   
   send_str(s, "\r\nReady to receive REP packet...\r\n");
-  if (!protocol_launch(s, &temp_proto, rep_path, "up")) {
+  if (!protocol_launch(s, selected, rep_path, "up")) {
     send_str(s, "\r\nTransfer failed or cancelled.\r\n");
-    rmdir(temp_dir);
+    bbs_remove_tree(temp_dir);
     return;
   }
 
   if (access(rep_path, R_OK) != 0) {
     if (!find_rep_file(temp_dir, rep_path, sizeof(rep_path))) {
       send_str(s, "\r\nNo REP file received.\r\n");
-      rmdir(temp_dir);
+      bbs_remove_tree(temp_dir);
       return;
     }
   }
@@ -679,5 +676,5 @@ void cmd_qwk_upload(Session* s, const char* data) {
   } else {
     send_str(s, "\r\nNo REP file found. Upload cancelled.\r\n");
   }
-  rmdir(temp_dir);
+  bbs_remove_tree(temp_dir);
 }
