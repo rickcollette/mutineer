@@ -691,8 +691,11 @@ static bool door_launch_native(Session* s, const DbDoor* door) {
   log_info("launching native door %s: %s", door->name, argv[0]);
   int timeout = door->timeout_sec > 0 ? door->timeout_sec : s->cfg.door_default_timeout_sec;
   BbsProcessResult pres;
-  bool ok = bbs_exec_argv(argv, door->name, door->workdir,
-                          -1, -1, -1, timeout, &pres, errbuf, sizeof(errbuf));
+  errbuf[0] = '\0';
+  bool ok = bbs_exec_argv_cancel(argv, door->name, door->workdir,
+                                 -1, -1, -1, timeout,
+                                 (s && s->fd > STDERR_FILENO) ? s->fd : -1,
+                                 &pres, errbuf, sizeof(errbuf));
   if (!ok && errbuf[0]) log_error("native door %s: %s", door->name, errbuf);
   bbs_argv_free(argv);
   if (s->db) db_node_upsert(s->db, s->node_num, s->user.id, "online", "menu", s->ip);
@@ -1175,9 +1178,10 @@ bool protocol_launch(Session* s, const DbProtocol* proto, const char* filepath, 
               ? s->cfg.protocol_timeout_sec
               : s->cfg.door_default_timeout_sec;
   BbsProcessResult pres;
-  bool ok = bbs_exec_argv(argv, proto->name, NULL,
-                          s->fd, s->fd, s->fd, timeout, &pres,
-                          errbuf, sizeof(errbuf));
+  errbuf[0] = '\0';
+  bool ok = bbs_exec_argv_cancel(argv, proto->name, NULL,
+                                 s->fd, s->fd, s->fd, timeout, s->fd,
+                                 &pres, errbuf, sizeof(errbuf));
   if (!ok && errbuf[0]) log_error("protocol %s: %s", proto->name, errbuf);
   bbs_argv_free(argv);
   if (s->db) db_node_upsert(s->db, s->node_num, s->user.id, "online", "menu", s->ip);

@@ -419,6 +419,7 @@ bool bucc_value_equal(bucc_value_t* a, bucc_value_t* b) {
                    a->as.datetime.minute == b->as.datetime.minute &&
                    a->as.datetime.second == b->as.datetime.second;
         case BUCC_VAL_ARRAY:
+            if (!a->as.array || !b->as.array) return a->as.array == b->as.array;
             if (a->as.array->len != b->as.array->len) return false;
             for (size_t i = 0; i < a->as.array->len; i++) {
                 if (!bucc_value_equal(&a->as.array->items[i], &b->as.array->items[i]))
@@ -426,7 +427,18 @@ bool bucc_value_equal(bucc_value_t* a, bucc_value_t* b) {
             }
             return true;
         case BUCC_VAL_MAP:
-            return a->as.map == b->as.map;
+            if (!a->as.map || !b->as.map) return a->as.map == b->as.map;
+            if (a->as.map->len != b->as.map->len) return false;
+            for (size_t i = 0; i < a->as.map->len; i++) {
+                bucc_map_entry_t* entry = &a->as.map->entries[i];
+                if (!entry->key || !entry->value) return false;
+                bucc_value_t other = bucc_map_get(b->as.map, entry->key);
+                bool found = !BUCC_IS_NULL(other) || bucc_map_has(b->as.map, entry->key);
+                bool equal = found && bucc_value_equal(entry->value, &other);
+                bucc_value_release(&other);
+                if (!equal) return false;
+            }
+            return true;
         case BUCC_VAL_ERROR:
             return a->as.error == b->as.error;
         default:

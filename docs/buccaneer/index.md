@@ -3,7 +3,7 @@
 **Buccaneer** is Mutineer's interpreted language for BBS addons, games, and extensions — structured BASIC-like syntax, compile-to-bytecode, run inside the BBS process with capability-gated host APIs.
 
 ```
-.bucc source  →  bucc compiler  →  .bc module  →  VM + host bridge  →  caller session
+.bucc source  →  bucc compiler  →  .bc module  →  bytecode runtime + host bridge  →  caller session
 ```
 
 ## Documentation
@@ -20,17 +20,17 @@
 | Topic | Document |
 |-------|----------|
 | Doors overview (native, DOS, BUCC) | [Doors and Scripting](../doors-and-scripting.md) |
-| Architecture / VM placement | [Architecture](../architecture.md) |
+| Architecture / runtime placement | [Architecture](../architecture.md) |
 
 ## Implementation status
 
-Buccaneer is under active development. The compiler, runtime, host bridge, and BBS door launch path are built by the top-level CMake project; some host functions and runtime semantics still have open follow-up work (track [GitHub issues](https://github.com/rickcollette/mutineer/issues?q=label%3Abuccaneer)).
+Buccaneer is built by the top-level CMake project. The compiler, runtime, host bridge, BBS door launch path, chain/exit control flow, and documented core host APIs are covered by the repository test suite. Track new follow-up work through [GitHub issues](https://github.com/rickcollette/mutineer/issues?q=label%3Abuccaneer).
 
 Always test doors with `bucc-simulator` before deploying to a live BBS.
 
 ## Formal specifications
 
-Low-level specs for compiler and VM implementers live under `SPECS/BUCCANEER/`:
+Low-level specs for compiler and runtime implementers live under `SPECS/BUCCANEER/`:
 
 | Spec | Topic |
 |------|-------|

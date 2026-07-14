@@ -16,6 +16,7 @@
 #include "bbs_plugin_api.h"
 #include "bbs_plugin_loader.h"
 #include "bbs_plugin_registry.h"
+#include "bbs_util.h"
 
 #define TEST_ASSERT(cond, msg) do { \
   if (!(cond)) { fprintf(stderr, "FAIL: %s\n", msg); return 1; } \
@@ -24,9 +25,7 @@
 static const char* g_hello_plugin_path = "build/plugins/hello.so";
 
 static void rm_rf(const char* path) {
-  char cmd[512];
-  snprintf(cmd, sizeof(cmd), "rm -rf '%s'", path);
-  (void)system(cmd);
+  bbs_remove_tree(path);
 }
 
 static int copy_file(const char* src, const char* dst) {
@@ -57,7 +56,8 @@ static int copy_file(const char* src, const char* dst) {
 }
 
 static int make_plugin_dir(char* dir, size_t dir_sz) {
-  snprintf(dir, dir_sz, "/tmp/mutineer_plugin_test_%ld_%d", (long)getpid(), rand());
+  snprintf(dir, dir_sz, "%s/mutineer_plugin_test_%ld_%d",
+           getenv("TMPDIR") ? getenv("TMPDIR") : "/tmp", (long)getpid(), rand());
   rm_rf(dir);
   if (mkdir(dir, 0755) != 0) return -1;
   char dst[512];
@@ -396,7 +396,8 @@ static int test_loader_config_rules(void) {
 
 static int test_host_api_filesystem_safety(void) {
   char root[256];
-  snprintf(root, sizeof(root), "/tmp/mutineer_plugin_data_%ld_%d", (long)getpid(), rand());
+  snprintf(root, sizeof(root), "%s/mutineer_plugin_data_%ld_%d",
+           getenv("TMPDIR") ? getenv("TMPDIR") : "/tmp", (long)getpid(), rand());
   rm_rf(root);
   TEST_ASSERT(mkdir(root, 0755) == 0, "plugin data root creates");
 

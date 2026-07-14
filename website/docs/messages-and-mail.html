@@ -20,24 +20,15 @@
 <h3>Area Fields</h3>
 <table>
 <tr><th>Field</th><th>Purpose</th></tr>
-<table>
-<tr><th><code>name</code></th><th>Display name</th></tr>
-<table>
-<tr><th><code>filename</code></th><th>Base filename for area storage</th></tr>
-<table>
-<tr><th><code>acs_read</code></th><th>ACS required to read</th></tr>
-<table>
-<tr><th><code>acs_post</code></th><th>ACS required to post</th></tr>
-<table>
-<tr><th><code>acs_sysop</code></th><th>ACS for sysop functions</th></tr>
-<table>
-<tr><th><code>anon_policy</code></th><th>Anonymous posting policy (0=No, 1=Yes, 2=Forced, 3=DearAbby, 4=AnyName)</th></tr>
-<table>
-<tr><th><code>max_msgs</code></th><th>Maximum messages retained</th></tr>
-<table>
-<tr><th><code>password</code></th><th>Optional area password</th></tr>
-<table>
-<tr><th><code>origin</code></th><th>Origin line for echomail</th></tr>
+<tr><td><code>name</code></td><td>Display name</td></tr>
+<tr><td><code>filename</code></td><td>Base filename for area storage</td></tr>
+<tr><td><code>acs_read</code></td><td>ACS required to read</td></tr>
+<tr><td><code>acs_post</code></td><td>ACS required to post</td></tr>
+<tr><td><code>acs_sysop</code></td><td>ACS for sysop functions</td></tr>
+<tr><td><code>anon_policy</code></td><td>Anonymous posting policy (0=No, 1=Yes, 2=Forced, 3=DearAbby, 4=AnyName)</td></tr>
+<tr><td><code>max_msgs</code></td><td>Maximum messages retained</td></tr>
+<tr><td><code>password</code></td><td>Optional area password</td></tr>
+<tr><td><code>origin</code></td><td>Origin line for echomail</td></tr>
 </table>
 <h3>Conferences</h3>
 <p>Conferences group message areas. Users join via <code>joinconf</code>/<code>leaveconf</code> actions or conference editor.</p>
@@ -50,53 +41,32 @@
 <p>Dispatched by <code>handle_msg_command()</code> in <code>src/msg_cmds.c</code>:</p>
 <table>
 <tr><th>Command</th><th>Handler</th><th>Description</th></tr>
-<table>
-<tr><th><code>MA</code></th><th><code>cmd_msg_area_change</code></th><th>Change current message area</th></tr>
-<table>
-<tr><th><code>MG</code></th><th><code>cmd_msg_area_list</code></th><th>List available message areas</th></tr>
-<table>
-<tr><th><code>MN</code></th><th><code>cmd_msg_new_scan</code></th><th>Scan for new messages</th></tr>
-<table>
-<tr><th><code>MP</code></th><th><code>cmd_msg_post</code></th><th>Post new message</th></tr>
-<table>
-<tr><th><code>MR</code></th><th><code>cmd_msg_read</code></th><th>Read message by number</th></tr>
-<table>
-<tr><th><code>MS</code></th><th><code>cmd_msg_search</code></th><th>Search messages</th></tr>
-<table>
-<tr><th><code>MW</code></th><th><code>cmd_msg_write_email</code></th><th>Write private email</th></tr>
-<table>
-<tr><th><code>MY</code></th><th><code>cmd_msg_your_scan</code></th><th>Scan messages addressed to you</th></tr>
-<table>
-<tr><th><code>MZ</code></th><th><code>cmd_msg_toggle_scan_areas</code></th><th>Toggle per-area scan flags</th></tr>
+<tr><td><code>MA</code></td><td><code>cmd_msg_area_change</code></td><td>Change current message area</td></tr>
+<tr><td><code>MG</code></td><td><code>cmd_msg_area_list</code></td><td>List available message areas</td></tr>
+<tr><td><code>MN</code></td><td><code>cmd_msg_new_scan</code></td><td>Scan for new messages</td></tr>
+<tr><td><code>MP</code></td><td><code>cmd_msg_post</code></td><td>Post new message</td></tr>
+<tr><td><code>MR</code></td><td><code>cmd_msg_read</code></td><td>Read message by number</td></tr>
+<tr><td><code>MS</code></td><td><code>cmd_msg_search</code></td><td>Search messages</td></tr>
+<tr><td><code>MW</code></td><td><code>cmd_msg_write_email</code></td><td>Write private email</td></tr>
+<tr><td><code>MY</code></td><td><code>cmd_msg_your_scan</code></td><td>Scan messages addressed to you</td></tr>
+<tr><td><code>MZ</code></td><td><code>cmd_msg_toggle_scan_areas</code></td><td>Toggle per-area scan flags</td></tr>
 </table>
 <p>Enter commands at the <code>:</code> prompt in message mode or via menu data fields (e.g., <code>MZ</code> in <code>menus/message.mnu</code>).</p>
 <h2>Read Commands (R*)</h2>
 <table>
 <tr><th>Command</th><th>Handler</th><th>Description</th></tr>
-<table>
-<tr><th><code>RA</code></th><th><code>cmd_msg_read</code></th><th>Read all (alias)</th></tr>
-<table>
-<tr><th><code>RC</code></th><th><code>cmd_msg_continuous_read</code></th><th>Continuous read mode</th></tr>
-<table>
-<tr><th><code>RE</code></th><th><code>cmd_msg_reply</code></th><th>Reply to message</th></tr>
-<table>
-<tr><th><code>RJ</code></th><th><code>cmd_msg_jump_reply</code></th><th>Jump to message and reply</th></tr>
-<table>
-<tr><th><code>RL</code></th><th><code>cmd_msg_list</code></th><th>List messages in area</th></tr>
-<table>
-<tr><th><code>RM</code></th><th><code>cmd_msg_edit</code></th><th>Edit own message</th></tr>
-<table>
-<tr><th><code>RN</code></th><th><code>cmd_msg_read_new</code></th><th>Read new messages</th></tr>
-<table>
-<tr><th><code>RP</code></th><th><code>cmd_msg_read_private</code></th><th>Read private mail</th></tr>
-<table>
-<tr><th><code>RQ</code></th><th><code>cmd_msg_quick_scan</code></th><th>Quick scan headers</th></tr>
-<table>
-<tr><th><code>RT</code></th><th><code>cmd_msg_thread_view</code></th><th>Thread tree view</th></tr>
-<table>
-<tr><th><code>RV</code></th><th><code>cmd_msg_view_attachment</code></th><th>View/download attachment</th></tr>
-<table>
-<tr><th><code>RY</code></th><th><code>cmd_msg_your_messages</code></th><th>Your messages list</th></tr>
+<tr><td><code>RA</code></td><td><code>cmd_msg_read</code></td><td>Read all (alias)</td></tr>
+<tr><td><code>RC</code></td><td><code>cmd_msg_continuous_read</code></td><td>Continuous read mode</td></tr>
+<tr><td><code>RE</code></td><td><code>cmd_msg_reply</code></td><td>Reply to message</td></tr>
+<tr><td><code>RJ</code></td><td><code>cmd_msg_jump_reply</code></td><td>Jump to message and reply</td></tr>
+<tr><td><code>RL</code></td><td><code>cmd_msg_list</code></td><td>List messages in area</td></tr>
+<tr><td><code>RM</code></td><td><code>cmd_msg_edit</code></td><td>Edit own message</td></tr>
+<tr><td><code>RN</code></td><td><code>cmd_msg_read_new</code></td><td>Read new messages</td></tr>
+<tr><td><code>RP</code></td><td><code>cmd_msg_read_private</code></td><td>Read private mail</td></tr>
+<tr><td><code>RQ</code></td><td><code>cmd_msg_quick_scan</code></td><td>Quick scan headers</td></tr>
+<tr><td><code>RT</code></td><td><code>cmd_msg_thread_view</code></td><td>Thread tree view</td></tr>
+<tr><td><code>RV</code></td><td><code>cmd_msg_view_attachment</code></td><td>View/download attachment</td></tr>
+<tr><td><code>RY</code></td><td><code>cmd_msg_your_messages</code></td><td>Your messages list</td></tr>
 </table>
 <p>Full reference: <a href="reference/message-commands.html">Message Commands</a>.</p>
 <h2>Posting Flow</h2>
@@ -114,10 +84,8 @@
 <h3>Signatures and Taglines</h3>
 <table>
 <tr><th>Action</th><th>Description</th></tr>
-<table>
-<tr><th><code>setsignature</code></th><th>Set user signature text</th></tr>
-<table>
-<tr><th><code>settagline</code></th><th>Set user tagline text</th></tr>
+<tr><td><code>setsignature</code></td><td>Set user signature text</td></tr>
+<tr><td><code>settagline</code></td><td>Set user tagline text</td></tr>
 </table>
 <p>User record fields: <code>signature</code>, <code>tagline</code>, <code>use_signature</code>, <code>use_tagline</code>.</p>
 <h2>Private Email</h2>
@@ -133,24 +101,18 @@
 <h3>Database Tables</h3>
 <table>
 <tr><th>Table</th><th>Purpose</th></tr>
-<table>
-<tr><th><code>qwk_hubs</code></th><th>Network hub definitions</th></tr>
-<table>
-<tr><th><code>qwk_area_links</code></th><th>Map local areas to hub conferences</th></tr>
-<table>
-<tr><th><code>qwk_packet_queue</code></th><th>Pending import/export packets</th></tr>
-<table>
-<tr><th><code>mail_packets</code></th><th>Generated packet records per user</th></tr>
+<tr><td><code>qwk_hubs</code></td><td>Network hub definitions</td></tr>
+<tr><td><code>qwk_area_links</code></td><td>Map local areas to hub conferences</td></tr>
+<tr><td><code>qwk_packet_queue</code></td><td>Pending import/export packets</td></tr>
+<tr><td><code>mail_packets</code></td><td>Generated packet records per user</td></tr>
 </table>
 <h3>User Flow</h3>
 <p>Menu action <code>netmail</code> provides QWK download/upload. CLI tool <code>mutineer-qwkgen</code> generates packets for batch/cron use.</p>
 <h3>QWK Commands (in session)</h3>
 <table>
 <tr><th>Command</th><th>Handler</th><th>Description</th></tr>
-<table>
-<tr><th>QWK download</th><th><code>cmd_qwk_download</code></th><th>Generate and download QWK packet</th></tr>
-<table>
-<tr><th>QWK upload</th><th><code>cmd_qwk_upload</code></th><th>Upload REP packet</th></tr>
+<tr><td>QWK download</td><td><code>cmd_qwk_download</code></td><td>Generate and download QWK packet</td></tr>
+<tr><td>QWK upload</td><td><code>cmd_qwk_upload</code></td><td>Upload REP packet</td></tr>
 </table>
 <p>User field <code>last_qwk</code> tracks last packet date.</p>
 <h2>FidoNet</h2>
@@ -158,22 +120,16 @@
 <h3>Tables</h3>
 <table>
 <tr><th>Table</th><th>Purpose</th></tr>
-<table>
-<tr><th><code>fido_akas</code></th><th>Up to 20 AKA addresses (zone:net/node.point)</th></tr>
-<table>
-<tr><th><code>fido_echolinks</code></th><th>Echo tag to message area mapping</th></tr>
-<table>
-<tr><th><code>fido_netmail</code></th><th>Outbound netmail queue</th></tr>
-<table>
-<tr><th><code>fido_echomail_queue</code></th><th>Echomail export queue</th></tr>
+<tr><td><code>fido_akas</code></td><td>Up to 20 AKA addresses (zone:net/node.point)</td></tr>
+<tr><td><code>fido_echolinks</code></td><td>Echo tag to message area mapping</td></tr>
+<tr><td><code>fido_netmail</code></td><td>Outbound netmail queue</td></tr>
+<tr><td><code>fido_echomail_queue</code></td><td>Echomail export queue</td></tr>
 </table>
 <h3>Sysop Tools</h3>
 <table>
 <tr><th>Action</th><th>Description</th></tr>
-<table>
-<tr><th><code>fidoeditor</code></th><th>Manage AKAs and echolinks</th></tr>
-<table>
-<tr><th><code>fidosend</code></th><th>Send pending netmail</th></tr>
+<tr><td><code>fidoeditor</code></td><td>Manage AKAs and echolinks</td></tr>
+<tr><td><code>fidosend</code></td><td>Send pending netmail</td></tr>
 </table>
 <p>CLI: <code>mutineer-netmail-export</code> exports the netmail queue to BSO format.</p>
 <h2>Message Attributes</h2>
@@ -182,14 +138,10 @@
 <p>Incomplete compositions saved to <code>drafts</code> table on disconnect:</p>
 <table>
 <tr><th>Field</th><th>Purpose</th></tr>
-<table>
-<tr><th><code>user_id</code></th><th>Owner</th></tr>
-<table>
-<tr><th><code>area_id</code></th><th>Target area</th></tr>
-<table>
-<tr><th><code>to_user_id</code> / <code>to_name</code></th><th>Email recipient</th></tr>
-<table>
-<tr><th><code>subject</code> / <code>body</code></th><th>Draft content</th></tr>
+<tr><td><code>user_id</code></td><td>Owner</td></tr>
+<tr><td><code>area_id</code></td><td>Target area</td></tr>
+<tr><td><code>to_user_id</code> / <code>to_name</code></td><td>Email recipient</td></tr>
+<tr><td><code>subject</code> / <code>body</code></td><td>Draft content</td></tr>
 </table>
 <h2>Scan Flags</h2>
 <p><code>MZ</code> toggles per-user area scan participation in <code>user_msg_scan_areas</code>. Disabled areas are skipped during <code>MN</code>/<code>RN</code> scans.</p>
@@ -197,24 +149,18 @@
 <p>AC flags blocking message activity:</p>
 <table>
 <tr><th>Flag</th><th>ACS</th><th>Effect</th></tr>
-<table>
-<tr><th><code>AC_RMSG</code></th><th><code>RM</code></th><th>Block message areas entirely</th></tr>
-<table>
-<tr><th><code>AC_RPOST</code></th><th><code>RP</code></th><th>Block posting</th></tr>
-<table>
-<tr><th><code>AC_RPOSTAN</code></th><th><code>R*</code></th><th>Block anonymous posting</th></tr>
-<table>
-<tr><th><code>AC_REMAIL</code></th><th><code>RE</code></th><th>Block email</th></tr>
+<tr><td><code>AC_RMSG</code></td><td><code>RM</code></td><td>Block message areas entirely</td></tr>
+<tr><td><code>AC_RPOST</code></td><td><code>RP</code></td><td>Block posting</td></tr>
+<tr><td><code>AC_RPOSTAN</code></td><td><code>R*</code></td><td>Block anonymous posting</td></tr>
+<tr><td><code>AC_REMAIL</code></td><td><code>RE</code></td><td>Block email</td></tr>
 </table>
 <h2>PLANK Integration</h2>
 <p>When PLANK areas map to local message areas (<code>plank_areas.local_area_id</code>), posts may generate PLANK objects for store-and-forward sync. See <a href="networking-plank.html">PLANK Networking</a>.</p>
 <h2>Maintenance</h2>
 <table>
 <tr><th>Tool</th><th>Purpose</th></tr>
-<table>
-<tr><th><code>mutineer-msgpack</code></th><th>Pack/prune old messages</th></tr>
-<table>
-<tr><th><code>mutineer-maint</code></th><th>Database maintenance</th></tr>
+<tr><td><code>mutineer-msgpack</code></td><td>Pack/prune old messages</td></tr>
+<tr><td><code>mutineer-maint</code></td><td>Database maintenance</td></tr>
 </table>
 <p>In-BBS: <code>maintenance</code> action → message pack options via <code>maint.c</code>.</p>
 <h2>Related Documentation</h2>

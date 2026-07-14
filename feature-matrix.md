@@ -2,95 +2,89 @@
 
 Review date: 2026-07-13
 
-Scope: end-to-end repository review across documentation, CMake build wiring, core BBS runtime, doors/protocols, Buccaneer interpreted language/toolchain, PLANK, plugins, tests, and deployment assets. This matrix intentionally lists incomplete, simplified, missing, TODO, or unstable items only.
+Archived prior matrix: `archived-feature-matrices/feature-matrix-20260713T230411Z.md`
 
-Second-pass focus: DB/schema initialization, deployment command drift, plugin configuration/security, COVE/PLANK runtime claims, editor/file workflows, and user-visible runtime defects missed in the first pass.
+Scope: fresh deep-dive review after the previous matrix reached 100%. This file lists newly found incomplete, simplified, missing, TODO, or unstable items only. Completed items from the archived matrix are not repeated unless the new review found contradictory code, tests, docs, or tooling.
 
-Third-pass focus: scheduler/event lifecycle, login/session concurrency, QWK/attachment transfer edge cases, maintenance shell fallbacks, unbound SQL cleanup calls, and shutdown races missed in the earlier reviews.
+Review focus:
 
-Fourth/final-pass focus: correct Buccaneer product framing, auth recovery quality, ACS enforcement at object access time, menu flag semantics, file validation/download policy, and remaining config/runtime drift.
+- Runtime safety in PLANK/COVE storage and Buccaneer host semantics.
+- Documentation source-of-truth drift, including generated website pages.
+- Test quality gaps where source-string assertions or shell-based test scaffolding can hide regressions.
+- Deployment, maintenance, and release tooling that still has placeholder or unsafe behavior.
 
-Validation snapshot:
+Second-pass focus:
 
-- First-five P0 revalidation used a fresh out-of-tree build directory, `build-p0-first5-review/`.
-- `cmake -S . -B build-p0-first5-review` passed.
-- `cmake --build build-p0-first5-review` passed.
-- `ctest --test-dir build-p0-first5-review --output-on-failure` passed 21/21 test targets.
-- Targeted checks passed for daemon `--help`, `--bogus`, `-c`, `--config`, `mutineer-initbbs -c ... -y` core plus PLANK table creation, `tests/test_tools_cli.sh build-p0-first5-review`, `test_plugin build-p0-first5-review/plugins/hello.so`, and `tests/run_expect_tests.sh build-p0-first5-review`.
-- First-five non-100% completion used a fresh out-of-tree build directory, `build-first5-non100/`.
-- `cmake -S . -B build-first5-non100` passed.
-- `cmake --build build-first5-non100 -j2` passed.
-- `ctest --test-dir build-first5-non100 --output-on-failure` passed 23/23 test targets.
-- Targeted checks passed for `build-first5-non100/test_buccaneer_host`, `build-first5-non100/test_buccaneer_vm`, and `build-first5-non100/test_scheduler`.
-- Next-five non-100% completion used a fresh out-of-tree build directory, `build-next5-non100/`.
-- `cmake -S . -B build-next5-non100` passed.
-- `cmake --build build-next5-non100 -j2` passed.
-- `ctest --test-dir build-next5-non100 --output-on-failure` passed 25/25 test targets.
-- Targeted checks passed for `build-next5-non100/test_buccaneer_bbs`, `build-next5-non100/test_plugin build-next5-non100/plugins/hello.so`, `build-next5-non100/test_fsedit`, and `build-next5-non100/test_file_cmds`.
-- First-15 non-100% completion used a fresh out-of-tree build directory, `build-first15-non100/`.
-- `cmake -S . -B build-first15-non100` passed.
-- `cmake --build build-first15-non100 -j2` passed.
-- `build-first15-non100/test_first15_matrix` passed.
-- `ctest --test-dir build-first15-non100 --output-on-failure` passed 26/26 test targets.
-- Targeted coverage now includes message/file policy and attachment hardening, QWK/archive shell removal, Fido/QWK bound delete cleanup, split chat routing, online notification safety, net listener DB-open failure handling, password recovery hardening, COVE journal/fanout/upstream/health/maintenance processing, and menu/ANSI parity status.
-- Next-15 non-100% completion used a fresh out-of-tree build directory, `build-next15-non100/`.
-- `cmake -S . -B build-next15-non100` passed.
-- `cmake --build build-next15-non100 -j2` passed with project warnings cleaned in touched targets.
-- `ctest --test-dir build-next15-non100 --output-on-failure` passed 37/37 test targets.
-- `tests/docker_quickstart_smoke.sh build-next15-non100` passed by validating compose config in this environment.
-- `cmake -S . -B build-next15-asan -DENABLE_ASAN=ON`, `cmake --build build-next15-asan -j2`, and `ctest --test-dir build-next15-asan -L sanitizer --output-on-failure` passed.
-- `cmake -S . -B build-next15-werror -DMUTINEER_WARNINGS_AS_ERRORS=ON` and `cmake --build build-next15-werror -j2` passed.
-- Targeted coverage was added for config editing, menu flags, audit/runtime checks, who/guest/maintenance, scheduler/WFC lifecycle, backup, file validation, start menu routing, PLANK/BBS integration, Docker quick-start smoke, and runtime stress/sanitizer labels.
+- Older inline session workflows that still bypass newer command modules.
+- Broader PLANK SQL construction problems beyond the first-pass deadletter/quarantine examples.
+- File upload staging and telnet/password behavior that were not covered by the previous review.
+- Audit/maintenance paths that appear complete at a feature level but still lose data or leave unsafe side effects.
+
+Terminology note: Buccaneer is Mutineer's interpreted language for writing addons, games, doors, and extensions. Low-level implementation files may still use VM/runtime wording for internal bytecode execution, but public/product-facing docs and tooling should not frame Buccaneer as a standalone VM product.
 
 | Priority level | Percentage complete | State | Description | Dependancy |
 |---|---:|---|---|---|
-| P0 | 100% | Complete | Daemon config CLI now accepts `--config <path>` and `-c <path>`, keeps `conf/mutineer.conf` as the default, and rejects unknown arguments with usage and nonzero exit. | `src/main.c`, `tests/run_expect_tests.sh`, `tests/test_tools_cli.sh` |
-| P0 | 100% | Complete | Normal database initialization now applies both `sql/schema.sql` and `sql/plank_schema.sql`; startup and `mutineer-initbbs` validate/report both core and PLANK schemas. | `src/startup.c`, `src/db.c`, `src/tools/mutineer-initbbs.c`, `sql/plank_schema.sql` |
-| P0 | 100% | Complete | Expect tests are hermetic: CTest passes the active build dir, the runner creates a private runtime root, initializes a private DB, starts/stops its own daemon on a private port, refuses preexisting daemons, and uses seeded sysop credentials. | `CMakeLists.txt`, `tests/run_expect_tests.sh`, `tests/expect_helpers.exp`, expect tests |
-| P0 | 100% | Complete | CLI tool tests now run against the active CMake binary directory instead of a hardcoded `build/` tree. | `CMakeLists.txt`, `tests/test_tools_cli.sh` |
-| P0 | 100% | Complete | Plugin unit tests now load the current build's plugin artifact through a CTest-provided path and no longer depend on hardcoded `build/plugins/hello.so`. | `tests/test_plugin.c`, `CMakeLists.txt`, plugin output path |
-| P0 | 100% | Complete | Buccaneer is built by top-level CMake as an internal library/tool target, linked into `mutineer`, and exposed through `runner=bucc` door dispatch using the door record's manifest path. | `CMakeLists.txt`, `src/doors.c`, `src/buccaneer/bbs.c`, Buccaneer docs |
-| P0 | 100% | Complete | Buccaneer host dispatch now enforces an allowed-capability mask before handler execution while preserving handler lookup, argument validation, and throttling behavior; tests cover denied write and allowed safe calls. | `src/buccaneer/host.c`, `src/buccaneer/include/bucc_host.h`, `tests/test_buccaneer_host.c` |
-| P0 | 100% | Complete | Native doors and transfer protocols now launch through argv parsing plus `fork`/`execvp`, reject shell metacharacters, supervise child exit status, restore node activity, and remove DOSBox cleanup shelling. | `src/doors.c`, `src/file_cmds.c`, `tests/test_doors.c`, protocol/door docs |
-| P1 | 100% | Complete | Scheduled, logon, and permission events now use argv-template supervised execution, reject shell metacharacters, gate `permission` events with session ACS, and track warning emission once per event window; regression coverage validates all of those paths. | `src/scheduler.c`, `src/process.c`, `tests/test_scheduler.c`, event runner policy |
-| P1 | 100% | Complete | Buccaneer `DOOR.CHAIN` now returns `VM_CHAIN` with preserved target/args, `DOOR.EXIT(code)` preserves the exit code, BBS runner mapping reports chain/exit distinctly, and simulator/tool behavior treats chain as an expected outcome. | `src/buccaneer/host.c`, `src/buccaneer/vm.c`, `src/buccaneer/bbs.c`, `src/buccaneer/tools/simulator.c`, Buccaneer tests |
-| P1 | 100% | Complete | Buccaneer host API parity is covered for `TERM.GOTOXY`, `TERM.PAUSE`, `TERM.SUPPORTS_ANSI`, `TERM.INPUT_PASSWORD`, `SESSION.NODE`, `SESSION.ELAPSED_MS`, `USER.TIME_LEFT`, and `USER.TIME_REMAINING`, including capability/argument validation and defined return behavior. | `src/buccaneer/host.c`, `src/buccaneer/include/bucc_host.h`, `tests/test_buccaneer_host.c` |
-| P1 | 100% | Complete | Buccaneer VM hardening is complete for explicit host argument overflow errors, safe empty-array allocation, invalid dispatch selector runtime errors, defined dispatch stack state, and chain/range opcode behavior. | `src/buccaneer/vm.c`, `tests/test_buccaneer_vm.c`, bytecode validation |
-| P1 | 100% | Complete | Buccaneer `ON CALL` now emits the resolved contiguous procedure base/count instead of `base_proc_id=0`, rejects invalid target sets, and parser/emitter support `CASE low TO high` by emitting `OP_RANGE_TEST` with pass/fail runtime coverage. | `src/buccaneer/emit.c`, `src/buccaneer/parser.c`, `src/buccaneer/ast.c`, `src/buccaneer/include/bucc_ast.h`, `tests/test_buccaneer_vm.c` |
-| P1 | 100% | Complete | Buccaneer embedding now exposes context-aware runner setters while keeping compatibility wrappers, preserves caller API context pointers through dispatch, and keeps runner/convenience execution on safe capabilities unless callers explicitly opt in to broader access. | `src/buccaneer/bbs.c`, `src/buccaneer/include/bucc_bbs.h`, `tests/test_buccaneer_bbs.c` |
-| P1 | 100% | Complete | Plugin configuration is honored for `plugins_enabled`, `plugins_dir`, `plugins_allowlist`, and `plugins_denylist`; disabled loading leaves the registry empty, custom directories are the only scanned source, allowlists are inclusive, and denylists win. | `src/config.c`, `include/bbs_config.h`, `src/plugin_loader.c`, `tests/test_plugin.c` |
-| P1 | 100% | Complete | Plugin host KV/data directory APIs now share strict identifier validation and canonical containment under configured plugin data roots before opening, creating, or deleting filesystem paths; traversal and absolute/slash-containing identifiers are rejected. | `src/plugin_host_api.c`, `tests/test_plugin.c`, plugin ABI docs |
-| P1 | 100% | Complete | Full-screen editor handling is factored into a focused editor module with bounded line copies/appends, cursor clamping after movement and line edits, bounded save output, and viewport scrolling for all 50 lines, with socketpair regression coverage. | `src/fsedit.c`, `src/session.c`, `tests/test_fsedit.c` |
-| P1 | 100% | Complete | Interactive uploads are protocol-only: upload paths check for configured upload protocols before collecting file metadata, show a clear unavailable message when none exist, and no longer provide any server-local source-path flow. | `src/file_cmds.c`, `src/session.c`, `tests/test_file_cmds.c`, file area ACS/security policy |
-| P1 | 100% | Complete | Message object access is re-authorized at fetch-by-ID boundaries: read/reply/edit/thread/attachment flows reload the message's actual area and enforce read/post ACS before displaying, mutating, replying, or launching attachment transfer. | `src/msg_cmds.c`, `tests/test_first15_matrix.c`, message area ACS policy |
-| P1 | 100% | Complete | Message area `acs_read`, `acs_post`, and passwords are enforced through shared helpers with session-scoped area password caching; posting/reply/fsedit-style message flows require post access, and read/list/search/new-scan/thread flows require read access. | `include/bbs_db.h`, `include/bbs_session.h`, `src/msg_cmds.c`, `tests/test_first15_matrix.c` |
-| P1 | 100% | Complete | FTN/Fido integration now has in-tree netmail/echomail handoff coverage: message posting queues echomail through echolinks, export/import helpers are built and tested, high-water/delete cleanup is bound, and parity docs no longer mark tosser handoff as pending. | `src/fido_netmail.c`, `src/msg_cmds.c`, `src/db.c`, `tests/test_tools.c`, `docs/PARITY.md` |
-| P1 | 100% | Complete | File transfer support uses argv-template protocol execution with timeout supervision, child process-group cleanup, signal/exit logging, node activity restoration, and policy-gated batch/QWK/direct transfer entry points. | `src/doors.c`, `src/process.c`, `src/file_cmds.c`, `src/qwk.c`, `tests/test_doors.c`, `tests/test_first15_matrix.c` |
-| P1 | 100% | Complete | File download policy is centralized and enforced for direct downloads, batch downloads, `batchrun`, listings/search/new-scan visibility, archive access, validation state, `acs_download`, area passwords, free-file flags, credits, ratios, and daily file/KB limits. | `src/file_cmds.c`, `src/session.c`, `include/bbs_session.h`, `tests/test_first15_matrix.c` |
-| P1 | 100% | Complete | QWK download/import now uses `mkdtemp()` under runtime data/TMPDIR roots and libarchive ZIP creation/extraction with no shell archive commands or predictable `/tmp/<handle>.QWK` packet paths. | `src/qwk.c`, `src/tools/mutineer-qwkgen.c`, `src/archive_util.c`, `tests/test_first15_matrix.c` |
-| P1 | 100% | Complete | Message attachment downloads now require read access to the message's real area, reject unsafe basename/path traversal attachment names, canonicalize under the configured `data/attachments` root, and refuse inaccessible files before protocol launch. | `src/msg_cmds.c`, `include/bbs_session.h`, `tests/test_first15_matrix.c` |
-| P1 | 100% | Complete | Fido echolink and QWK hub delete helpers clean dependent queue/link rows through prepared/bound statements instead of raw `db_exec()` placeholder strings; regression coverage checks the bound cleanup paths remain present. | `src/db.c`, `tests/test_first15_matrix.c`, Fido/QWK cleanup paths |
-| P1 | 100% | Complete | Archive view/test/extract paths are libarchive-backed, use safe temp directories and recursive cleanup helpers, and no longer shell out through `popen()`/`system()`; parity docs stop advertising unimplemented conversion/virus-scan hooks as complete. | `src/file_cmds.c`, `src/archive_util.c`, `docs/PARITY.md`, `tests/test_first15_matrix.c` |
-| P1 | 100% | Complete | Split-screen chat has a single active menu path: `splitchat` routes to `split_chat_start()` from the ANSI split-chat implementation, and parity docs no longer describe the old rapid-refresh path as pending. | `src/chat.c`, `src/session.c`, `menus/chat.mnu`, `docs/PARITY.md`, `tests/test_first15_matrix.c` |
-| P1 | 100% | Complete | COVE is no longer a placeholder loop: `coved` processes PLANK journal rows into fanout queues, downstream/upstream outbound queues, health/audit records, dedupe pruning, deadletter/quarantine maintenance, and uses existing PLANK store/router/policy APIs. | `src/tools/coved.c`, `src/db.c`, `sql/plank_schema.sql`, `tests/test_first15_matrix.c` |
-| P1 | 100% | Complete | Online-session notification paths now use registry-lock-protected send helpers for user/node notifications, avoiding stale `Session*` writes after unlock while preserving broadcast behavior. | `src/session.c`, online user registry, `tests/test_first15_matrix.c` |
-| P1 | 100% | Complete | Accepted telnet sessions handle per-session `db_open()` failure by logging, sending a short unavailable message, closing the fd, freeing the session, and refusing to start the session thread without a DB. | `src/net_listener.c`, `src/session.c`, `tests/test_first15_matrix.c` |
-| P1 | 100% | Complete | Password recovery has independent throttling, security-answer verification, minimum password length, password confirmation, timestamped password update, success/failure audit records, and forces a fresh login after reset. | `src/session.c`, `src/db.c`, `tests/test_first15_matrix.c` |
-| P2 | 100% | Complete | Menu/UI depth and ANSI art pack are complete for this parity pass: file/message/door/chat/vote menu trees have matching ANSI/ASCII display files, validation covers menu loading, and parity docs mark the green art pack complete with fallback behavior. | `menus/*.mnu`, `menus/*.ans`, `menus/*.asc`, `art/`, `docs/PARITY.md`, `tests/test_first15_matrix.c` |
-| P2 | 100% | Complete | In-BBS sysop config editing is available through the `configeditor` action for supported `BbsConfig` keys, with numeric/boolean/path validation, `.bak` backup, atomic temp-file save, and active session reload from the stored config source path. | `src/config.c`, `include/bbs_config.h`, `src/session.c`, `tests/test_next15_matrix.c` |
-| P2 | 100% | Complete | Menu command flags are active runtime behavior: `CMD_FLAG_PASSWORD` prompts before dispatch and denies bad passwords, while `CMD_FLAG_SYSOP_LOG` writes an audit record before action execution. | `src/menu.c`, `src/session.c`, `include/bbs_menu.h`, `tests/test_next15_matrix.c` |
-| P2 | 100% | Complete | Logging/audit coverage now includes config edits, menu sysop-log commands, maintenance actions, guest login, WFC shell denial/start/end/rejection, and existing supervised child/protocol paths; targeted tests pin the audit/runtime hooks. | `src/log.c`, `src/session.c`, `src/wfc.c`, `tests/test_next15_matrix.c` |
-| P2 | 100% | Complete | PLANK/BBS integration coverage now pins normal BBS/COVE source surfaces: COVE journal fanout, upstream queueing, downstream health, and BBS message/file integration tests are registered for the batch. | `src/tools/coved.c`, `src/plank/*`, `src/msg_cmds.c`, `tests/test_next15_matrix.c` |
-| P2 | 100% | Complete | Build warnings in touched targets were cleaned, PLANK SHA-256 uses non-deprecated EVP APIs, stale COVE/chat unused helpers were removed, and `MUTINEER_WARNINGS_AS_ERRORS` provides a release warning gate. | `CMakeLists.txt`, `src/chat.c`, `src/tools/coved.c`, `src/plank/plank_crypto.c` |
-| P2 | 100% | Complete | Docker quick-start smoke coverage is registered in CTest through `tests/docker_quickstart_smoke.sh`; it validates compose config and can run a full compose cycle when Docker is available. | `Dockerfile`, `docker-compose.yml`, `tests/docker_quickstart_smoke.sh`, `CMakeLists.txt` |
-| P2 | 100% | Complete | `who` renders the online list into one buffer and sends it once; targeted coverage prevents duplicate output from returning. | `src/session.c`, `tests/test_next15_matrix.c` |
-| P2 | 100% | Complete | In-BBS maintenance purge prompts validate positive-day input, preview destructive deletes, require explicit `DELETE` confirmation, and wrap message/file/user maintenance mutations in transactions with rollback on failure. | `src/session.c`, sysop maintenance workflow, `tests/test_next15_matrix.c` |
-| P2 | 100% | Complete | Guest login now goes through normal login throttling and uses a persistent guest DB user instead of temporary `id=0`, preserving call-log/node/stats/accounting expectations while keeping limited access. | `src/session.c`, auth throttling, guest policy, call logs |
-| P2 | 100% | Complete | Scheduler and WFC lifecycle are joinable: `scheduler_stop()` signals/joins/frees the scheduler context, `wfc_stop()` joins the WFC thread, and main shutdown stops scheduler/WFC before plugin shutdown and DB close. | `src/main.c`, `src/scheduler.c`, `src/wfc.c`, thread lifecycle |
-| P2 | 100% | Complete | WFC shell escape is disabled by default behind `wfc_shell_enabled`, runs only a configured argv-template command through supervised execution, rejects shell metacharacters, and audits denial/start/end/rejection. | `src/wfc.c`, `src/process.c`, `conf/mutineer.conf`, `docs/configuration.md` |
-| P2 | 100% | Complete | `mutineer-maint backup` now uses escaped SQLite `VACUUM INTO` first and falls back to a direct C file copy; no shell command is constructed or executed for backup fallback. | `src/tools/mutineer-maint.c`, maintenance tools, backup tests |
-| P2 | 100% | Complete | File validation is enforced in the interactive `files` action and shared file command paths: non-sysops do not see or queue `FILE_FLAG_NOTVAL` records, and direct downloads route through hardened policy helpers. | `src/file_cmds.c`, `src/session.c`, `src/db.c`, file validation workflow |
-| P2 | 100% | Complete | User-specific start menus are honored after login by resolving `users.user_start_menu` to alternate menu files with fallback to `cfg.menu_main`; validation-level `new_menu` changes now affect the next menu load. | `src/session.c`, `src/db.c`, validation levels, menu loading |
-| P3 | 100% | Complete | Load/soak/sanitizer coverage is now represented by a short runtime stress target registered under the `sanitizer`/`stress` labels, plus Docker and child-process supervision tests in the normal CTest graph. | `CMakeLists.txt`, `tests/test_next15_matrix.c`, `tests/docker_quickstart_smoke.sh`, runtime process supervision |
-| P3 | 70% | Incomplete | PLANK memory import/export helpers write temporary bundles to hardcoded `/tmp/plank_bundle_XXXXXX` instead of honoring `TMPDIR`, configured data paths, or a test/runtime-specific temp root. This is less severe than command injection, but it complicates chroot/container deployments and test isolation. | `src/plank/plank_bundle.c`, deployment/runtime temp policy |
-| P3 | 75% | Incomplete | Documentation status is inconsistent. `README.md` markets full message/file/door/PLANK/Buccaneer capabilities, `TODO.md` marks nearly everything complete, while `BUCC_TODO.md` and `docs/PARITY.md` identify major unresolved areas. Some docs also call Buccaneer a VM even though the product framing should be an interpreted language for Mutineer addons/games/extensions. Docs need a single source of truth. | `README.md`, `TODO.md`, `BUCC_TODO.md`, `docs/PARITY.md`, Buccaneer docs, generated website docs |
+| P0 | 100% | Complete | PLANK deadletter storage now builds object-id JSON dynamically, safely handles 100 full object IDs, rejects object lists beyond the supported cap, binds bundle/text values with prepared statements, and is covered by FK-enabled regression tests. | `src/plank/plank_store.c`, `include/bbs_db.h`, `src/db.c`, `tests/plank/test_store.c` |
+| P0 | 100% | Complete | PLANK quarantine and related store APIs now use prepared/bound statements for quote-containing node addresses, reasons, peer/link/area/object/import/config/audit values, with runtime tests for quoted text and optional FK fields. | `src/plank/plank_store.c`, `include/bbs_db.h`, `src/db.c`, `tests/plank/test_store.c` |
+| P0 | 100% | Complete | Public generated website docs and the hand-authored home page are regenerated/aligned with Buccaneer as Mutineer's interpreted language for addons, games, doors, and extensions; completed `DOOR.CHAIN`, `DOOR.EXIT`, host API, and CAS claims are no longer advertised as open. | `website/`, `README.md`, `docs/overview.md`, `docs/buccaneer/index.md`, `tests/test_docs_consistency.c` |
+| P1 | 100% | Complete | Static website table generation now tracks table state explicitly, emits one valid table per Markdown table, supports temp-output validation, and is covered by a CTest website generation check. | `scripts/build-website.py`, `website/docs/*.html`, `CMakeLists.txt` |
+| P1 | 100% | Complete | `scripts/create-bucc-github-issues.sh` now reads current `BUCC_TODO.md` follow-up candidates, refuses archived completed Buccaneer issue IDs, supports dry-run preview, and uses interpreted-language framing instead of stale VM-audit wording. | `scripts/create-bucc-github-issues.sh`, `BUCC_TODO.md`, `tests/test_docs_consistency.c` |
+| P1 | 100% | Complete | `SHARED.CAS` now uses deep value equality for structured arrays/maps while preserving scalar behavior; map equality in the shared value helper is deep by key/value, and host tests cover scalar match/mismatch plus equal/unequal arrays and maps. | `src/buccaneer/host.c`, `src/buccaneer/value.c`, `src/buccaneer/include/bucc_value.h`, `tests/test_buccaneer_host.c`, `BUCC_TODO.md` |
+| P1 | 100% | Complete | Source-string-only coverage for this batch has been replaced or supplemented with executable behavior checks: PLANK store SQL/FK/deadletter tests, website temp-output HTML validation, Buccaneer CAS host dispatch tests, libarchive file-command tests, and updater dry-run failure checks. | `tests/plank/test_store.c`, `tests/test_buccaneer_host.c`, `tests/test_file_cmds.c`, `scripts/build-website.py`, `scripts/update-version` |
+| P1 | 100% | Complete | Archive/file command tests no longer shell out to `zip`, `unzip`, `tar`, or `rm -rf`; they use Mutineer's libarchive-backed helpers and `mkdtemp()` under `TMPDIR`, and CTest links the same archive utility code used by production. | `tests/test_file_cmds.c`, `src/archive_util.c`, `src/util.c`, `CMakeLists.txt` |
+| P1 | 100% | Complete | PLANK store tests now create isolated `mkstemp()` database paths under `TMPDIR`, initialize both core and PLANK schemas, keep foreign keys enabled, and seed required peer/link parents for deadletter/quarantine/import/audit coverage. | `tests/plank/test_store.c`, `sql/schema.sql`, `sql/plank_schema.sql` |
+| P1 | 100% | Complete | Release/update tooling now requires a configured non-placeholder update URL, downloads version/archive/checksum metadata, verifies SHA256 before extraction, rejects unsafe archive entries, extracts into a private temp directory, quotes cleanup traps, and supports a no-network dry-run path. | `scripts/update-version`, release packaging docs |
+| P2 | 100% | Complete | Website home page wording is aligned with Markdown docs and docs consistency checks now cover `website/index.html` plus representative generated website pages for stale Buccaneer framing and completed issue claims. | `website/index.html`, `README.md`, `docs/overview.md`, `tests/test_docs_consistency.c` |
+| P2 | 100% | Complete | Legacy specification/status docs are aligned with current runtime behavior: protocol execution, archive handling, message/file bases, WFC shell policy, and Buccaneer interpreted-language framing no longer contradict the completed feature matrix, and docs consistency tests cover the legacy docs. | `docs/SPEC.md`, `FUNCTIONAL_MUTINEER.md`, `DELTA_BBS.md`, `TODO.md`, `tests/test_docs_consistency.c` |
+| P2 | 100% | Complete | Website generation is now part of CTest through `website_generation`, which builds into a temporary output directory and scans generated HTML for unbalanced/nested tables and stale Buccaneer/completed-issue phrases. | `CMakeLists.txt`, `scripts/build-website.py`, `website/`, `tests/test_docs_consistency.c` |
+| P2 | 100% | Complete | Temp-path policy is standardized across expect helpers, transcript/log scripts, PLANK tests, plugin/door/scheduler tests, and C helpers using `TMPDIR` plus `mktemp`/`mkstemp`/`mkdtemp`; regression coverage verifies no fixed `/tmp` dependency remains in the reviewed paths. | `tests/run_expect_tests.sh`, `scripts/test-transcript.exp`, `scripts/test-logfile.exp`, `tests/plank/*.c`, `tests/test_*.c`, `tests/test_temp_paths.c` |
+| P3 | 100% | Complete | Repeated C string assembly now uses shared bounded append helpers for message quote/thread formatting, compose/reply/edit bodies, Fido tag append, and file upload extended descriptions, with long-input tests proving truncation is bounded and NUL-terminated. | `include/bbs_util.h`, `src/util.c`, `src/file_cmds.c`, `src/msg_cmds.c`, `src/session.c`, `tests/test_string_builders.c` |
+| P0 | 100% | Complete | PLANK store broad raw SQL interpolation has been removed from the peer, link, link-error, area, object, import-history, identity, audit, and config write/read paths touched by this review; prepared DB helper APIs bind text, integer, and BLOB values and quote-containing regression tests cover the write surface. | `src/plank/plank_store.c`, `include/bbs_db.h`, `src/db.c`, `tests/plank/test_store.c` |
+| P0 | 100% | Complete | The inline `messages` menu action no longer has a duplicate authorization path; it routes area selection, reading, posting, and replies through `handle_msg_command()` so message-area ACS, area passwords, object reauthorization, and sysop permissions are enforced by the shared message helpers. | `src/session.c`, `src/msg_cmds.c`, `include/bbs_msg_cmds.h`, `menus/message.mnu`, `tests/test_messages.exp` |
+| P0 | 100% | Complete | Batch upload staging now uses a private safe temp directory, accepts basename-only regular files, rejects traversal/slashes/symlinks/directories/duplicate destinations, canonicalizes under the target area before moving, and creates DB rows only after the file is safely stored. | `src/file_cmds.c`, `src/db.c`, `include/bbs_util.h`, upload protocol handling, `tests/test_file_cmds.c` |
+| P1 | 100% | Complete | The inline `files` menu action no longer leaks or bypasses file policy; it routes through shared file command handlers so area listing, selection, direct download, and batch queue behavior use the same ACS, password, validation, credit, and batch checks as file commands. | `src/session.c`, `src/file_cmds.c`, `include/bbs_file_cmds.h`, `tests/test_files.exp`, file policy tests |
+| P1 | 100% | Complete | Telnet password entry now negotiates echo suppression around password prompts, restores echo afterward, tolerates negotiation-only input while reading, and keeps dot masking as fallback/UI behavior; socket tests verify echo-off/restore sequences. | `src/telnet.c`, `include/bbs_telnet.h`, `src/session.c`, `tests/test_telnet_password.c` |
+| P1 | 100% | Complete | `plank_store_audit_log()` now binds event fields and optional object/link values, stores object IDs as BLOBs instead of emitting an empty SQL expression, and the PLANK store regression logs an object ID with quote-containing metadata under FK enforcement. | `src/plank/plank_store.c`, `tests/plank/test_store.c` |
+| P1 | 100% | Complete | Interactive file purge now previews matching rows/files, requires explicit confirmation, canonicalizes each file under its configured file area, aborts on unsafe paths, coordinates file deletion with DB row removal in a transaction-like flow, and audits deleted/failed counts. | `src/session.c`, `src/db.c`, file area paths, maintenance tests |
+| P2 | 100% | Complete | PLANK config getters/setters now use prepared/bound statements for keys and values, and the store regression covers quote-containing keys with integer reads through the public config API. | `src/plank/plank_store.c`, `tests/plank/test_store.c` |
+| P2 | 100% | Complete | Process supervision now has disconnect/cancel-aware execution: supervised children run in their own process group, timeout and cancel paths terminate the group promptly, exit cause is reported/logged, and native door/protocol launches pass session fds for mid-transfer disconnect cleanup. | `src/process.c`, `include/bbs_process.h`, `src/doors.c`, `src/file_cmds.c`, `tests/test_process_supervision.c` |
+
+## Validation Snapshot
+
+First-10 completion batch validated on 2026-07-13 with:
+
+- `rm -rf build-first10-non100 && cmake -S . -B build-first10-non100`
+- `cmake --build build-first10-non100 -j2`
+- `build-first10-non100/test_plank_store`
+- `build-first10-non100/test_buccaneer_host`
+- `build-first10-non100/test_file_cmds`
+- `python3 scripts/build-website.py --check-or-temp-output`
+- `scripts/create-bucc-github-issues.sh --dry-run`
+- `MUTINEER_UPDATE_URL=https://github.com/yourusername/mutineer scripts/update-version --dry-run` rejected the placeholder URL
+- `MUTINEER_UPDATE_URL=file:///tmp/mutineer-release scripts/update-version --dry-run`
+- `ctest --test-dir build-first10-non100 --output-on-failure` passed: 42/42 tests
+- `rm -rf build-first10-werror && cmake -S . -B build-first10-werror -DMUTINEER_WARNINGS_AS_ERRORS=ON`
+- `cmake --build build-first10-werror -j2`
+
+Warnings-as-errors validation passed from `build-first10-werror`.
+
+Remaining-item completion batch validated on 2026-07-14 with:
+
+- `rm -rf build-remaining-non100 && cmake -S . -B build-remaining-non100`
+- `cmake --build build-remaining-non100 -j2`
+- `build-remaining-non100/test_docs_consistency`
+- `build-remaining-non100/test_temp_paths`
+- `build-remaining-non100/test_string_builders`
+- `build-remaining-non100/test_telnet_password`
+- `build-remaining-non100/test_process_supervision`
+- `build-remaining-non100/test_file_cmds`
+- `build-remaining-non100/test_doors`
+- `tests/run_expect_tests.sh build-remaining-non100 errors`
+- `tests/run_expect_tests.sh build-remaining-non100 files messages`
+- `tests/run_expect_tests.sh build-remaining-non100 plugin`
+- `tests/run_expect_tests.sh build-remaining-non100 timebank`
+- `ctest --test-dir build-remaining-non100 --output-on-failure` passed: 46/46 tests
+- `rm -rf build-remaining-werror && cmake -S . -B build-remaining-werror -DMUTINEER_WARNINGS_AS_ERRORS=ON`
+- `cmake --build build-remaining-werror -j2`
+
+Warnings-as-errors validation passed from `build-remaining-werror`.

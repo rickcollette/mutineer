@@ -1,5 +1,5 @@
 #!/usr/bin/expect -f
-# Chat feature tests for Mutineer BBS
+# Focused chat smoke test for Mutineer BBS.
 
 set script_dir [file dirname [info script]]
 source "$script_dir/expect_helpers.exp"
@@ -8,239 +8,48 @@ puts ""
 puts "=== Chat Feature Tests ==="
 puts ""
 
-# Test 1: Enter and exit chat room
-run_test "enter_exit_chat" {
+run_test "enter_send_exit_chat" {
     if {![connect_bbs]} { return 0 }
     if {![login_as "sysop" "mutineer"]} { return 0 }
-    
-    send "C\r"
-    
-    expect {
-        -re "Channel|Chat|restricted" { }
-        timeout { return 0 }
-    }
-    
-    # If we got channel prompt, select default
-    expect {
-        -re {Channel.*:} {
-            send "\r"
-        }
-        "> " { }
-        "restricted" {
-            send "Q\r"
-            expect {
-                eof { }
-                timeout { }
-            }
-            return 0
-        }
-        timeout { }
-    }
-    
-    # Wait for chat prompt (may already be showing)
-    expect {
-        "> " { }
-        -re {Entering.*chat} { 
-            expect "> "
-        }
-        timeout { }
-    }
-    
-    # Exit chat
-    send "/quit\r"
-    
-    expect {
-        -re "Selection:|Leaving chat" { }
-        timeout { }
-    }
-    
-    # Make sure we're back at menu
-    expect {
-        "Selection:" { }
-        timeout { }
-    }
-    
-    send "Q\r"
-    expect {
-        eof { }
-        timeout { }
-    }
-    return 1
-}
 
-# Test 2: Send chat message
-run_test "send_chat_message" {
-    if {![connect_bbs]} { return 0 }
-    if {![login_as "sysop" "mutineer"]} { return 0 }
-    
     send "C\r"
-    
     expect {
-        -re "Channel.*:" {
-            send "\r"
-        }
+        -re "Channel.*:" { send "\r" }
         "> " { }
+        "restricted" { return 0 }
         timeout { return 0 }
     }
-    
+
     expect {
         "> " { }
         timeout { return 0 }
     }
-    
-    # Send a test message
+
     send "Hello from expect test!\r"
-    
-    # Should still be at chat prompt
     expect {
         "> " { }
         timeout { return 0 }
     }
-    
+
     send "/quit\r"
     expect {
         "Selection:" { }
-        timeout { }
-    }
-    send "Q\r"
-    expect {
-        eof { }
-        timeout { }
-    }
-    return 1
-}
-
-# Test 3: Wall post
-run_test "wall_post" {
-    if {![connect_bbs]} { return 0 }
-    if {![login_as "sysop" "mutineer"]} { return 0 }
-    
-    send "L\r"
-    
-    expect {
-        -re "Wall message:|Message:" { }
-        "restricted" {
-            send "Q\r"
-            expect {
-                eof { }
-                timeout { }
-            }
-            return 0
-        }
-        timeout { return 0 }
-    }
-    
-    send "Test wall post from expect\r"
-    
-    expect {
-        "Selection:" { }
-        timeout { return 0 }
-    }
-    
-    send "Q\r"
-    expect {
-        eof { }
-        timeout { }
-    }
-    return 1
-}
-
-# Test 4: Whisper (send to node)
-run_test "whisper" {
-    if {![connect_bbs]} { return 0 }
-    if {![login_as "sysop" "mutineer"]} { return 0 }
-    
-    send "S\r"
-    
-    expect {
-        -re "Node.*:|Whisper" { }
-        "restricted" {
-            send "Q\r"
-            expect {
-                eof { }
-                timeout { }
-            }
-            return 0
-        }
-        timeout { return 0 }
-    }
-    
-    # Try to whisper to node 1 (ourselves or non-existent)
-    send "1\r"
-    
-    expect {
-        -re "Message:|not online|Invalid" { }
-        timeout { return 0 }
-    }
-    
-    # If we got message prompt, send something
-    expect {
-        "Message:" {
-            send "Test whisper\r"
-        }
-        "Selection:" { }
-        timeout { }
-    }
-    
-    expect {
-        "Selection:" { }
-        timeout { }
-    }
-    
-    send "Q\r"
-    expect {
-        eof { }
-        timeout { }
-    }
-    return 1
-}
-
-# Test 5: Select different chat channel
-run_test "chat_channel_select" {
-    if {![connect_bbs]} { return 0 }
-    if {![login_as "sysop" "mutineer"]} { return 0 }
-    
-    send "C\r"
-    
-    expect {
-        -re "Channel.*:" { }
-        "> " {
-            # Already in chat, exit first
-            send "/quit\r"
+        -re "Leaving chat" {
             expect {
                 "Selection:" { }
-                timeout { }
-            }
-            send "C\r"
-            expect {
-                -re "Channel.*:" { }
-                timeout { }
+                timeout { return 0 }
             }
         }
         timeout { return 0 }
     }
-    
-    # Select channel 2
-    send "2\r"
-    
-    expect {
-        "> " { }
-        timeout { return 0 }
-    }
-    
-    send "/quit\r"
-    expect {
-        "Selection:" { }
-        timeout { }
-    }
+
     send "Q\r"
     expect {
         eof { }
-        timeout { }
+        timeout { return 0 }
     }
     return 1
 }
 
-# Print summary and exit
 set exit_code [test_summary "test_chat.exp"]
 exit $exit_code

@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <limits.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <errno.h>
@@ -197,6 +198,117 @@ int db_query_int(BbsDb *db, const char *sql, int default_val)
   return result;
 #else
   (void)sql;
+  return default_val;
+#endif
+}
+
+#ifdef HAVE_SQLITE
+static bool db_bind_values(BbsDb *db, sqlite3_stmt *st, const DbBind *binds, int bind_count)
+{
+  if (bind_count < 0)
+  {
+    set_err(db, "negative bind count");
+    return false;
+  }
+  for (int i = 0; i < bind_count; i++)
+  {
+    const DbBind *b = &binds[i];
+    int idx = i + 1;
+    int rc = SQLITE_OK;
+    switch (b->type)
+    {
+    case DB_BIND_NULL:
+      rc = sqlite3_bind_null(st, idx);
+      break;
+    case DB_BIND_INT:
+      rc = sqlite3_bind_int(st, idx, b->v.i);
+      break;
+    case DB_BIND_INT64:
+      rc = sqlite3_bind_int64(st, idx, (sqlite3_int64)b->v.i64);
+      break;
+    case DB_BIND_TEXT:
+      rc = sqlite3_bind_text(st, idx, b->v.text ? b->v.text : "", -1, SQLITE_TRANSIENT);
+      break;
+    case DB_BIND_BLOB:
+      if (b->v.blob.len > (size_t)INT_MAX)
+      {
+        set_err(db, "blob bind too large");
+        return false;
+      }
+      if (b->v.blob.len == 0)
+        rc = sqlite3_bind_blob(st, idx, "", 0, SQLITE_TRANSIENT);
+      else
+        rc = sqlite3_bind_blob(st, idx, b->v.blob.data, (int)b->v.blob.len, SQLITE_TRANSIENT);
+      break;
+    default:
+      set_err(db, "unknown bind type");
+      return false;
+    }
+    if (rc != SQLITE_OK)
+    {
+      set_err(db, sqlite3_errmsg(db->db));
+      return false;
+    }
+  }
+  return true;
+}
+#endif
+
+bool db_exec_prepared(BbsDb *db, const char *sql, const DbBind *binds, int bind_count)
+{
+  if (!db || !sql)
+    return false;
+#ifdef HAVE_SQLITE
+  sqlite3_stmt *st = NULL;
+  if (sqlite3_prepare_v2(db->db, sql, -1, &st, NULL) != SQLITE_OK)
+  {
+    set_err(db, sqlite3_errmsg(db->db));
+    return false;
+  }
+  bool ok = db_bind_values(db, st, binds, bind_count);
+  int rc = ok ? sqlite3_step(st) : SQLITE_ERROR;
+  if (ok && rc != SQLITE_DONE)
+  {
+    set_err(db, sqlite3_errmsg(db->db));
+    ok = false;
+  }
+  sqlite3_finalize(st);
+  return ok;
+#else
+  (void)sql;
+  (void)binds;
+  (void)bind_count;
+  set_err(db, "sqlite disabled");
+  return false;
+#endif
+}
+
+int db_query_int_prepared(BbsDb *db, const char *sql, const DbBind *binds, int bind_count, int default_val)
+{
+  if (!db || !sql)
+    return default_val;
+#ifdef HAVE_SQLITE
+  sqlite3_stmt *st = NULL;
+  if (sqlite3_prepare_v2(db->db, sql, -1, &st, NULL) != SQLITE_OK)
+  {
+    set_err(db, sqlite3_errmsg(db->db));
+    return default_val;
+  }
+  int result = default_val;
+  if (db_bind_values(db, st, binds, bind_count))
+  {
+    int rc = sqlite3_step(st);
+    if (rc == SQLITE_ROW)
+      result = sqlite3_column_int(st, 0);
+    else if (rc != SQLITE_DONE)
+      set_err(db, sqlite3_errmsg(db->db));
+  }
+  sqlite3_finalize(st);
+  return result;
+#else
+  (void)sql;
+  (void)binds;
+  (void)bind_count;
   return default_val;
 #endif
 }
@@ -2200,6 +2312,58 @@ int db_file_list(DbFileArea *area, BbsDb *db, DbFileRec *out, int max)
   return count;
 #else
   (void)area;
+  (void)out;
+  (void)max;
+  set_err(db, "sqlite disabled");
+  return 0;
+#endif
+}
+
+int db_file_list_older(BbsDb *db, int days, DbFileRec *out, int max)
+{
+  if (!db || !out || max <= 0 || days <= 0)
+    return 0;
+#ifdef HAVE_SQLITE
+  const char *sql =
+      "SELECT f.id, f.area_id, f.filename, COALESCE(f.description,''), COALESCE(f.extended_desc,''), "
+      "COALESCE(f.file_id_diz,''), f.size_bytes, f.uploaded_at, f.uploaded_by, COALESCE(u.handle,''), "
+      "COALESCE(f.sha256,''), f.file_points, f.download_count, f.owner_credit, f.flags "
+      "FROM files f LEFT JOIN users u ON u.id = f.uploaded_by "
+      "WHERE f.uploaded_at < datetime('now', ?1) ORDER BY f.id ASC LIMIT ?2";
+  char mod[32];
+  snprintf(mod, sizeof(mod), "-%d days", days);
+  sqlite3_stmt *st = NULL;
+  if (sqlite3_prepare_v2(db->db, sql, -1, &st, NULL) != SQLITE_OK)
+  {
+    set_err(db, sqlite3_errmsg(db->db));
+    return 0;
+  }
+  sqlite3_bind_text(st, 1, mod, -1, SQLITE_TRANSIENT);
+  sqlite3_bind_int(st, 2, max);
+  int count = 0;
+  while (sqlite3_step(st) == SQLITE_ROW && count < max)
+  {
+    out[count].id = sqlite3_column_int(st, 0);
+    out[count].area_id = sqlite3_column_int(st, 1);
+    safe_copy(out[count].filename, sizeof(out[count].filename), (const char *)sqlite3_column_text(st, 2));
+    safe_copy(out[count].desc, sizeof(out[count].desc), (const char *)sqlite3_column_text(st, 3));
+    safe_copy(out[count].extended_desc, sizeof(out[count].extended_desc), (const char *)sqlite3_column_text(st, 4));
+    safe_copy(out[count].file_id_diz, sizeof(out[count].file_id_diz), (const char *)sqlite3_column_text(st, 5));
+    out[count].size_bytes = sqlite3_column_int(st, 6);
+    safe_copy(out[count].uploaded_at, sizeof(out[count].uploaded_at), (const char *)sqlite3_column_text(st, 7));
+    out[count].uploaded_by = sqlite3_column_int(st, 8);
+    safe_copy(out[count].uploader, sizeof(out[count].uploader), (const char *)sqlite3_column_text(st, 9));
+    safe_copy(out[count].sha256, sizeof(out[count].sha256), (const char *)sqlite3_column_text(st, 10));
+    out[count].file_points = sqlite3_column_int(st, 11);
+    out[count].download_count = sqlite3_column_int(st, 12);
+    out[count].owner_credit = sqlite3_column_int(st, 13);
+    out[count].flags = sqlite3_column_int(st, 14);
+    count++;
+  }
+  sqlite3_finalize(st);
+  return count;
+#else
+  (void)days;
   (void)out;
   (void)max;
   set_err(db, "sqlite disabled");
@@ -4778,10 +4942,19 @@ bool file_area_resolve(const char *area_path, const char *filename, char *out, s
 {
   if (!area_path || !filename || !out)
     return false;
-  /* prevent path traversal */
-  if (strstr(filename, ".."))
+  if (!bbs_safe_filename(filename, 128))
     return false;
-  path_join(area_path, filename, out, out_cap);
+  char area_real[PATH_MAX];
+  if (!realpath(area_path, area_real))
+    return false;
+  char joined[PATH_MAX];
+  path_join(area_real, filename, joined, sizeof(joined));
+  size_t area_len = strlen(area_real);
+  if (strncmp(joined, area_real, area_len) != 0 ||
+      (joined[area_len] != '/' && joined[area_len] != '\0'))
+    return false;
+  if (snprintf(out, out_cap, "%s", joined) >= (int)out_cap)
+    return false;
   return true;
 }
 bool db_seed_defaults(BbsDb *db, const char *sysop_pw_hash)

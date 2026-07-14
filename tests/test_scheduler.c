@@ -65,7 +65,9 @@ static int test_argv_parser_rejects_shell(void) {
 }
 
 static int test_permission_and_logon_events(void) {
-  char temp_template[] = "/tmp/mutineer-sched-XXXXXX";
+  char temp_template[256];
+  snprintf(temp_template, sizeof(temp_template), "%s/mutineer-sched-XXXXXX",
+           getenv("TMPDIR") ? getenv("TMPDIR") : "/tmp");
   char* dir = mkdtemp(temp_template);
   CHECK(dir != NULL, "temporary scheduler directory creates");
 

@@ -65,6 +65,14 @@ static int bbs_node(void* ctx) {
   return 7;
 }
 
+static int check_bool_result(bucc_value_t v, bool expected, const char* msg) {
+  if (v.kind != BUCC_VAL_BOOL || v.as.b != expected) {
+    fprintf(stderr, "FAIL: %s\n", msg);
+    return 1;
+  }
+  return 0;
+}
+
 int main(void) {
   bucc_host_context_t* ctx = bucc_host_context_new();
   CHECK(ctx != NULL, "host context allocates");
@@ -92,7 +100,8 @@ int main(void) {
   bucc_host_set_kv_api(ctx, &kv, NULL);
   bucc_host_set_allowed_capabilities(ctx, BUCC_CAP_TERM_OUTPUT | BUCC_CAP_TERM_INPUT |
                                           BUCC_CAP_TERM_QUERY | BUCC_CAP_USER_READ |
-                                          BUCC_CAP_SESSION_READ | BUCC_CAP_DOOR_CHAIN);
+                                          BUCC_CAP_SESSION_READ | BUCC_CAP_DOOR_CHAIN |
+                                          BUCC_CAP_SHARED_READ | BUCC_CAP_SHARED_WRITE);
 
   bucc_value_t ok = bucc_host_dispatch(NULL, "TERM", "PRINTLN", NULL, 0, ctx);
   CHECK(ok.kind == BUCC_VAL_NULL, "allowed TERM.PRINTLN succeeds");
@@ -135,6 +144,81 @@ int main(void) {
   bucc_value_t time_remaining = bucc_host_dispatch(&vm, "USER", "TIME_REMAINING", NULL, 0, ctx);
   CHECK(time_remaining.kind == BUCC_VAL_I64 && time_remaining.as.i64 == 42,
         "USER.TIME_REMAINING compatibility alias returns time left");
+
+  bucc_string_t* cas_key = bucc_string_from_cstr("cas-key");
+  bucc_value_t set_scalar[] = { BUCC_STRING_VAL(cas_key), BUCC_I64_VAL(10) };
+  bucc_value_t set_scalar_result = bucc_host_dispatch(&vm, "SHARED", "SET", set_scalar, 2, ctx);
+  CHECK(set_scalar_result.kind == BUCC_VAL_NULL, "SHARED.SET scalar succeeds");
+  bucc_value_t cas_scalar_ok[] = { BUCC_STRING_VAL(cas_key), BUCC_I64_VAL(10), BUCC_I64_VAL(11) };
+  bucc_value_t cas_result = bucc_host_dispatch(&vm, "SHARED", "CAS", cas_scalar_ok, 3, ctx);
+  CHECK(check_bool_result(cas_result, true, "SHARED.CAS scalar match succeeds") == 0,
+        "SHARED.CAS scalar match succeeds");
+  bucc_value_t cas_scalar_bad[] = { BUCC_STRING_VAL(cas_key), BUCC_I64_VAL(10), BUCC_I64_VAL(12) };
+  cas_result = bucc_host_dispatch(&vm, "SHARED", "CAS", cas_scalar_bad, 3, ctx);
+  CHECK(check_bool_result(cas_result, false, "SHARED.CAS scalar mismatch fails") == 0,
+        "SHARED.CAS scalar mismatch fails");
+
+  bucc_array_t* arr_current = bucc_array_new(2);
+  bucc_array_t* arr_expected = bucc_array_new(2);
+  bucc_array_t* arr_different = bucc_array_new(2);
+  CHECK(arr_current && arr_expected && arr_different, "arrays allocate");
+  bucc_array_push(arr_current, BUCC_I64_VAL(1));
+  bucc_array_push(arr_current, bucc_make_string("two"));
+  bucc_array_push(arr_expected, BUCC_I64_VAL(1));
+  bucc_array_push(arr_expected, bucc_make_string("two"));
+  bucc_array_push(arr_different, BUCC_I64_VAL(1));
+  bucc_array_push(arr_different, bucc_make_string("three"));
+  bucc_string_t* arr_key = bucc_string_from_cstr("array-key");
+  bucc_value_t set_array[] = { BUCC_STRING_VAL(arr_key), BUCC_ARRAY_VAL(arr_current) };
+  CHECK(bucc_host_dispatch(&vm, "SHARED", "SET", set_array, 2, ctx).kind == BUCC_VAL_NULL,
+        "SHARED.SET array succeeds");
+  bucc_value_t cas_array_ok[] = { BUCC_STRING_VAL(arr_key), BUCC_ARRAY_VAL(arr_expected), BUCC_I64_VAL(99) };
+  cas_result = bucc_host_dispatch(&vm, "SHARED", "CAS", cas_array_ok, 3, ctx);
+  CHECK(check_bool_result(cas_result, true, "SHARED.CAS deep array equality succeeds") == 0,
+        "SHARED.CAS deep array equality succeeds");
+  bucc_value_t set_array_again[] = { BUCC_STRING_VAL(arr_key), BUCC_ARRAY_VAL(arr_current) };
+  CHECK(bucc_host_dispatch(&vm, "SHARED", "SET", set_array_again, 2, ctx).kind == BUCC_VAL_NULL,
+        "SHARED.SET array again succeeds");
+  bucc_value_t cas_array_bad[] = { BUCC_STRING_VAL(arr_key), BUCC_ARRAY_VAL(arr_different), BUCC_I64_VAL(100) };
+  cas_result = bucc_host_dispatch(&vm, "SHARED", "CAS", cas_array_bad, 3, ctx);
+  CHECK(check_bool_result(cas_result, false, "SHARED.CAS unequal array fails") == 0,
+        "SHARED.CAS unequal array fails");
+
+  bucc_map_t* map_current = bucc_map_new(2);
+  bucc_map_t* map_expected = bucc_map_new(2);
+  bucc_map_t* map_different = bucc_map_new(2);
+  CHECK(map_current && map_expected && map_different, "maps allocate");
+  bucc_map_set_cstr(map_current, "score", BUCC_I64_VAL(42));
+  bucc_map_set_cstr(map_current, "name", bucc_make_string("mutineer"));
+  bucc_map_set_cstr(map_expected, "score", BUCC_I64_VAL(42));
+  bucc_map_set_cstr(map_expected, "name", bucc_make_string("mutineer"));
+  bucc_map_set_cstr(map_different, "score", BUCC_I64_VAL(43));
+  bucc_map_set_cstr(map_different, "name", bucc_make_string("mutineer"));
+  bucc_string_t* map_key = bucc_string_from_cstr("map-key");
+  bucc_value_t set_map[] = { BUCC_STRING_VAL(map_key), BUCC_MAP_VAL(map_current) };
+  CHECK(bucc_host_dispatch(&vm, "SHARED", "SET", set_map, 2, ctx).kind == BUCC_VAL_NULL,
+        "SHARED.SET map succeeds");
+  bucc_value_t cas_map_ok[] = { BUCC_STRING_VAL(map_key), BUCC_MAP_VAL(map_expected), BUCC_I64_VAL(123) };
+  cas_result = bucc_host_dispatch(&vm, "SHARED", "CAS", cas_map_ok, 3, ctx);
+  CHECK(check_bool_result(cas_result, true, "SHARED.CAS deep map equality succeeds") == 0,
+        "SHARED.CAS deep map equality succeeds");
+  bucc_value_t set_map_again[] = { BUCC_STRING_VAL(map_key), BUCC_MAP_VAL(map_current) };
+  CHECK(bucc_host_dispatch(&vm, "SHARED", "SET", set_map_again, 2, ctx).kind == BUCC_VAL_NULL,
+        "SHARED.SET map again succeeds");
+  bucc_value_t cas_map_bad[] = { BUCC_STRING_VAL(map_key), BUCC_MAP_VAL(map_different), BUCC_I64_VAL(124) };
+  cas_result = bucc_host_dispatch(&vm, "SHARED", "CAS", cas_map_bad, 3, ctx);
+  CHECK(check_bool_result(cas_result, false, "SHARED.CAS unequal map fails") == 0,
+        "SHARED.CAS unequal map fails");
+
+  bucc_string_release(cas_key);
+  bucc_string_release(arr_key);
+  bucc_string_release(map_key);
+  bucc_array_release(arr_current);
+  bucc_array_release(arr_expected);
+  bucc_array_release(arr_different);
+  bucc_map_release(map_current);
+  bucc_map_release(map_expected);
+  bucc_map_release(map_different);
 
   bucc_value_t extra_arg = BUCC_I64_VAL(1);
   bucc_value_t too_many = bucc_host_dispatch(&vm, "TERM", "SUPPORTS_ANSI", &extra_arg, 1, ctx);

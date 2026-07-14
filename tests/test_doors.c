@@ -10,6 +10,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdarg.h>
 #include <unistd.h>
 #include <sys/stat.h>
 #include <sys/socket.h>
@@ -51,9 +52,23 @@ static int g_pass = 0, g_fail = 0;
   else       { printf("  FAIL: %s  (line %d)\n", msg, __LINE__); g_fail++; } \
 } while(0)
 
+static const char* tmp_root(void) {
+  const char* root = getenv("TMPDIR");
+  return (root && root[0]) ? root : "/tmp";
+}
+
+static void make_tmp_path(char* out, size_t outcap, const char* fmt, ...) {
+  char leaf[256];
+  va_list ap;
+  va_start(ap, fmt);
+  vsnprintf(leaf, sizeof(leaf), fmt, ap);
+  va_end(ap);
+  path_join(tmp_root(), leaf, out, outcap);
+}
+
 static char* write_tmp_file(const char* name, const char* content) {
   static char path[256];
-  snprintf(path, sizeof(path), "/tmp/%s", name);
+  make_tmp_path(path, sizeof(path), "%s", name);
   FILE* f = fopen(path, "w");
   if (!f) return NULL;
   fputs(content, f);
@@ -62,9 +77,7 @@ static char* write_tmp_file(const char* name, const char* content) {
 }
 
 static void rm_rf(const char* path) {
-  char cmd[512];
-  snprintf(cmd, sizeof(cmd), "rm -rf '%s'", path);
-  (void)system(cmd);
+  bbs_remove_tree(path);
 }
 
 /* =========================================================================
@@ -227,7 +240,7 @@ static void test_runtime_tree(void) {
 
   /* Create a fake master_dir with one file */
   char master[256];
-  snprintf(master, sizeof(master), "/tmp/test_doors_master_%d", (int)getpid());
+  make_tmp_path(master, sizeof(master), "test_doors_master_%d", (int)getpid());
   rm_rf(master);
   if (mkdir(master, 0755) != 0) { printf("  SKIP: cannot create %s\n", master); return; }
   char file[300];
@@ -242,7 +255,7 @@ static void test_runtime_tree(void) {
   snprintf(m.startup, sizeof(m.startup), "GAME.EXE");
 
   char runtime_base[256];
-  snprintf(runtime_base, sizeof(runtime_base), "/tmp/test_doors_runtime_%d", (int)getpid());
+  make_tmp_path(runtime_base, sizeof(runtime_base), "test_doors_runtime_%d", (int)getpid());
   rm_rf(runtime_base);
 
   char runtime_root[512];
@@ -288,9 +301,10 @@ static void test_dosbox_conf(void) {
   snprintf(m.startup, sizeof(m.startup), "ALADDIN.EXE");
 
   char conf_path[256];
-  snprintf(conf_path, sizeof(conf_path), "/tmp/test_dosbox_%d.conf", (int)getpid());
+  make_tmp_path(conf_path, sizeof(conf_path), "test_dosbox_%d.conf", (int)getpid());
 
-  const char* game_dir = "/tmp/game";
+  char game_dir[256];
+  make_tmp_path(game_dir, sizeof(game_dir), "game");
   char errbuf[256];
   bool ok = dosbox_build_conf(&m, game_dir, conf_path, errbuf, sizeof(errbuf));
   CHECK(ok, "build_conf returns true");
@@ -331,9 +345,13 @@ static void test_dosbox_conf_usedtr(void) {
   snprintf(m.startup, sizeof(m.startup), "GAME.EXE");
 
   char conf_path[256];
-  snprintf(conf_path, sizeof(conf_path), "/tmp/test_dosbox_dtr_%d.conf", (int)getpid());
+  make_tmp_path(conf_path, sizeof(conf_path), "test_dosbox_dtr_%d.conf", (int)getpid());
   char errbuf[256];
-  dosbox_build_conf(&m, "/tmp/game", conf_path, errbuf, sizeof(errbuf));
+  {
+    char game_dir[256];
+    make_tmp_path(game_dir, sizeof(game_dir), "game");
+    dosbox_build_conf(&m, game_dir, conf_path, errbuf, sizeof(errbuf));
+  }
 
   char* content = file_read_all(conf_path, NULL);
   if (content) {
@@ -352,7 +370,7 @@ static void test_dosbox_launch_fake(void) {
 
   /* Create a fake dosbox script that immediately exits 0 */
   char fake_dosbox[256];
-  snprintf(fake_dosbox, sizeof(fake_dosbox), "/tmp/fake_dosbox_%d", (int)getpid());
+  make_tmp_path(fake_dosbox, sizeof(fake_dosbox), "fake_dosbox_%d", (int)getpid());
 
   FILE* f = fopen(fake_dosbox, "w");
   if (!f) { printf("  SKIP: cannot write fake dosbox\n"); return; }
@@ -362,7 +380,7 @@ static void test_dosbox_launch_fake(void) {
 
   /* Create fake master_dir and aladdin reference door */
   char master[256];
-  snprintf(master, sizeof(master), "/tmp/test_fake_master_%d", (int)getpid());
+  make_tmp_path(master, sizeof(master), "test_fake_master_%d", (int)getpid());
   rm_rf(master);
   if (mkdir(master, 0755) != 0) { unlink(fake_dosbox); printf("  SKIP\n"); return; }
   char exe_path[300];
@@ -372,7 +390,7 @@ static void test_dosbox_launch_fake(void) {
 
   /* Write a manifest */
   char manifest_path[300];
-  snprintf(manifest_path, sizeof(manifest_path), "/tmp/test_fake_manifest_%d.json", (int)getpid());
+  make_tmp_path(manifest_path, sizeof(manifest_path), "test_fake_manifest_%d.json", (int)getpid());
   f = fopen(manifest_path, "w");
   if (f) {
     fprintf(f, "{\n");
@@ -395,7 +413,7 @@ static void test_dosbox_launch_fake(void) {
   s.fd = STDIN_FILENO; /* harmless — fake dosbox won't use it */
   snprintf(s.cfg.dosbox_path, sizeof(s.cfg.dosbox_path), "%s", fake_dosbox);
   snprintf(s.cfg.door_runtime_path, sizeof(s.cfg.door_runtime_path),
-           "/tmp/test_fake_runtime_%d", (int)getpid());
+           "%s/test_fake_runtime_%d", tmp_root(), (int)getpid());
   s.cfg.door_default_timeout_sec = 5;
   s.cfg.door_cleanup_on_exit = 1;
   s.cfg.door_keep_failed_runs = 0;
@@ -466,7 +484,7 @@ static void test_native_door_regression(void) {
   s.alive = 1;
   s.node_num = 1;
   s.fd = STDIN_FILENO;
-  snprintf(s.cfg.dropfile_path, sizeof(s.cfg.dropfile_path), "/tmp/test_native_drop_%d", (int)getpid());
+  make_tmp_path(s.cfg.dropfile_path, sizeof(s.cfg.dropfile_path), "test_native_drop_%d", (int)getpid());
   snprintf(s.ip, sizeof(s.ip), "127.0.0.1");
   snprintf(s.user.handle, sizeof(s.user.handle), "testuser");
   snprintf(s.user.last_login_at, sizeof(s.user.last_login_at), "2026-01-01");
@@ -493,7 +511,7 @@ static void test_native_door_argv_and_rejection(void) {
   printf("\n[native door: argv parser and metachar rejection]\n");
 
   char out_path[256];
-  snprintf(out_path, sizeof(out_path), "/tmp/test_native_argv_%d.txt", (int)getpid());
+  make_tmp_path(out_path, sizeof(out_path), "test_native_argv_%d.txt", (int)getpid());
   unlink(out_path);
 
   Session s;
@@ -501,7 +519,7 @@ static void test_native_door_argv_and_rejection(void) {
   s.alive = 1;
   s.node_num = 1;
   s.fd = STDIN_FILENO;
-  snprintf(s.cfg.dropfile_path, sizeof(s.cfg.dropfile_path), "/tmp/test_native_drop_%d", (int)getpid());
+  make_tmp_path(s.cfg.dropfile_path, sizeof(s.cfg.dropfile_path), "test_native_drop_%d", (int)getpid());
   snprintf(s.ip, sizeof(s.ip), "127.0.0.1");
   snprintf(s.user.handle, sizeof(s.user.handle), "testuser");
 
@@ -533,7 +551,7 @@ static void test_protocol_argv_and_rejection(void) {
   }
 
   char filepath[256];
-  snprintf(filepath, sizeof(filepath), "/tmp/test_protocol_file_%d.dat", (int)getpid());
+  make_tmp_path(filepath, sizeof(filepath), "test_protocol_file_%d.dat", (int)getpid());
   unlink(filepath);
 
   Session s;

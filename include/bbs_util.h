@@ -2,6 +2,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <stdarg.h>
 
 void str_trim(char* s);
 bool str_starts_with(const char* s, const char* prefix);
@@ -31,3 +32,10 @@ bool bbs_safe_filename(const char* value, size_t max_len);
 bool bbs_mkdir_p(const char* path, int mode);
 
 bool bbs_remove_tree(const char* path);
+
+/* Bounded append helpers. Return false if output was truncated or invalid. */
+bool bbs_str_append(char* dst, size_t cap, const char* src);
+bool bbs_str_appendf(char* dst, size_t cap, const char* fmt, ...);
+
+/* Create a mkdtemp directory under TMPDIR or /tmp. Template suffix is _XXXXXX. */
+bool bbs_make_temp_dir(const char* prefix, char* out, size_t out_cap);

@@ -19,6 +19,7 @@
 #include <string.h>
 #include <getopt.h>
 #include <unistd.h>
+#include <errno.h>
 
 #define BUCC_VERSION "0.1.0"
 
@@ -27,6 +28,18 @@ extern int bucc_format_file(const char* input_path, const char* output_path,
 extern int bucc_lint_file(const char* input_path, bool json_output);
 extern int bucc_simulate(const char* module_path, const char* user_name,
                         int user_security, bool debug);
+
+static bool make_temp_module_path(char* path, size_t path_size) {
+    if (!path || path_size == 0) return false;
+    const char* tmpdir = getenv("TMPDIR");
+    if (!tmpdir || !tmpdir[0]) tmpdir = "/tmp";
+    int n = snprintf(path, path_size, "%s/bucc_XXXXXX", tmpdir);
+    if (n < 0 || (size_t)n >= path_size) return false;
+    int fd = mkstemp(path);
+    if (fd < 0) return false;
+    close(fd);
+    return true;
+}
 
 static void print_version(void) {
     printf("bucc %s - Buccaneer Language Toolchain\n", BUCC_VERSION);
@@ -324,11 +337,17 @@ static int cmd_run(int argc, char** argv) {
         return 1;
     }
     
-    char temp_path[256];
-    snprintf(temp_path, sizeof(temp_path), "/tmp/bucc_%d.bc", getpid());
+    char temp_path[512];
+    if (!make_temp_module_path(temp_path, sizeof(temp_path))) {
+        fprintf(stderr, "Error: Cannot create temporary module path: %s\n", strerror(errno));
+        bucc_module_free(module);
+        bucc_debug_map_free(debug_map);
+        return 1;
+    }
     
     if (!bucc_module_save(module, temp_path)) {
         fprintf(stderr, "Error: Cannot write temporary module\n");
+        unlink(temp_path);
         bucc_module_free(module);
         bucc_debug_map_free(debug_map);
         return 1;

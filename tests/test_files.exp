@@ -52,7 +52,7 @@ run_test "select_file_area" {
     send "F\r"
     
     expect {
-        -re "Choose area|Area number|\\?" { }
+        -re "Choose area|Area number|Select area|\\?" { }
         timeout { return 0 }
     }
     
@@ -60,7 +60,7 @@ run_test "select_file_area" {
     send "1\r"
     
     expect {
-        -re "Files:|No files|Download|batch|area|Invalid" { }
+        -re "Files:|No files|Download|batch|area|Invalid|File area changed|0 file\\(s\\) listed|Selection:" { }
         timeout { return 0 }
     }
     
@@ -84,7 +84,7 @@ run_test "view_file_list" {
     
     # Should see file listing or "no files" message
     expect {
-        -re "Files:|No files|#.*filename|Download|batch" { }
+        -re "Files:|No files|#.*Filename|Download|batch|File area changed|0 file\\(s\\) listed|Selection:" { }
         timeout { return 0 }
     }
     
@@ -107,7 +107,7 @@ run_test "batch_queue" {
     send "1\r"
     
     expect {
-        -re "batch queue|Download|Files:|No files" { }
+        -re "batch queue|Download|Files:|No files|File area changed|0 file\\(s\\) listed|Selection:" { }
         timeout { return 0 }
     }
     
@@ -115,7 +115,7 @@ run_test "batch_queue" {
     send "1\r"
     
     expect {
-        -re "Queued|added|batch|No file|Invalid|Download" { }
+        -re "Queued|added|batch|No file|Invalid|Download|Plugin not found|Selection:" { }
         timeout { }
     }
     

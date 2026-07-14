@@ -140,12 +140,10 @@ static bool attachment_path(Session *s, const char *name, char *out, size_t outc
 /* Append signature and/or tagline to a message body buffer. */
 static void append_sig_tag(Session *s, char *body, size_t cap) {
   if (s->user.use_signature && s->user.signature[0]) {
-    size_t n = strlen(body);
-    snprintf(body + n, cap - n, "\r\n-- \r\n%s", s->user.signature);
+    bbs_str_appendf(body, cap, "\r\n-- \r\n%s", s->user.signature);
   }
   if (s->user.use_tagline && s->user.tagline[0]) {
-    size_t n = strlen(body);
-    snprintf(body + n, cap - n, "\r\n * %s", s->user.tagline);
+    bbs_str_appendf(body, cap, "\r\n * %s", s->user.tagline);
   }
 }
 
@@ -157,12 +155,13 @@ static int compose_body(Session *s, char *body, size_t cap) {
   }
   send_str(s, "Enter message (blank line to end):\r\n");
   char line[256];
-  while (strlen(body) < cap - 256) {
+  while (cap > 256 && strlen(body) < cap - 256) {
     int n = prompt_line(s, "", line, sizeof(line));
     if (n < 0) return -1; /* disconnected */
     if (!line[0]) break;
-    strncat(body, line, cap - strlen(body) - 3);
-    strncat(body, "\r\n", cap - strlen(body) - 1);
+    if (!bbs_str_append(body, cap, line) ||
+        !bbs_str_append(body, cap, "\r\n"))
+      break;
   }
   return (int)strlen(body);
 }
@@ -589,9 +588,12 @@ void cmd_msg_reply(Session* s, const char* data) {
     const char* nl = strchr(p, '\n');
     size_t len = nl ? (size_t)(nl - p) : strlen(p);
     if (len > 60) len = 60;
-    strncat(quoted, "> ", sizeof(quoted) - strlen(quoted) - 1);
-    strncat(quoted, p, len < sizeof(quoted) - strlen(quoted) - 3 ? len : sizeof(quoted) - strlen(quoted) - 3);
-    strncat(quoted, "\r\n", sizeof(quoted) - strlen(quoted) - 1);
+    char snippet[64];
+    snprintf(snippet, sizeof(snippet), "%.*s", (int)len, p);
+    if (!bbs_str_append(quoted, sizeof(quoted), "> ") ||
+        !bbs_str_append(quoted, sizeof(quoted), snippet) ||
+        !bbs_str_append(quoted, sizeof(quoted), "\r\n"))
+      break;
     if (!nl) break;
     p = nl + 1;
   }
@@ -604,8 +606,10 @@ void cmd_msg_reply(Session* s, const char* data) {
   
   char body[2048] = {0};
   /* Pre-populate with quoted text */
-  snprintf(body, sizeof(body), "%s\r\n", quoted);
-  int r = compose_body(s, body + strlen(body), sizeof(body) - strlen(body));
+  bbs_str_append(body, sizeof(body), quoted);
+  bbs_str_append(body, sizeof(body), "\r\n");
+  size_t used = strlen(body);
+  int r = compose_body(s, body + used, sizeof(body) - used);
   if (r < 0) {
     if (body[0])
       db_draft_save(s->db, s->user.id, orig.area_id, 0, "", subject, body);
@@ -865,8 +869,9 @@ void cmd_msg_edit(Session* s, const char* data) {
   while (strlen(body) < sizeof(body) - 256) {
     prompt_line(s, "", line, sizeof(line));
     if (!line[0]) break;
-    strncat(body, line, sizeof(body) - strlen(body) - 3);
-    strncat(body, "\r\n", sizeof(body) - strlen(body) - 1);
+    if (!bbs_str_append(body, sizeof(body), line) ||
+        !bbs_str_append(body, sizeof(body), "\r\n"))
+      break;
   }
   
   if (!body[0]) {
@@ -1163,7 +1168,7 @@ void cmd_msg_thread_view(Session* s, const char* data) {
       /* Create indent */
       char indent[32] = "";
       for (int d = 0; d < depth && d < 10; d++) {
-        strcat(indent, "  ");
+        bbs_str_append(indent, sizeof(indent), "  ");
       }
       
       snprintf(buf, sizeof(buf), "%s%s#%d %s - %s (%s)\r\n",

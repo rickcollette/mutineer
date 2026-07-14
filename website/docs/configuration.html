@@ -39,158 +39,106 @@ build/mutineer --config /etc/mutineer/mutineer.conf
 <h3>Network and Listener</h3>
 <table>
 <tr><th>Key</th><th>Type</th><th>Default</th><th>Required</th><th>Description</th></tr>
-<table>
-<tr><th><code>bind</code></th><th>string</th><th><code>0.0.0.0</code></th><th>No</th><th>Address to bind telnet listener</th></tr>
-<table>
-<tr><th><code>port</code></th><th>int</th><th><code>2929</code></th><th>No</th><th>Telnet listen port</th></tr>
-<table>
-<tr><th><code>idle_timeout_sec</code></th><th>int</th><th><code>600</code></th><th>No</th><th>Seconds before idle disconnect</th></tr>
+<tr><td><code>bind</code></td><td>string</td><td><code>0.0.0.0</code></td><td>No</td><td>Address to bind telnet listener</td></tr>
+<tr><td><code>port</code></td><td>int</td><td><code>2929</code></td><td>No</td><td>Telnet listen port</td></tr>
+<tr><td><code>idle_timeout_sec</code></td><td>int</td><td><code>600</code></td><td>No</td><td>Seconds before idle disconnect</td></tr>
 </table>
 <h3>Paths</h3>
 <table>
 <tr><th>Key</th><th>Type</th><th>Default</th><th>Required</th><th>Description</th></tr>
-<table>
-<tr><th><code>db_path</code></th><th>string</th><th><code>data/mutineer.db</code></th><th>Yes*</th><th>SQLite database file</th></tr>
-<table>
-<tr><th><code>data_path</code></th><th>string</th><th><code>data</code></th><th>No</th><th>General data directory</th></tr>
-<table>
-<tr><th><code>logs_path</code></th><th>string</th><th><code>logs/mutineer.log</code></th><th>No</th><th>Main log file path</th></tr>
-<table>
-<tr><th><code>art_path</code></th><th>string</th><th><code>art</code></th><th>No</th><th>ANSI/ASCII art directory</th></tr>
-<table>
-<tr><th><code>menu_main</code></th><th>string</th><th><code>menus/main.mnu</code></th><th>Yes*</th><th>Main menu file after login</th></tr>
-<table>
-<tr><th><code>motd</code></th><th>string</th><th><code>art/motd.ans</code></th><th>No</th><th>Message of the day art file</th></tr>
-<table>
-<tr><th><code>doors_path</code></th><th>string</th><th><code>doors</code></th><th>No</th><th>Master door files directory</th></tr>
-<table>
-<tr><th><code>dropfile_path</code></th><th>string</th><th><code>data/dropfiles</code></th><th>No</th><th>Dropfile output directory</th></tr>
-<table>
-<tr><th><code>protocol_path</code></th><th>string</th><th><code>conf/protocols.conf</code></th><th>No</th><th>Transfer protocol definitions</th></tr>
-<table>
-<tr><th><code>chat_log_path</code></th><th>string</th><th>*(empty)*</th><th>No</th><th>Chat log directory; empty disables file logging</th></tr>
+<tr><td><code>db_path</code></td><td>string</td><td><code>data/mutineer.db</code></td><td>Yes*</td><td>SQLite database file</td></tr>
+<tr><td><code>data_path</code></td><td>string</td><td><code>data</code></td><td>No</td><td>General data directory</td></tr>
+<tr><td><code>logs_path</code></td><td>string</td><td><code>logs/mutineer.log</code></td><td>No</td><td>Main log file path</td></tr>
+<tr><td><code>art_path</code></td><td>string</td><td><code>art</code></td><td>No</td><td>ANSI/ASCII art directory</td></tr>
+<tr><td><code>menu_main</code></td><td>string</td><td><code>menus/main.mnu</code></td><td>Yes*</td><td>Main menu file after login</td></tr>
+<tr><td><code>motd</code></td><td>string</td><td><code>art/motd.ans</code></td><td>No</td><td>Message of the day art file</td></tr>
+<tr><td><code>doors_path</code></td><td>string</td><td><code>doors</code></td><td>No</td><td>Master door files directory</td></tr>
+<tr><td><code>dropfile_path</code></td><td>string</td><td><code>data/dropfiles</code></td><td>No</td><td>Dropfile output directory</td></tr>
+<tr><td><code>protocol_path</code></td><td>string</td><td><code>conf/protocols.conf</code></td><td>No</td><td>Transfer protocol definitions</td></tr>
+<tr><td><code>chat_log_path</code></td><td>string</td><td>*(empty)*</td><td>No</td><td>Chat log directory; empty disables file logging</td></tr>
 </table>
 <p>\*Startup sanity checks require these paths to exist or be creatable via <code>mutineer-initbbs</code>.</p>
 <h3>BBS Identity</h3>
 <table>
 <tr><th>Key</th><th>Type</th><th>Default</th><th>Required</th><th>Description</th></tr>
-<table>
-<tr><th><code>bbs_name</code></th><th>string</th><th><code>Mutineer BBS</code></th><th>No</th><th>Display name in MCI <code>~BN</code></th></tr>
-<table>
-<tr><th><code>sysop_name</code></th><th>string</th><th><code>Sysop</code></th><th>No</th><th>Sysop name in MCI <code>~SN</code></th></tr>
+<tr><td><code>bbs_name</code></td><td>string</td><td><code>Mutineer BBS</code></td><td>No</td><td>Display name in MCI <code>~BN</code></td></tr>
+<tr><td><code>sysop_name</code></td><td>string</td><td><code>Sysop</code></td><td>No</td><td>Sysop name in MCI <code>~SN</code></td></tr>
 </table>
 <h3>Session Limits</h3>
 <table>
 <tr><th>Key</th><th>Type</th><th>Default</th><th>Required</th><th>Description</th></tr>
-<table>
-<tr><th><code>session_time_limit_min</code></th><th>int</th><th><code>60</code></th><th>No</th><th>Default per-call time limit (minutes)</th></tr>
-<table>
-<tr><th><code>max_calls_per_day</code></th><th>int</th><th><code>0</code></th><th>No</th><th>Max logins per user per calendar day; <code>0</code> = unlimited</th></tr>
-<table>
-<tr><th><code>max_page_sysop</code></th><th>int</th><th><code>3</code></th><th>No</th><th>Max sysop page attempts per session; <code>0</code> = unlimited</th></tr>
+<tr><td><code>session_time_limit_min</code></td><td>int</td><td><code>60</code></td><td>No</td><td>Default per-call time limit (minutes)</td></tr>
+<tr><td><code>max_calls_per_day</code></td><td>int</td><td><code>0</code></td><td>No</td><td>Max logins per user per calendar day; <code>0</code> = unlimited</td></tr>
+<tr><td><code>max_page_sysop</code></td><td>int</td><td><code>3</code></td><td>No</td><td>Max sysop page attempts per session; <code>0</code> = unlimited</td></tr>
 </table>
 <h3>WFC Console</h3>
 <table>
 <tr><th>Key</th><th>Type</th><th>Default</th><th>Required</th><th>Description</th></tr>
-<table>
-<tr><th><code>wfc_enabled</code></th><th>int</th><th><code>1</code></th><th>No</th><th>Run local WFC console thread</th></tr>
-<table>
-<tr><th><code>wfc_refresh_ms</code></th><th>int</th><th><code>1000</code></th><th>No</th><th>WFC screen refresh interval (ms)</th></tr>
-<table>
-<tr><th><code>wfc_blank_sec</code></th><th>int</th><th><code>300</code></th><th>No</th><th>Blank screen timeout; <code>0</code> = disabled</th></tr>
-<table>
-<tr><th><code>wfc_node_num</code></th><th>int</th><th><code>1</code></th><th>No</th><th>Local WFC console node number</th></tr>
-<table>
-<tr><th><code>wfc_fg_color</code></th><th>int</th><th><code>11</code></th><th>No</th><th>WFC foreground ANSI color (0–15)</th></tr>
-<table>
-<tr><th><code>wfc_bg_color</code></th><th>int</th><th><code>0</code></th><th>No</th><th>WFC background ANSI color (0–7)</th></tr>
-<table>
-<tr><th><code>wfc_status_idle_char</code></th><th>char</th><th><code>I</code></th><th>No</th><th>Node status char when idle</th></tr>
-<table>
-<tr><th><code>wfc_status_logging_char</code></th><th>char</th><th><code>L</code></th><th>No</th><th>Node status char during login</th></tr>
-<table>
-<tr><th><code>wfc_status_online_char</code></th><th>char</th><th><code>A</code></th><th>No</th><th>Node status char when online</th></tr>
-<table>
-<tr><th><code>wfc_status_chat_char</code></th><th>char</th><th><code>S</code></th><th>No</th><th>Node status char during chat</th></tr>
+<tr><td><code>wfc_enabled</code></td><td>int</td><td><code>1</code></td><td>No</td><td>Run local WFC console thread</td></tr>
+<tr><td><code>wfc_refresh_ms</code></td><td>int</td><td><code>1000</code></td><td>No</td><td>WFC screen refresh interval (ms)</td></tr>
+<tr><td><code>wfc_blank_sec</code></td><td>int</td><td><code>300</code></td><td>No</td><td>Blank screen timeout; <code>0</code> = disabled</td></tr>
+<tr><td><code>wfc_node_num</code></td><td>int</td><td><code>1</code></td><td>No</td><td>Local WFC console node number</td></tr>
+<tr><td><code>wfc_fg_color</code></td><td>int</td><td><code>11</code></td><td>No</td><td>WFC foreground ANSI color (0–15)</td></tr>
+<tr><td><code>wfc_bg_color</code></td><td>int</td><td><code>0</code></td><td>No</td><td>WFC background ANSI color (0–7)</td></tr>
+<tr><td><code>wfc_status_idle_char</code></td><td>char</td><td><code>I</code></td><td>No</td><td>Node status char when idle</td></tr>
+<tr><td><code>wfc_status_logging_char</code></td><td>char</td><td><code>L</code></td><td>No</td><td>Node status char during login</td></tr>
+<tr><td><code>wfc_status_online_char</code></td><td>char</td><td><code>A</code></td><td>No</td><td>Node status char when online</td></tr>
+<tr><td><code>wfc_status_chat_char</code></td><td>char</td><td><code>S</code></td><td>No</td><td>Node status char during chat</td></tr>
+<tr><td><code>wfc_shell_enabled</code></td><td>int/bool</td><td><code>0</code></td><td>No</td><td>Enable the local WFC <code>D</code> command</td></tr>
+<tr><td><code>wfc_shell_command</code></td><td>string</td><td>*(empty)*</td><td>No</td><td>Argv-template command for WFC <code>D</code>; disabled unless explicitly set</td></tr>
 </table>
 <h3>Scheduler</h3>
 <table>
 <tr><th>Key</th><th>Type</th><th>Default</th><th>Required</th><th>Description</th></tr>
-<table>
-<tr><th><code>scheduler_enabled</code></th><th>int</th><th><code>1</code></th><th>No</th><th>Run background events thread</th></tr>
-<table>
-<tr><th><code>scheduler_tick_sec</code></th><th>int</th><th><code>30</code></th><th>No</th><th>Scheduler poll interval (seconds)</th></tr>
+<tr><td><code>scheduler_enabled</code></td><td>int</td><td><code>1</code></td><td>No</td><td>Run background events thread</td></tr>
+<tr><td><code>scheduler_tick_sec</code></td><td>int</td><td><code>30</code></td><td>No</td><td>Scheduler poll interval (seconds)</td></tr>
 </table>
 <h3>Authentication</h3>
 <table>
 <tr><th>Key</th><th>Type</th><th>Default</th><th>Required</th><th>Description</th></tr>
-<table>
-<tr><th><code>login_window_sec</code></th><th>int</th><th><code>120</code></th><th>No</th><th>Login throttle time window (seconds)</th></tr>
-<table>
-<tr><th><code>login_max_attempts</code></th><th>int</th><th><code>5</code></th><th>No</th><th>Max failed attempts per IP/user per window</th></tr>
-<table>
-<tr><th><code>password_upgrade</code></th><th>int</th><th><code>1</code></th><th>No</th><th>Enable Argon2/bcrypt hash migration on login</th></tr>
-<table>
-<tr><th><code>password_expire_days</code></th><th>int</th><th><code>0</code></th><th>No</th><th>Force password change after N days; <code>0</code> = disabled</th></tr>
+<tr><td><code>login_window_sec</code></td><td>int</td><td><code>120</code></td><td>No</td><td>Login throttle time window (seconds)</td></tr>
+<tr><td><code>login_max_attempts</code></td><td>int</td><td><code>5</code></td><td>No</td><td>Max failed attempts per IP/user per window</td></tr>
+<tr><td><code>password_upgrade</code></td><td>int</td><td><code>1</code></td><td>No</td><td>Enable Argon2/bcrypt hash migration on login</td></tr>
+<tr><td><code>password_expire_days</code></td><td>int</td><td><code>0</code></td><td>No</td><td>Force password change after N days; <code>0</code> = disabled</td></tr>
 </table>
 <h3>Credits and Ratios</h3>
 <table>
 <tr><th>Key</th><th>Type</th><th>Default</th><th>Required</th><th>Description</th></tr>
-<table>
-<tr><th><code>default_credits</code></th><th>int</th><th><code>5000</code></th><th>No</th><th>Starting credits for new users</th></tr>
-<table>
-<tr><th><code>default_file_points</code></th><th>int</th><th><code>0</code></th><th>No</th><th>Starting file points for new users</th></tr>
+<tr><td><code>default_credits</code></td><td>int</td><td><code>5000</code></td><td>No</td><td>Starting credits for new users</td></tr>
+<tr><td><code>default_file_points</code></td><td>int</td><td><code>0</code></td><td>No</td><td>Starting file points for new users</td></tr>
 </table>
 <h3>Multi-Login and Guest</h3>
 <table>
 <tr><th>Key</th><th>Type</th><th>Default</th><th>Required</th><th>Description</th></tr>
-<table>
-<tr><th><code>allow_multi_login</code></th><th>int</th><th><code>0</code></th><th>No</th><th>Allow duplicate logins (<code>1</code>) or block (<code>0</code>)</th></tr>
-<table>
-<tr><th><code>guest_enabled</code></th><th>int</th><th><code>0</code></th><th>No</th><th>Enable guest account login</th></tr>
-<table>
-<tr><th><code>guest_handle</code></th><th>string</th><th><code>GUEST</code></th><th>No</th><th>Guest account handle</th></tr>
-<table>
-<tr><th><code>guest_level_id</code></th><th>int</th><th><code>1</code></th><th>No</th><th>Security level ID for guests</th></tr>
+<tr><td><code>allow_multi_login</code></td><td>int</td><td><code>0</code></td><td>No</td><td>Allow duplicate logins (<code>1</code>) or block (<code>0</code>)</td></tr>
+<tr><td><code>guest_enabled</code></td><td>int</td><td><code>0</code></td><td>No</td><td>Enable guest account login</td></tr>
+<tr><td><code>guest_handle</code></td><td>string</td><td><code>GUEST</code></td><td>No</td><td>Guest account handle</td></tr>
+<tr><td><code>guest_level_id</code></td><td>int</td><td><code>1</code></td><td>No</td><td>Security level ID for guests</td></tr>
 </table>
 <h3>Welcome Letter</h3>
 <table>
 <tr><th>Key</th><th>Type</th><th>Default</th><th>Required</th><th>Description</th></tr>
-<table>
-<tr><th><code>welcome_letter_enabled</code></th><th>int</th><th><code>1</code></th><th>No</th><th>Send welcome letter on first login</th></tr>
-<table>
-<tr><th><code>welcome_letter_file</code></th><th>string</th><th><code>art/welcome.txt</code></th><th>No</th><th>Welcome letter text file path</th></tr>
-<table>
-<tr><th><code>welcome_letter_from</code></th><th>string</th><th><code>Sysop</code></th><th>No</th><th>Sender name on welcome letter</th></tr>
+<tr><td><code>welcome_letter_enabled</code></td><td>int</td><td><code>1</code></td><td>No</td><td>Send welcome letter on first login</td></tr>
+<tr><td><code>welcome_letter_file</code></td><td>string</td><td><code>art/welcome.txt</code></td><td>No</td><td>Welcome letter text file path</td></tr>
+<tr><td><code>welcome_letter_from</code></td><td>string</td><td><code>Sysop</code></td><td>No</td><td>Sender name on welcome letter</td></tr>
 </table>
 <h3>DOSBox / DOS Door Runner</h3>
 <table>
 <tr><th>Key</th><th>Type</th><th>Default</th><th>Required</th><th>Description</th></tr>
-<table>
-<tr><th><code>dosbox_path</code></th><th>string</th><th><code>dosbox</code></th><th>No</th><th>Path to DOSBox binary</th></tr>
-<table>
-<tr><th><code>door_runtime_path</code></th><th>string</th><th><code>data/door_runtime</code></th><th>No</th><th>Base dir for per-launch runtime trees</th></tr>
-<table>
-<tr><th><code>door_copy_mode</code></th><th>string</th><th><code>copy</code></th><th>No</th><th>File copy mode for door launch</th></tr>
-<table>
-<tr><th><code>door_default_timeout_sec</code></th><th>int</th><th><code>300</code></th><th>No</th><th>Door timeout; <code>0</code> = no timeout</th></tr>
-<table>
-<tr><th><code>door_cleanup_on_exit</code></th><th>int</th><th><code>1</code></th><th>No</th><th>Remove runtime tree on successful exit</th></tr>
-<table>
-<tr><th><code>door_keep_failed_runs</code></th><th>int</th><th><code>0</code></th><th>No</th><th>Keep runtime tree on failure for debugging</th></tr>
+<tr><td><code>dosbox_path</code></td><td>string</td><td><code>dosbox</code></td><td>No</td><td>Path to DOSBox binary</td></tr>
+<tr><td><code>door_runtime_path</code></td><td>string</td><td><code>data/door_runtime</code></td><td>No</td><td>Base dir for per-launch runtime trees</td></tr>
+<tr><td><code>door_copy_mode</code></td><td>string</td><td><code>copy</code></td><td>No</td><td>File copy mode for door launch</td></tr>
+<tr><td><code>door_default_timeout_sec</code></td><td>int</td><td><code>300</code></td><td>No</td><td>Door timeout; <code>0</code> = no timeout</td></tr>
+<tr><td><code>door_cleanup_on_exit</code></td><td>int</td><td><code>1</code></td><td>No</td><td>Remove runtime tree on successful exit</td></tr>
+<tr><td><code>door_keep_failed_runs</code></td><td>int</td><td><code>0</code></td><td>No</td><td>Keep runtime tree on failure for debugging</td></tr>
 </table>
-<h2>Config Keys in mutineer.conf (Not in BbsConfig)</h2>
-<p>The sample <code>conf/mutineer.conf</code> includes plugin settings read by <code>plugin_loader.c</code> (not in <code>BbsConfig</code> struct):</p>
+<h3>Plugins</h3>
 <table>
-<tr><th>Key</th><th>Example</th><th>Description</th></tr>
-<table>
-<tr><th><code>plugins_enabled</code></th><th><code>true</code></th><th>Enable plugin loading</th></tr>
-<table>
-<tr><th><code>plugins_dir</code></th><th><code>plugins</code></th><th>Directory containing <code>.so</code> plugins</th></tr>
-<table>
-<tr><th><code>plugins_allowlist</code></th><th>*(empty)*</th><th>Comma-separated plugin IDs to allow</th></tr>
-<table>
-<tr><th><code>plugins_denylist</code></th><th>*(empty)*</th><th>Comma-separated plugin IDs to deny</th></tr>
+<tr><th>Key</th><th>Type</th><th>Default</th><th>Required</th><th>Description</th></tr>
+<tr><td><code>plugins_enabled</code></td><td>int/bool</td><td><code>1</code></td><td>No</td><td>Enable plugin loading</td></tr>
+<tr><td><code>plugins_dir</code></td><td>string</td><td><code>plugins</code></td><td>No</td><td>Directory containing <code>.so</code> plugins</td></tr>
+<tr><td><code>plugins_allowlist</code></td><td>string</td><td>*(empty)*</td><td>No</td><td>Comma-separated plugin IDs to allow</td></tr>
+<tr><td><code>plugins_denylist</code></td><td>string</td><td>*(empty)*</td><td>No</td><td>Comma-separated plugin IDs to deny</td></tr>
 </table>
 <h2>Required vs Optional</h2>
 <p><strong>Startup will fail without:</strong></p>

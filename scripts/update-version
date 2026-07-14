@@ -1,18 +1,75 @@
-#!/bin/bash
-# Check for updates, backup, download, and migrate Mutineer BBS
-set -e
+#!/usr/bin/env bash
+# Check for updates, verify release metadata, backup, download, and migrate Mutineer BBS.
+set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 BBS_ROOT="$(dirname "$SCRIPT_DIR")"
-BBS_DIR="$BBS_ROOT/dist"
-
-# Configuration - adjust these for your setup
-UPDATE_URL="${MUTINEER_UPDATE_URL:-https://github.com/yourusername/mutineer/releases/latest/download}"
+BBS_DIR="${MUTINEER_DIST_DIR:-$BBS_ROOT/dist}"
 VERSION_FILE="$BBS_DIR/VERSION"
+ARCHIVE_NAME="${MUTINEER_UPDATE_ARCHIVE:-mutineer-linux-x64.tar.gz}"
+UPDATE_URL="${MUTINEER_UPDATE_URL:-}"
 CURRENT_VERSION="unknown"
 
-if [ -f "$VERSION_FILE" ]; then
-    CURRENT_VERSION=$(cat "$VERSION_FILE")
+usage() {
+  cat <<EOF
+Usage: $0 [check|install|force|--dry-run]
+
+Environment:
+  MUTINEER_UPDATE_URL      Required release base URL. Example:
+                           https://example.com/mutineer/releases/latest/download
+  MUTINEER_UPDATE_ARCHIVE  Optional archive name. Default: $ARCHIVE_NAME
+  MUTINEER_DIST_DIR        Optional installed dist directory. Default: $BBS_DIR
+EOF
+}
+
+require_update_url() {
+  if [[ -z "$UPDATE_URL" ]]; then
+    echo "Error: MUTINEER_UPDATE_URL is required; no production update source is configured." >&2
+    return 1
+  fi
+  if [[ "$UPDATE_URL" == *"yourusername"* || "$UPDATE_URL" == *"example.com"* ]]; then
+    echo "Error: MUTINEER_UPDATE_URL contains a placeholder value." >&2
+    return 1
+  fi
+}
+
+fetch() {
+  local src="$1"
+  local dst="$2"
+  curl -fsSL "$src" -o "$dst"
+}
+
+safe_archive_entries() {
+  local archive="$1"
+  local entry
+  while IFS= read -r entry; do
+    case "$entry" in
+      ""|/*|../*|*/../*|*"/.."|*"//"*|*"\\"*)
+        echo "Error: unsafe archive entry: $entry" >&2
+        return 1
+        ;;
+    esac
+  done < <(tar -tzf "$archive")
+}
+
+verify_archive() {
+  local dir="$1"
+  local archive="$dir/$ARCHIVE_NAME"
+  local checksum="$dir/$ARCHIVE_NAME.sha256"
+  if [[ ! -s "$archive" ]]; then
+    echo "Error: downloaded archive is missing or empty" >&2
+    return 1
+  fi
+  if [[ ! -s "$checksum" ]]; then
+    echo "Error: missing SHA256 metadata: $ARCHIVE_NAME.sha256" >&2
+    return 1
+  fi
+  (cd "$dir" && sha256sum -c --status "$ARCHIVE_NAME.sha256")
+  safe_archive_entries "$archive"
+}
+
+if [[ -f "$VERSION_FILE" ]]; then
+  CURRENT_VERSION="$(cat "$VERSION_FILE")"
 fi
 
 echo "Mutineer Update Utility"
@@ -20,126 +77,111 @@ echo "======================="
 echo "Current version: $CURRENT_VERSION"
 echo ""
 
-# Check for new version
 check_version() {
-    echo "Checking for updates..."
-    
-    # Try to fetch latest version info
-    LATEST_VERSION=$(curl -sL "$UPDATE_URL/VERSION" 2>/dev/null || echo "")
-    
-    if [ -z "$LATEST_VERSION" ]; then
-        echo "Could not check for updates. Network error or URL not configured."
-        echo "Set MUTINEER_UPDATE_URL environment variable to your release URL."
-        return 1
-    fi
-    
-    echo "Latest version: $LATEST_VERSION"
-    
-    if [ "$CURRENT_VERSION" = "$LATEST_VERSION" ]; then
-        echo "You are running the latest version."
-        return 1
-    fi
-    
-    echo "New version available!"
-    return 0
+  require_update_url
+  echo "Checking for updates..."
+  local latest
+  latest="$(curl -fsSL "$UPDATE_URL/VERSION" 2>/dev/null || true)"
+  if [[ -z "$latest" ]]; then
+    echo "Could not check for updates. Network error or missing VERSION metadata." >&2
+    return 1
+  fi
+  echo "Latest version: $latest"
+  if [[ "$CURRENT_VERSION" == "$latest" ]]; then
+    echo "You are running the latest version."
+    return 1
+  fi
+  echo "New version available."
 }
 
-# Download and install update
 do_update() {
-    echo ""
-    echo "Starting update process..."
-    
-    # Step 1: Backup current installation
-    echo ""
-    echo "Step 1: Creating backup..."
-    "$SCRIPT_DIR/backup"
-    
-    # Step 2: Stop BBS if running
-    echo ""
-    echo "Step 2: Stopping BBS..."
-    "$SCRIPT_DIR/stop" || true
-    
-    # Step 3: Download new version
-    echo ""
-    echo "Step 3: Downloading update..."
-    TEMP_DIR=$(mktemp -d)
-    trap "rm -rf $TEMP_DIR" EXIT
-    
-    if ! curl -sL "$UPDATE_URL/mutineer-linux-x64.tar.gz" -o "$TEMP_DIR/update.tar.gz"; then
-        echo "Error: Failed to download update"
-        exit 1
-    fi
-    
-    # Step 4: Extract and verify
-    echo "Step 4: Extracting..."
-    cd "$TEMP_DIR"
-    tar -xzf update.tar.gz
-    
-    if [ ! -f "$TEMP_DIR/mutineer" ]; then
-        echo "Error: Invalid update package"
-        exit 1
-    fi
-    
-    # Step 5: Install new binary
-    echo "Step 5: Installing..."
-    cp "$TEMP_DIR/mutineer" "$BBS_DIR/mutineer.new"
-    chmod +x "$BBS_DIR/mutineer.new"
+  require_update_url
+
+  echo ""
+  echo "Starting update process..."
+
+  echo ""
+  echo "Step 1: Creating backup..."
+  "$SCRIPT_DIR/backup"
+
+  echo ""
+  echo "Step 2: Stopping BBS..."
+  "$SCRIPT_DIR/stop" || true
+
+  echo ""
+  echo "Step 3: Downloading verified update artifacts..."
+  local temp_dir
+  temp_dir="$(mktemp -d "${TMPDIR:-/tmp}/mutineer_update_XXXXXX")"
+  trap 'rm -rf "$temp_dir"' EXIT
+
+  fetch "$UPDATE_URL/VERSION" "$temp_dir/VERSION"
+  fetch "$UPDATE_URL/$ARCHIVE_NAME" "$temp_dir/$ARCHIVE_NAME"
+  fetch "$UPDATE_URL/$ARCHIVE_NAME.sha256" "$temp_dir/$ARCHIVE_NAME.sha256"
+
+  echo "Step 4: Verifying checksum and archive layout..."
+  verify_archive "$temp_dir"
+
+  echo "Step 5: Extracting into private temp directory..."
+  local extract_dir="$temp_dir/extract"
+  mkdir -p "$extract_dir"
+  tar -xzf "$temp_dir/$ARCHIVE_NAME" -C "$extract_dir"
+
+  if [[ ! -f "$extract_dir/mutineer" ]]; then
+    echo "Error: invalid update package; mutineer binary missing" >&2
+    exit 1
+  fi
+
+  echo "Step 6: Installing binary..."
+  install -m 0755 "$extract_dir/mutineer" "$BBS_DIR/mutineer.new"
+  if [[ -f "$BBS_DIR/mutineer" ]]; then
     mv "$BBS_DIR/mutineer" "$BBS_DIR/mutineer.old"
-    mv "$BBS_DIR/mutineer.new" "$BBS_DIR/mutineer"
-    
-    # Update version file
-    if [ -f "$TEMP_DIR/VERSION" ]; then
-        cp "$TEMP_DIR/VERSION" "$VERSION_FILE"
+  fi
+  mv "$BBS_DIR/mutineer.new" "$BBS_DIR/mutineer"
+  cp "$temp_dir/VERSION" "$VERSION_FILE"
+
+  echo "Step 7: Applying verified migrations and assets..."
+  if [[ -f "$extract_dir/migrate.sql" ]]; then
+    sqlite3 "$BBS_DIR/data/mutineer.db" < "$extract_dir/migrate.sql"
+  fi
+  for dir in art menus sql; do
+    if [[ -d "$extract_dir/$dir" ]]; then
+      mkdir -p "$BBS_DIR/$dir"
+      cp -Rn "$extract_dir/$dir/." "$BBS_DIR/$dir/"
     fi
-    
-    # Step 6: Run migrations if any
-    echo "Step 6: Running migrations..."
-    if [ -f "$TEMP_DIR/migrate.sql" ]; then
-        echo "  Applying database migrations..."
-        sqlite3 "$BBS_DIR/data/mutineer.db" < "$TEMP_DIR/migrate.sql"
-    fi
-    
-    # Copy any new/updated assets
-    for dir in art menus sql; do
-        if [ -d "$TEMP_DIR/$dir" ]; then
-            echo "  Updating $dir..."
-            cp -rn "$TEMP_DIR/$dir/"* "$BBS_DIR/$dir/" 2>/dev/null || true
-        fi
-    done
-    
-    # Cleanup old binary
-    rm -f "$BBS_DIR/mutineer.old"
-    
-    echo ""
-    echo "Update complete!"
-    echo "New version: $(cat "$VERSION_FILE" 2>/dev/null || echo 'unknown')"
-    echo ""
-    echo "Start the BBS with: $SCRIPT_DIR/start-screen"
+  done
+
+  rm -f "$BBS_DIR/mutineer.old"
+
+  echo ""
+  echo "Update complete."
+  echo "New version: $(cat "$VERSION_FILE" 2>/dev/null || echo 'unknown')"
 }
 
-# Main
 case "${1:-check}" in
-    check)
-        check_version
-        ;;
-    install|update)
-        if check_version; then
-            read -p "Proceed with update? [y/N] " confirm
-            if [ "$confirm" = "y" ] || [ "$confirm" = "Y" ]; then
-                do_update
-            else
-                echo "Update cancelled."
-            fi
-        fi
-        ;;
-    force)
-        do_update
-        ;;
-    *)
-        echo "Usage: $0 [check|install|force]"
-        echo "  check   - Check for new version (default)"
-        echo "  install - Check and install if available"
-        echo "  force   - Force reinstall/update"
-        exit 1
-        ;;
+  check)
+    check_version
+    ;;
+  install|update)
+    if check_version; then
+      read -r -p "Proceed with update? [y/N] " confirm
+      case "$confirm" in
+        y|Y) do_update ;;
+        *) echo "Update cancelled." ;;
+      esac
+    fi
+    ;;
+  force)
+    do_update
+    ;;
+  --dry-run)
+    require_update_url
+    echo "Dry run passed: update URL is configured and no install actions were taken."
+    ;;
+  -h|--help)
+    usage
+    ;;
+  *)
+    usage >&2
+    exit 2
+    ;;
 esac

@@ -2,7 +2,7 @@
 
 # Mutineer BBS Overview
 
-Mutineer BBS is a classic telnet bulletin board system for Linux, written in C11. It targets operators who want Renegade-style menus, message and file areas, doors, and sysop tools — with modern persistence (SQLite), password hashing (PBKDF2 with optional Argon2 upgrade), and extensibility via loadable plugins and the Buccaneer scripting VM.
+Mutineer BBS is a classic telnet bulletin board system for Linux, written in C11. It targets operators who want Renegade-style menus, message and file areas, doors, and sysop tools — with modern persistence (SQLite), password hashing (PBKDF2 with optional Argon2 upgrade), and extensibility via loadable plugins and the Buccaneer interpreted language.
 
 ## Design Goals
 
@@ -40,7 +40,7 @@ Mutineer BBS is a classic telnet bulletin board system for Linux, written in C11
 - Multiple file areas with per-area ACS and flags
 - Upload/download with credit and ratio enforcement
 - Batch download queue (FB/FC/FK commands)
-- Archive test/extract/view (zip, tar, rar, 7z via external tools)
+- Archive test/extract/view through libarchive-backed helpers
 - SHA-256 duplicate detection on upload
 - Protocol launcher for configured transfer protocols
 
@@ -48,7 +48,7 @@ Mutineer BBS is a classic telnet bulletin board system for Linux, written in C11
 
 - Native executable doors with dropfile generation (DOOR.SYS, DORINFO1.DEF)
 - DOSBox DOS door runner with per-launch isolation
-- Buccaneer embedded bytecode VM (Pascal-like syntax)
+- Buccaneer interpreted language for addons, games, doors, and extensions
 - Loadable `.so` plugins via `dlopen` with stable ABI
 
 ### Sysop Tools
@@ -81,7 +81,7 @@ mutineer-bbs/
 ├── src/                 BBS core (session, menus, messages, files, doors, chat)
 │   ├── tools/           Standalone CLI utilities
 │   ├── plank/           PLANK protocol implementation
-│   └── buccaneer/       Buccaneer language (lexer, parser, VM, host bridge)
+│   └── buccaneer/       Buccaneer language (lexer, parser, bytecode runtime, host bridge)
 ├── include/             Public headers
 ├── sql/                 schema.sql (BBS) + plank_schema.sql (PLANK extension)
 ├── conf/                Default configuration (mutineer.conf)
@@ -138,7 +138,7 @@ Built from `src/buccaneer/Makefile`:
 | `bucc` | Buccaneer compiler |
 | `bucc-linter` | Static analysis |
 | `bucc-formatter` | Source formatter |
-| `bucc-simulator` | Standalone VM simulator |
+| `bucc-simulator` | Standalone Buccaneer runtime simulator |
 
 ### Test Binaries
 
@@ -151,10 +151,10 @@ Built from `src/buccaneer/Makefile`:
 | SQLite3 | Yes | `libsqlite3-dev` — persistent storage |
 | OpenSSL | Yes | `libssl-dev` — PBKDF2 password hashing, PLANK crypto |
 | pthreads | Yes | Thread-per-connection model |
+| libarchive | Yes | `libarchive-dev` — archive and QWK package handling |
 | libargon2 | Optional | Argon2 password upgrade when `password_upgrade=1` |
 | libzstd | Optional | PLANK bundle compression |
 | DOSBox | Optional | DOS door runner (`dosbox` on PATH or `dosbox_path`) |
-| zip/unzip, tar, unrar, 7z | Optional | Archive operations in file commands |
 
 Debian/Ubuntu install:
 

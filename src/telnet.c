@@ -36,6 +36,16 @@ void telnet_send_initial(int fd) {
   tn_send_ttype_send(fd);
 }
 
+void telnet_password_begin(int fd) {
+  tn_send3(fd, IAC, WILL, TELOPT_ECHO);
+  tn_send3(fd, IAC, DO, TELOPT_SGA);
+}
+
+void telnet_password_end(int fd) {
+  tn_send3(fd, IAC, WONT, TELOPT_ECHO);
+  tn_send3(fd, IAC, DO, TELOPT_SGA);
+}
+
 static void handle_iac_cmd(TelnetState* tn, int fd, uint8_t cmd, uint8_t opt) {
   (void)tn;
 

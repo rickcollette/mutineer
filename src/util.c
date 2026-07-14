@@ -9,6 +9,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <dirent.h>
+#include <stdarg.h>
 
 void str_trim(char* s) {
   if (!s) return;
@@ -188,4 +189,41 @@ bool bbs_remove_tree(const char* path) {
     return rmdir(path) == 0 && ok;
   }
   return unlink(path) == 0;
+}
+
+static size_t bbs_strnlen_local(const char* s, size_t cap) {
+  size_t n = 0;
+  if (!s) return 0;
+  while (n < cap && s[n]) n++;
+  return n;
+}
+
+bool bbs_str_append(char* dst, size_t cap, const char* src) {
+  if (!dst || cap == 0 || !src) return false;
+  size_t used = bbs_strnlen_local(dst, cap);
+  if (used >= cap) return false;
+  size_t avail = cap - used;
+  int n = snprintf(dst + used, avail, "%s", src);
+  return n >= 0 && (size_t)n < avail;
+}
+
+bool bbs_str_appendf(char* dst, size_t cap, const char* fmt, ...) {
+  if (!dst || cap == 0 || !fmt) return false;
+  size_t used = bbs_strnlen_local(dst, cap);
+  if (used >= cap) return false;
+  size_t avail = cap - used;
+  va_list ap;
+  va_start(ap, fmt);
+  int n = vsnprintf(dst + used, avail, fmt, ap);
+  va_end(ap);
+  return n >= 0 && (size_t)n < avail;
+}
+
+bool bbs_make_temp_dir(const char* prefix, char* out, size_t out_cap) {
+  if (!out || out_cap == 0) return false;
+  const char* root = getenv("TMPDIR");
+  if (!root || !root[0]) root = "/tmp";
+  const char* p = (prefix && prefix[0]) ? prefix : "mutineer";
+  if (snprintf(out, out_cap, "%s/%s_XXXXXX", root, p) >= (int)out_cap) return false;
+  return mkdtemp(out) != NULL;
 }

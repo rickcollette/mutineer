@@ -21,14 +21,10 @@
 <p>WFC shows a grid of node slots with status characters:</p>
 <table>
 <tr><th>Config Key</th><th>Default</th><th>Meaning</th></tr>
-<table>
-<tr><th><code>wfc_status_idle_char</code></th><th><code>I</code></th><th>Node idle</th></tr>
-<table>
-<tr><th><code>wfc_status_logging_char</code></th><th><code>L</code></th><th>User logging in</th></tr>
-<table>
-<tr><th><code>wfc_status_online_char</code></th><th><code>A</code></th><th>User online</th></tr>
-<table>
-<tr><th><code>wfc_status_chat_char</code></th><th><code>S</code></th><th>User in chat</th></tr>
+<tr><td><code>wfc_status_idle_char</code></td><td><code>I</code></td><td>Node idle</td></tr>
+<tr><td><code>wfc_status_logging_char</code></td><td><code>L</code></td><td>User logging in</td></tr>
+<tr><td><code>wfc_status_online_char</code></td><td><code>A</code></td><td>User online</td></tr>
+<tr><td><code>wfc_status_chat_char</code></td><td><code>S</code></td><td>User in chat</td></tr>
 </table>
 <h3>Tuning</h3>
 <pre><code class="ini">
@@ -59,20 +55,13 @@ wfc_bg_color=0
 <p>Managed in <code>security_levels</code> table:</p>
 <table>
 <tr><th>Field</th><th>Purpose</th></tr>
-<table>
-<tr><th><code>level</code></th><th>Numeric security level</th></tr>
-<table>
-<tr><th><code>time_limit_min</code></th><th>Per-call time limit</th></tr>
-<table>
-<tr><th><code>call_allow</code></th><th>Calls per day</th></tr>
-<table>
-<tr><th><code>dl_one_day</code> / <code>dl_k_one_day</code></th><th>Download limits</th></tr>
-<table>
-<tr><th><code>download_ratio_num/den</code></th><th>Required UL/DL ratio</th></tr>
-<table>
-<tr><th><code>post_ratio_num/den</code></th><th>Required post ratio</th></tr>
-<table>
-<tr><th><code>email_allow</code> / <code>vote_allow</code> / <code>anon_allow</code></th><th>Feature permissions</th></tr>
+<tr><td><code>level</code></td><td>Numeric security level</td></tr>
+<tr><td><code>time_limit_min</code></td><td>Per-call time limit</td></tr>
+<tr><td><code>call_allow</code></td><td>Calls per day</td></tr>
+<tr><td><code>dl_one_day</code> / <code>dl_k_one_day</code></td><td>Download limits</td></tr>
+<tr><td><code>download_ratio_num/den</code></td><td>Required UL/DL ratio</td></tr>
+<tr><td><code>post_ratio_num/den</code></td><td>Required post ratio</td></tr>
+<tr><td><code>email_allow</code> / <code>vote_allow</code> / <code>anon_allow</code></td><td>Feature permissions</td></tr>
 </table>
 <h3>Validation Levels</h3>
 <p><code>validation_levels</code> table defines account validation workflows (new user approval, expiration demotion).</p>
@@ -93,28 +82,17 @@ guest_level_id=1
 <p>Remote sysop editors accessible via menu actions and F-keys:</p>
 <table>
 <tr><th>Action</th><th>Purpose</th></tr>
-<table>
-<tr><th><code>useredit</code></th><th>User records</th></tr>
-<table>
-<tr><th><code>confeditor</code></th><th>Conferences and membership</th></tr>
-<table>
-<tr><th><code>areaadmin</code></th><th>Message areas</th></tr>
-<table>
-<tr><th><code>fileadmin</code></th><th>File areas</th></tr>
-<table>
-<tr><th><code>protocoleditor</code></th><th>Transfer protocols</th></tr>
-<table>
-<tr><th><code>menueditor</code></th><th>Menu files (.mnu)</th></tr>
-<table>
-<tr><th><code>voteeditor</code></th><th>Vote topics and choices</th></tr>
-<table>
-<tr><th><code>eventeditor</code></th><th>Scheduled events</th></tr>
-<table>
-<tr><th><code>fidoeditor</code></th><th>FidoNet AKAs and echolinks</th></tr>
-<table>
-<tr><th><code>qwkneteditor</code></th><th>QWK hubs and area links</th></tr>
-<table>
-<tr><th><code>subscriptioneditor</code></th><th>Subscription types</th></tr>
+<tr><td><code>useredit</code></td><td>User records</td></tr>
+<tr><td><code>confeditor</code></td><td>Conferences and membership</td></tr>
+<tr><td><code>areaadmin</code></td><td>Message areas</td></tr>
+<tr><td><code>fileadmin</code></td><td>File areas</td></tr>
+<tr><td><code>protocoleditor</code></td><td>Transfer protocols</td></tr>
+<tr><td><code>menueditor</code></td><td>Menu files (.mnu)</td></tr>
+<tr><td><code>voteeditor</code></td><td>Vote topics and choices</td></tr>
+<tr><td><code>eventeditor</code></td><td>Scheduled events</td></tr>
+<tr><td><code>fidoeditor</code></td><td>FidoNet AKAs and echolinks</td></tr>
+<tr><td><code>qwkneteditor</code></td><td>QWK hubs and area links</td></tr>
+<tr><td><code>subscriptioneditor</code></td><td>Subscription types</td></tr>
 </table>
 <h3>Menu Editor</h3>
 <p>Edit menu files in <code>menus/</code> directory:</p>
@@ -129,28 +107,19 @@ guest_level_id=1
 <h3>Event Types</h3>
 <table>
 <tr><th>Type</th><th>Trigger</th></tr>
-<table>
-<tr><th><code>scheduled</code></th><th>Cron-like schedule string</th></tr>
-<table>
-<tr><th><code>logon</code></th><th>On user login</th></tr>
-<table>
-<tr><th><code>permission</code></th><th>ACS-gated event</th></tr>
+<tr><td><code>scheduled</code></td><td>Cron-like schedule string</td></tr>
+<tr><td><code>logon</code></td><td>On user login</td></tr>
+<tr><td><code>permission</code></td><td>ACS-gated event</td></tr>
 </table>
 <h3>Event Fields</h3>
 <table>
 <tr><th>Field</th><th>Purpose</th></tr>
-<table>
-<tr><th><code>name</code></th><th>Event identifier</th></tr>
-<table>
-<tr><th><code>schedule</code></th><th>Schedule expression</th></tr>
-<table>
-<tr><th><code>command</code></th><th>Command to execute</th></tr>
-<table>
-<tr><th><code>acs</code></th><th>ACS for permission events</th></tr>
-<table>
-<tr><th><code>warning_min</code></th><th>Minutes warning before run</th></tr>
-<table>
-<tr><th><code>enabled</code></th><th>Active flag</th></tr>
+<tr><td><code>name</code></td><td>Event identifier</td></tr>
+<tr><td><code>schedule</code></td><td>Schedule expression</td></tr>
+<tr><td><code>command</code></td><td>Command to execute</td></tr>
+<tr><td><code>acs</code></td><td>ACS for permission events</td></tr>
+<tr><td><code>warning_min</code></td><td>Minutes warning before run</td></tr>
+<tr><td><code>enabled</code></td><td>Active flag</td></tr>
 </table>
 <p>Example commands: run <code>mutineer-maint vacuum</code>, pack tools, external scripts.</p>
 <p>Sample crontab entries in <code>scripts/crontabs</code>.</p>
@@ -209,12 +178,9 @@ max_calls_per_day=0   # unlimited; set &gt;0 to cap daily logins
 <h3>Account Status</h3>
 <table>
 <tr><th>Flag</th><th>Effect</th></tr>
-<table>
-<tr><th><code>STATUS_LOCKED</code></th><th>Cannot log in</th></tr>
-<table>
-<tr><th><code>STATUS_DELETED</code></th><th>Soft deleted</th></tr>
-<table>
-<tr><th><code>AC_RLOGON</code></th><th>Restricted from logon</th></tr>
+<tr><td><code>STATUS_LOCKED</code></td><td>Cannot log in</td></tr>
+<tr><td><code>STATUS_DELETED</code></td><td>Soft deleted</td></tr>
+<tr><td><code>AC_RLOGON</code></td><td>Restricted from logon</td></tr>
 </table>
 <h3>Signals</h3>
 <ul>
@@ -227,14 +193,10 @@ max_calls_per_day=0   # unlimited; set &gt;0 to cap daily logins
 <h2>Statistics</h2>
 <table>
 <tr><th>Source</th><th>Data</th></tr>
-<table>
-<tr><th><code>stats</code> table</th><th>Lifetime counters</th></tr>
-<table>
-<tr><th><code>daily_stats</code></th><th>Today only</th></tr>
-<table>
-<tr><th><code>history</code></th><th>Per-day archive</th></tr>
-<table>
-<tr><th><code>system_info</code></th><th>BBS metadata</th></tr>
+<tr><td><code>stats</code> table</td><td>Lifetime counters</td></tr>
+<tr><td><code>daily_stats</code></td><td>Today only</td></tr>
+<tr><td><code>history</code></td><td>Per-day archive</td></tr>
+<tr><td><code>system_info</code></td><td>BBS metadata</td></tr>
 </table>
 <pre><code class="bash">
 build/mutineer-stats
@@ -244,21 +206,16 @@ build/mutineer-stats -s    # key=value short format
 <h2>Bulletins and Auto Message</h2>
 <table>
 <tr><th>Table</th><th>Purpose</th></tr>
-<table>
-<tr><th><code>bulletins</code></th><th>Sysop bulletins with ACS</th></tr>
-<table>
-<tr><th><code>automsg</code></th><th>Single auto-message (id=1)</th></tr>
+<tr><td><code>bulletins</code></td><td>Sysop bulletins with ACS</td></tr>
+<tr><td><code>automsg</code></td><td>Single auto-message (id=1)</td></tr>
 </table>
 <p>Menu action <code>bulletins</code> displays bulletins filtered by ACS.</p>
 <h2>Voting</h2>
 <table>
 <tr><th>Action</th><th>Purpose</th></tr>
-<table>
-<tr><th><code>vote</code></th><th>User voting booth</th></tr>
-<table>
-<tr><th><code>voteresults</code></th><th>View results (sysop/ACS gated)</th></tr>
-<table>
-<tr><th><code>voteeditor</code></th><th>Create/edit vote topics</th></tr>
+<tr><td><code>vote</code></td><td>User voting booth</td></tr>
+<tr><td><code>voteresults</code></td><td>View results (sysop/ACS gated)</td></tr>
+<tr><td><code>voteeditor</code></td><td>Create/edit vote topics</td></tr>
 </table>
 <p>Tables: <code>votes</code>, <code>vote_choices</code>, <code>vote_ballots</code>, <code>user_votes</code>.</p>
 <h2>Time Bank</h2>
@@ -266,25 +223,18 @@ build/mutineer-stats -s    # key=value short format
 <h2>Subscriptions</h2>
 <table>
 <tr><th>Action</th><th>Purpose</th></tr>
-<table>
-<tr><th><code>subscriptioneditor</code></th><th>Manage subscription types</th></tr>
-<table>
-<tr><th><code>subscribe</code></th><th>User purchase/activate subscription</th></tr>
+<tr><td><code>subscriptioneditor</code></td><td>Manage subscription types</td></tr>
+<tr><td><code>subscribe</code></td><td>User purchase/activate subscription</td></tr>
 </table>
 <p>ACS term <code>E#</code> checks active subscription type.</p>
 <h2>Operational Scripts</h2>
 <table>
 <tr><th>Script</th><th>Purpose</th></tr>
-<table>
-<tr><th><code>scripts/start</code></th><th>Start BBS daemon</th></tr>
-<table>
-<tr><th><code>scripts/stop</code></th><th>Stop BBS</th></tr>
-<table>
-<tr><th><code>scripts/start-screen</code></th><th>Start in screen session</th></tr>
-<table>
-<tr><th><code>scripts/watchdog</code></th><th>Auto-restart on crash</th></tr>
-<table>
-<tr><th><code>scripts/bbs-wall</code></th><th>Send wall to online users</th></tr>
+<tr><td><code>scripts/start</code></td><td>Start BBS daemon</td></tr>
+<tr><td><code>scripts/stop</code></td><td>Stop BBS</td></tr>
+<tr><td><code>scripts/start-screen</code></td><td>Start in screen session</td></tr>
+<tr><td><code>scripts/watchdog</code></td><td>Auto-restart on crash</td></tr>
+<tr><td><code>scripts/bbs-wall</code></td><td>Send wall to online users</td></tr>
 </table>
 <h2>Related Documentation</h2>
 <ul>

@@ -43,68 +43,43 @@ Q|Logoff|logout|
 <h3>Menu Directives</h3>
 <table>
 <tr><th>Directive</th><th>Description</th></tr>
-<table>
-<tr><th><code>@TITLE</code></th><th>Menu title displayed in generic renderer</th></tr>
-<table>
-<tr><th><code>@FLAGS</code></th><th>Comma-separated menu flags (see below)</th></tr>
-<table>
-<tr><th><code>@PROMPT</code></th><th>Custom input prompt (default <code>Selection: </code>)</th></tr>
-<table>
-<tr><th><code>@ART</code></th><th>ANSI/ASCII art file to display before menu</th></tr>
-<table>
-<tr><th><code>@FALLBACK</code></th><th>Fallback menu if no valid selection</th></tr>
-<table>
-<tr><th><code>@COLS</code></th><th>Column count for generic menu layout</th></tr>
+<tr><td><code>@TITLE</code></td><td>Menu title displayed in generic renderer</td></tr>
+<tr><td><code>@FLAGS</code></td><td>Comma-separated menu flags (see below)</td></tr>
+<tr><td><code>@PROMPT</code></td><td>Custom input prompt (default <code>Selection: </code>)</td></tr>
+<tr><td><code>@ART</code></td><td>ANSI/ASCII art file to display before menu</td></tr>
+<tr><td><code>@FALLBACK</code></td><td>Fallback menu if no valid selection</td></tr>
+<tr><td><code>@COLS</code></td><td>Column count for generic menu layout</td></tr>
 </table>
 <h3>Menu Flags (<code>include/bbs_menu.h</code>)</h3>
 <table>
 <tr><th>Flag</th><th>Constant</th><th>Effect</th></tr>
-<table>
-<tr><th><code>clrscr</code></th><th><code>MENU_FLAG_CLRSCR_BEFORE</code></th><th>Clear screen before display</th></tr>
-<table>
-<tr><th><code>nocenter</code></th><th><code>MENU_FLAG_DONT_CENTER</code></th><th>Don&#x27;t center menu title</th></tr>
-<table>
-<tr><th><code>notitle</code></th><th><code>MENU_FLAG_NO_MENU_TITLE</code></th><th>Hide menu title</th></tr>
-<table>
-<tr><th><code>pause</code></th><th><code>MENU_FLAG_FORCE_PAUSE</code></th><th>Pause after display</th></tr>
-<table>
-<tr><th><code>autotime</code></th><th><code>MENU_FLAG_AUTO_TIME</code></th><th>Show time remaining</th></tr>
-<table>
-<tr><th><code>noprompt</code></th><th><code>MENU_FLAG_NO_MENU_PROMPT</code></th><th>Hide selection prompt</th></tr>
-<table>
-<tr><th><code>lightbar</code></th><th><code>MENU_FLAG_USE_LIGHTBAR</code></th><th>Lightbar navigation</th></tr>
-<table>
-<tr><th><code>hotkeys</code></th><th><code>MENU_FLAG_HOTKEYS</code></th><th>Hot keys (no ENTER required)</th></tr>
+<tr><td><code>clrscr</code></td><td><code>MENU_FLAG_CLRSCR_BEFORE</code></td><td>Clear screen before display</td></tr>
+<tr><td><code>nocenter</code></td><td><code>MENU_FLAG_DONT_CENTER</code></td><td>Don&#x27;t center menu title</td></tr>
+<tr><td><code>notitle</code></td><td><code>MENU_FLAG_NO_MENU_TITLE</code></td><td>Hide menu title</td></tr>
+<tr><td><code>pause</code></td><td><code>MENU_FLAG_FORCE_PAUSE</code></td><td>Pause after display</td></tr>
+<tr><td><code>autotime</code></td><td><code>MENU_FLAG_AUTO_TIME</code></td><td>Show time remaining</td></tr>
+<tr><td><code>noprompt</code></td><td><code>MENU_FLAG_NO_MENU_PROMPT</code></td><td>Hide selection prompt</td></tr>
+<tr><td><code>lightbar</code></td><td><code>MENU_FLAG_USE_LIGHTBAR</code></td><td>Lightbar navigation</td></tr>
+<tr><td><code>hotkeys</code></td><td><code>MENU_FLAG_HOTKEYS</code></td><td>Hot keys (no ENTER required)</td></tr>
 </table>
 <h3>Command Flags</h3>
 <table>
 <tr><th>Flag</th><th>Constant</th><th>Effect</th></tr>
-<table>
-<tr><th><code>hidden</code></th><th><code>CMD_FLAG_HIDDEN</code></th><th>Don&#x27;t display in menu</th></tr>
-<table>
-<tr><th><code>unhidden</code></th><th><code>CMD_FLAG_UNHIDDEN</code></th><th>Always display (override ACS hide)</th></tr>
-<table>
-<tr><th><code>password</code></th><th><code>CMD_FLAG_PASSWORD</code></th><th>Require password entry</th></tr>
-<table>
-<tr><th><code>sysoplog</code></th><th><code>CMD_FLAG_SYSOP_LOG</code></th><th>Log selection to sysop log</th></tr>
+<tr><td><code>hidden</code></td><td><code>CMD_FLAG_HIDDEN</code></td><td>Don&#x27;t display in menu</td></tr>
+<tr><td><code>unhidden</code></td><td><code>CMD_FLAG_UNHIDDEN</code></td><td>Always display (override ACS hide)</td></tr>
+<tr><td><code>password</code></td><td><code>CMD_FLAG_PASSWORD</code></td><td>Require password entry</td></tr>
+<tr><td><code>sysoplog</code></td><td><code>CMD_FLAG_SYSOP_LOG</code></td><td>Log selection to sysop log</td></tr>
 </table>
 <h3>Menu Item Fields</h3>
 <table>
 <tr><th>Field</th><th>Description</th></tr>
-<table>
-<tr><th><code>KEY</code></th><th>Single character or multi-char key string</th></tr>
-<table>
-<tr><th><code>Label</code></th><th>Display text (may contain MCI tokens)</th></tr>
-<table>
-<tr><th><code>Action</code></th><th>Action name passed to <code>handle_action()</code></th></tr>
-<table>
-<tr><th><code>Data</code></th><th>Optional parameter (command data, submenu name)</th></tr>
-<table>
-<tr><th><code>ACS</code></th><th>Access control expression; empty = everyone</th></tr>
-<table>
-<tr><th><code>CmdFlags</code></th><th>Command flags (enhanced format)</th></tr>
-<table>
-<tr><th><code>Password</code></th><th>Required password if <code>password</code> flag set</th></tr>
+<tr><td><code>KEY</code></td><td>Single character or multi-char key string</td></tr>
+<tr><td><code>Label</code></td><td>Display text (may contain MCI tokens)</td></tr>
+<tr><td><code>Action</code></td><td>Action name passed to <code>handle_action()</code></td></tr>
+<tr><td><code>Data</code></td><td>Optional parameter (command data, submenu name)</td></tr>
+<tr><td><code>ACS</code></td><td>Access control expression; empty = everyone</td></tr>
+<tr><td><code>CmdFlags</code></td><td>Command flags (enhanced format)</td></tr>
+<tr><td><code>Password</code></td><td>Required password if <code>password</code> flag set</td></tr>
 </table>
 <h3>Submenus</h3>
 <p>Use action <code>menu</code> with data set to another menu filename (without path):</p>
@@ -119,10 +94,8 @@ M|Messages|menu|message.mnu
 <p>Each menu typically has companion art files in the same directory:</p>
 <table>
 <tr><th>Extension</th><th>Format</th></tr>
-<table>
-<tr><th><code>.ans</code></th><th>ANSI color art with escape sequences</th></tr>
-<table>
-<tr><th><code>.asc</code></th><th>ASCII plain text art</th></tr>
+<tr><td><code>.ans</code></td><td>ANSI color art with escape sequences</td></tr>
+<tr><td><code>.asc</code></td><td>ASCII plain text art</td></tr>
 </table>
 <p>Templates embed MCI tokens that expand at display time. The <code>@ART</code> directive or menu name convention (<code>main.mnu</code> → <code>main.ans</code>) selects the template.</p>
 <p><code>menu_template.c</code> loads the art file, runs <code>mci_expand()</code>, and sends the result to the terminal.</p>
@@ -132,136 +105,82 @@ M|Messages|menu|message.mnu
 <p>User-selectable color schemes (0–7) map <code>^0</code> through <code>^9</code> to ANSI colors:</p>
 <table>
 <tr><th>Token</th><th>Role</th></tr>
-<table>
-<tr><th><code>^0</code></th><th>Primary accent</th></tr>
-<table>
-<tr><th><code>^1</code></th><th>Secondary</th></tr>
-<table>
-<tr><th><code>^2</code></th><th>Text</th></tr>
-<table>
-<tr><th><code>^3</code></th><th>Dim text</th></tr>
-<table>
-<tr><th><code>^4</code></th><th>Highlight</th></tr>
-<table>
-<tr><th><code>^5</code></th><th>Error/alert</th></tr>
-<table>
-<tr><th><code>^6</code></th><th>Success</th></tr>
-<table>
-<tr><th><code>^7</code></th><th>Label</th></tr>
-<table>
-<tr><th><code>^8</code></th><th>Border</th></tr>
-<table>
-<tr><th><code>^9</code></th><th>Title</th></tr>
+<tr><td><code>^0</code></td><td>Primary accent</td></tr>
+<tr><td><code>^1</code></td><td>Secondary</td></tr>
+<tr><td><code>^2</code></td><td>Text</td></tr>
+<tr><td><code>^3</code></td><td>Dim text</td></tr>
+<tr><td><code>^4</code></td><td>Highlight</td></tr>
+<tr><td><code>^5</code></td><td>Error/alert</td></tr>
+<tr><td><code>^6</code></td><td>Success</td></tr>
+<tr><td><code>^7</code></td><td>Label</td></tr>
+<tr><td><code>^8</code></td><td>Border</td></tr>
+<tr><td><code>^9</code></td><td>Title</td></tr>
 </table>
 <p>Schemes: Mutineer Green (default), Classic Blue, Amber, Cyan, Red Sunset, Magenta, Monochrome, Bright White.</p>
 <p>Users change scheme via the <code>pickscheme</code> menu action.</p>
 <h3>Attribute Tokens</h3>
 <table>
 <tr><th>Token</th><th>Effect</th></tr>
-<table>
-<tr><th><code>~L#</code></th><th>Set foreground color (0–15)</th></tr>
-<table>
-<tr><th><code>~B#</code></th><th>Set background color (0–7)</th></tr>
-<table>
-<tr><th><code>~K0</code> / <code>~K1</code></th><th>Blink off/on</th></tr>
-<table>
-<tr><th><code>~RS</code></th><th>Reset all attributes</th></tr>
+<tr><td><code>~L#</code></td><td>Set foreground color (0–15)</td></tr>
+<tr><td><code>~B#</code></td><td>Set background color (0–7)</td></tr>
+<tr><td><code>~K0</code> / <code>~K1</code></td><td>Blink off/on</td></tr>
+<tr><td><code>~RS</code></td><td>Reset all attributes</td></tr>
 </table>
 <h3>User MCI (<code>~XX</code>)</h3>
 <table>
 <tr><th>Token</th><th>Expands To</th></tr>
-<table>
-<tr><th><code>~UN</code></th><th>User handle</th></tr>
-<table>
-<tr><th><code>~RN</code></th><th>Real name</th></tr>
-<table>
-<tr><th><code>~U#</code></th><th>User ID</th></tr>
-<table>
-<tr><th><code>~AG</code></th><th>Age (from birth date)</th></tr>
-<table>
-<tr><th><code>~BD</code></th><th>Birth date</th></tr>
-<table>
-<tr><th><code>~SX</code></th><th>Sex (M/F/U)</th></tr>
-<table>
-<tr><th><code>~SL</code></th><th>Security level</th></tr>
-<table>
-<tr><th><code>~CR</code></th><th>Credits</th></tr>
-<table>
-<tr><th><code>~FP</code></th><th>File points</th></tr>
-<table>
-<tr><th><code>~TL</code></th><th>Time left (minutes)</th></tr>
-<table>
-<tr><th><code>~TB</code></th><th>Time bank balance</th></tr>
-<table>
-<tr><th><code>~LG</code></th><th>Total logons</th></tr>
-<table>
-<tr><th><code>~NN</code></th><th>Node number</th></tr>
-<table>
-<tr><th><code>~MP</code></th><th>Messages posted</th></tr>
-<table>
-<tr><th><code>~UL</code> / <code>~DL</code></th><th>Upload/download counts</th></tr>
-<table>
-<tr><th><code>~UK</code> / <code>~DK</code></th><th>Upload/download KB</th></tr>
+<tr><td><code>~UN</code></td><td>User handle</td></tr>
+<tr><td><code>~RN</code></td><td>Real name</td></tr>
+<tr><td><code>~U#</code></td><td>User ID</td></tr>
+<tr><td><code>~AG</code></td><td>Age (from birth date)</td></tr>
+<tr><td><code>~BD</code></td><td>Birth date</td></tr>
+<tr><td><code>~SX</code></td><td>Sex (M/F/U)</td></tr>
+<tr><td><code>~SL</code></td><td>Security level</td></tr>
+<tr><td><code>~CR</code></td><td>Credits</td></tr>
+<tr><td><code>~FP</code></td><td>File points</td></tr>
+<tr><td><code>~TL</code></td><td>Time left (minutes)</td></tr>
+<tr><td><code>~TB</code></td><td>Time bank balance</td></tr>
+<tr><td><code>~LG</code></td><td>Total logons</td></tr>
+<tr><td><code>~NN</code></td><td>Node number</td></tr>
+<tr><td><code>~MP</code></td><td>Messages posted</td></tr>
+<tr><td><code>~UL</code> / <code>~DL</code></td><td>Upload/download counts</td></tr>
+<tr><td><code>~UK</code> / <code>~DK</code></td><td>Upload/download KB</td></tr>
 </table>
 <h3>System MCI (<code>~XX</code>)</h3>
 <table>
 <tr><th>Token</th><th>Expands To</th></tr>
-<table>
-<tr><th><code>~BN</code></th><th>BBS name</th></tr>
-<table>
-<tr><th><code>~SN</code></th><th>Sysop name</th></tr>
-<table>
-<tr><th><code>~TC</code></th><th>Total calls</th></tr>
-<table>
-<tr><th><code>~NU</code></th><th>Number of users</th></tr>
-<table>
-<tr><th><code>~NF</code></th><th>Number of files</th></tr>
-<table>
-<tr><th><code>~NM</code></th><th>Number of messages</th></tr>
-<table>
-<tr><th><code>~NO</code></th><th>Users online</th></tr>
-<table>
-<tr><th><code>~VR</code></th><th>Version string</th></tr>
-<table>
-<tr><th><code>~DA</code></th><th>Current date</th></tr>
-<table>
-<tr><th><code>~TM</code></th><th>Current time</th></tr>
+<tr><td><code>~BN</code></td><td>BBS name</td></tr>
+<tr><td><code>~SN</code></td><td>Sysop name</td></tr>
+<tr><td><code>~TC</code></td><td>Total calls</td></tr>
+<tr><td><code>~NU</code></td><td>Number of users</td></tr>
+<tr><td><code>~NF</code></td><td>Number of files</td></tr>
+<tr><td><code>~NM</code></td><td>Number of messages</td></tr>
+<tr><td><code>~NO</code></td><td>Users online</td></tr>
+<tr><td><code>~VR</code></td><td>Version string</td></tr>
+<tr><td><code>~DA</code></td><td>Current date</td></tr>
+<tr><td><code>~TM</code></td><td>Current time</td></tr>
 </table>
 <h3>Area MCI</h3>
 <table>
 <tr><th>Token</th><th>Expands To</th></tr>
-<table>
-<tr><th><code>~AN</code></th><th>Current message or file area name</th></tr>
-<table>
-<tr><th><code>~AR</code></th><th>User AR flags list</th></tr>
+<tr><td><code>~AN</code></td><td>Current message or file area name</td></tr>
+<tr><td><code>~AR</code></td><td>User AR flags list</td></tr>
 </table>
 <h3>Legacy Percent Codes (<code>%XX</code>)</h3>
 <table>
 <tr><th>Token</th><th>Expands To</th></tr>
-<table>
-<tr><th><code>%UN</code></th><th>User handle</th></tr>
-<table>
-<tr><th><code>%SL</code></th><th>Security level</th></tr>
-<table>
-<tr><th><code>%CR</code></th><th>Credits</th></tr>
-<table>
-<tr><th><code>%TL</code></th><th>Time left</th></tr>
-<table>
-<tr><th><code>%NN</code></th><th>Node number</th></tr>
-<table>
-<tr><th><code>%DA</code> / <code>%TM</code></th><th>Date/time</th></tr>
-<table>
-<tr><th><code>%PO</code></th><th>Posts count</th></tr>
-<table>
-<tr><th><code>%MT</code> / <code>%FT</code></th><th>Total messages/files</th></tr>
-<table>
-<tr><th><code>%MA</code> / <code>%FA</code></th><th>Messages/files in current area</th></tr>
-<table>
-<tr><th><code>%NO</code></th><th>Users online</th></tr>
-<table>
-<tr><th><code>%PE</code></th><th>Pause prompt</th></tr>
-<table>
-<tr><th>`%?expr{text\</th><th>else}`</th><th>ACS conditional text</th></tr>
+<tr><td><code>%UN</code></td><td>User handle</td></tr>
+<tr><td><code>%SL</code></td><td>Security level</td></tr>
+<tr><td><code>%CR</code></td><td>Credits</td></tr>
+<tr><td><code>%TL</code></td><td>Time left</td></tr>
+<tr><td><code>%NN</code></td><td>Node number</td></tr>
+<tr><td><code>%DA</code> / <code>%TM</code></td><td>Date/time</td></tr>
+<tr><td><code>%PO</code></td><td>Posts count</td></tr>
+<tr><td><code>%MT</code> / <code>%FT</code></td><td>Total messages/files</td></tr>
+<tr><td><code>%MA</code> / <code>%FA</code></td><td>Messages/files in current area</td></tr>
+<tr><td><code>%NO</code></td><td>Users online</td></tr>
+<tr><td><code>%PE</code></td><td>Pause prompt</td></tr>
+<tr><td>`%?expr{text\</td><td>else}`</td><td>ACS conditional text</td></tr>
 </table>
 <p>Full token list: <a href="reference/acs-mci.html">ACS and MCI Reference</a>.</p>
 <h2>ACS (Access Control Strings)</h2>
@@ -275,64 +194,37 @@ M|Messages|menu|message.mnu
 <h3>Standard Terms</h3>
 <table>
 <tr><th>Term</th><th>Meaning</th></tr>
-<table>
-<tr><th><code>S#</code></th><th>Security level &gt;= #</th></tr>
-<table>
-<tr><th><code>D#</code></th><th>Download security level &gt;= #</th></tr>
-<table>
-<tr><th><code>F?</code></th><th>AR flag ? set (A–Z)</th></tr>
-<table>
-<tr><th><code>R?</code></th><th>AC restriction flag ? set</th></tr>
-<table>
-<tr><th><code>A#</code></th><th>Age &gt;= #</th></tr>
-<table>
-<tr><th><code>C#</code></th><th>Total logons &gt;= #</th></tr>
-<table>
-<tr><th><code>C?</code></th><th>In conference ? (A–Z)</th></tr>
-<table>
-<tr><th><code>G?</code></th><th>Gender is ? (M/F)</th></tr>
-<table>
-<tr><th><code>H#</code></th><th>Current hour = #</th></tr>
-<table>
-<tr><th><code>N#</code></th><th>Node number = #</th></tr>
-<table>
-<tr><th><code>P#</code></th><th>Credits &gt;= #</th></tr>
-<table>
-<tr><th><code>T#</code></th><th>Time remaining &gt;= #</th></tr>
-<table>
-<tr><th><code>U#</code></th><th>User number = #</th></tr>
-<table>
-<tr><th><code>V</code></th><th>User validated (not expired)</th></tr>
-<table>
-<tr><th><code>W#</code></th><th>Day of week = # (0=Sun)</th></tr>
-<table>
-<tr><th><code>X#</code></th><th>Days until expiration &lt;= #</th></tr>
-<table>
-<tr><th><code>Z</code></th><th>Meets post ratio</th></tr>
-<table>
-<tr><th><code>PC</code></th><th>Post/call ratio met</th></tr>
-<table>
-<tr><th><code>DR</code></th><th>Download ratio met</th></tr>
-<table>
-<tr><th><code>J#</code></th><th>Member of conference #</th></tr>
-<table>
-<tr><th><code>E#</code></th><th>Active subscription type # (0=any)</th></tr>
+<tr><td><code>S#</code></td><td>Security level &gt;= #</td></tr>
+<tr><td><code>D#</code></td><td>Download security level &gt;= #</td></tr>
+<tr><td><code>F?</code></td><td>AR flag ? set (A–Z)</td></tr>
+<tr><td><code>R?</code></td><td>AC restriction flag ? set</td></tr>
+<tr><td><code>A#</code></td><td>Age &gt;= #</td></tr>
+<tr><td><code>C#</code></td><td>Total logons &gt;= #</td></tr>
+<tr><td><code>C?</code></td><td>In conference ? (A–Z)</td></tr>
+<tr><td><code>G?</code></td><td>Gender is ? (M/F)</td></tr>
+<tr><td><code>H#</code></td><td>Current hour = #</td></tr>
+<tr><td><code>N#</code></td><td>Node number = #</td></tr>
+<tr><td><code>P#</code></td><td>Credits &gt;= #</td></tr>
+<tr><td><code>T#</code></td><td>Time remaining &gt;= #</td></tr>
+<tr><td><code>U#</code></td><td>User number = #</td></tr>
+<tr><td><code>V</code></td><td>User validated (not expired)</td></tr>
+<tr><td><code>W#</code></td><td>Day of week = # (0=Sun)</td></tr>
+<tr><td><code>X#</code></td><td>Days until expiration &lt;= #</td></tr>
+<tr><td><code>Z</code></td><td>Meets post ratio</td></tr>
+<tr><td><code>PC</code></td><td>Post/call ratio met</td></tr>
+<tr><td><code>DR</code></td><td>Download ratio met</td></tr>
+<tr><td><code>J#</code></td><td>Member of conference #</td></tr>
+<tr><td><code>E#</code></td><td>Active subscription type # (0=any)</td></tr>
 </table>
 <h3>Legacy Terms</h3>
 <table>
 <tr><th>Term</th><th>Meaning</th></tr>
-<table>
-<tr><th><code>SLnn</code> / <code>Lnn</code></th><th>Security level &gt;= nn</th></tr>
-<table>
-<tr><th><code>+X</code></th><th>AR flag X set</th></tr>
-<table>
-<tr><th><code>ARABC</code></th><th>All listed AR flags set</th></tr>
-<table>
-<tr><th><code>C&gt;=N</code></th><th>Credits comparison</th></tr>
-<table>
-<tr><th><code>T&gt;=N</code></th><th>Time comparison</th></tr>
-<table>
-<tr><th><code>R&gt;=N</code></th><th>Ratio comparison</th></tr>
+<tr><td><code>SLnn</code> / <code>Lnn</code></td><td>Security level &gt;= nn</td></tr>
+<tr><td><code>+X</code></td><td>AR flag X set</td></tr>
+<tr><td><code>ARABC</code></td><td>All listed AR flags set</td></tr>
+<tr><td><code>C&gt;=N</code></td><td>Credits comparison</td></tr>
+<tr><td><code>T&gt;=N</code></td><td>Time comparison</td></tr>
+<tr><td><code>R&gt;=N</code></td><td>Ratio comparison</td></tr>
 </table>
 <h3>Menu ACS Examples</h3>
 <pre><code class="">
@@ -346,14 +238,10 @@ L20|+B       # Level 20+ OR AR flag B
 <p>System art lives in <code>art/</code> (configurable via <code>art_path</code>):</p>
 <table>
 <tr><th>File</th><th>Typical Use</th></tr>
-<table>
-<tr><th><code>motd.ans</code></th><th>Message of the day (config <code>motd</code>)</th></tr>
-<table>
-<tr><th><code>welcome.txt</code></th><th>Welcome letter text</th></tr>
-<table>
-<tr><th><code>logon.ans</code></th><th>Logon screen</th></tr>
-<table>
-<tr><th>Named art</th><th>Referenced by <code>send_named_art()</code> (e.g., <code>NOCREDTS</code>)</th></tr>
+<tr><td><code>motd.ans</code></td><td>Message of the day (config <code>motd</code>)</td></tr>
+<tr><td><code>welcome.txt</code></td><td>Welcome letter text</td></tr>
+<tr><td><code>logon.ans</code></td><td>Logon screen</td></tr>
+<tr><td>Named art</td><td>Referenced by <code>send_named_art()</code> (e.g., <code>NOCREDTS</code>)</td></tr>
 </table>
 <p>Art files are plain files with ANSI escape sequences. They may contain MCI tokens expanded at display time.</p>
 <p>Validate art paths during development with <code>mutineer-validate</code>.</p>
@@ -362,26 +250,16 @@ L20|+B       # Level 20+ OR AR flag B
 <p>Typical bindings (sysop level required):</p>
 <table>
 <tr><th>Key</th><th>Action</th></tr>
-<table>
-<tr><th>F1</th><th>User editor</th></tr>
-<table>
-<tr><th>F2</th><th>Conference editor</th></tr>
-<table>
-<tr><th>F3</th><th>Protocol editor</th></tr>
-<table>
-<tr><th>F4</th><th>Menu editor</th></tr>
-<table>
-<tr><th>F5</th><th>Validate files</th></tr>
-<table>
-<tr><th>F6</th><th>Vote editor</th></tr>
-<table>
-<tr><th>F7</th><th>Event editor</th></tr>
-<table>
-<tr><th>F8</th><th>Fido editor</th></tr>
-<table>
-<tr><th>F9</th><th>QWK network editor</th></tr>
-<table>
-<tr><th>F10</th><th>Maintenance</th></tr>
+<tr><td>F1</td><td>User editor</td></tr>
+<tr><td>F2</td><td>Conference editor</td></tr>
+<tr><td>F3</td><td>Protocol editor</td></tr>
+<tr><td>F4</td><td>Menu editor</td></tr>
+<tr><td>F5</td><td>Validate files</td></tr>
+<tr><td>F6</td><td>Vote editor</td></tr>
+<tr><td>F7</td><td>Event editor</td></tr>
+<tr><td>F8</td><td>Fido editor</td></tr>
+<tr><td>F9</td><td>QWK network editor</td></tr>
+<tr><td>F10</td><td>Maintenance</td></tr>
 </table>
 <p>Exact bindings are defined in <code>session.c</code> F-key handling. Sysop must have appropriate AR flags (typically <code>+A</code>).</p>
 <h2>Menu Validation</h2>

@@ -12,14 +12,14 @@ Host functions are called from bytecode as `NAMESPACE.NAME(args)`. The Mutineer 
 | `TERM.PRINTLN(text)` | term.io | 0–1 | — | ✅ |
 | `TERM.CLS()` | term.io | 0 | — | ✅ |
 | `TERM.COLOR(fg, bg?)` | term.io | 1–2 | — | ✅ |
-| `TERM.GOTOXY(x, y)` | term.io | 2 | — | ⚠️ |
+| `TERM.GOTOXY(x, y)` | term.io | 2 | — | ✅ |
 | `TERM.GETKEY()` | term.input | 0 | STRING | ✅ |
 | `TERM.INPUT(prompt, default)` | term.input | 0–2 | STRING | ✅ |
 | `TERM.WIDTH()` | term.query | 0 | INTEGER | ✅ |
 | `TERM.HEIGHT()` | term.query | 0 | INTEGER | ✅ |
-| `TERM.PAUSE(ms)` | term.io | — | — | ❌ |
-| `TERM.INPUT_PASSWORD(prompt)` | term.input | — | STRING | ❌ |
-| `TERM.SUPPORTS_ANSI()` | term.query | 0 | BOOLEAN | ❌ |
+| `TERM.PAUSE(ms)` | term.io | 0-1 | — | ✅ |
+| `TERM.INPUT_PASSWORD(prompt)` | term.input | 0-1 | STRING | ✅ |
+| `TERM.SUPPORTS_ANSI()` | term.query | 0 | BOOLEAN | ✅ |
 
 ## USER — current caller
 
@@ -29,9 +29,10 @@ Host functions are called from bytecode as `NAMESPACE.NAME(args)`. The Mutineer 
 | `USER.ALIAS()` | user.read | STRING |
 | `USER.ID()` | user.read | INTEGER |
 | `USER.SECURITY()` | user.read | INTEGER |
-| `USER.TIMELEFT()` | user.read | INTEGER |
+| `USER.TIME_LEFT()` | user.read | INTEGER |
+| `USER.TIME_REMAINING()` | user.read | INTEGER |
 
-Spec name `USER.TIME_LEFT()` is not registered — use `USER.TIMELEFT()`.
+`USER.TIMELEFT()` remains accepted as a compatibility alias.
 
 `USER.FLAGS()` — spec struct field exists; not yet in dispatch table.
 
@@ -48,8 +49,8 @@ Spec name `USER.TIME_LEFT()` is not registered — use `USER.TIMELEFT()`.
 |----------|-----|-------|
 | `SESSION.GET(key, default)` | session.read | |
 | `SESSION.SET(key, value)` | session.write | |
-
-Spec also defines `SESSION.NODE()` and `SESSION.ELAPSED_MS()` — not yet implemented; use `BBS.NODE()` for node number today.
+| `SESSION.NODE()` | session.read | Current node number |
+| `SESSION.ELAPSED_MS()` | session.read | Milliseconds since session start |
 
 ## BBS — system queries and messaging
 
@@ -63,8 +64,8 @@ Spec also defines `SESSION.NODE()` and `SESSION.ELAPSED_MS()` — not yet implem
 
 | Function | Cap | Notes |
 |----------|-----|-------|
-| `DOOR.EXIT(code?)` | — | Exit door; exit code propagation incomplete |
-| `DOOR.CHAIN(target, args?)` | door.chain | Use VM chain status (see GitHub BUG-1) |
+| `DOOR.EXIT(code?)` | — | Exit door and preserve the exit code |
+| `DOOR.CHAIN(target, args?)` | door.chain | Request a Buccaneer chain target and args |
 
 ## DATA — structured datasets
 
@@ -102,7 +103,7 @@ Spec also defines `SESSION.NODE()` and `SESSION.ELAPSED_MS()` — not yet implem
 |----------|-----|-------|
 | `SHARED.GET(key, default)` | shared.read | Not mutex-protected yet |
 | `SHARED.SET(key, value)` | shared.write | |
-| `SHARED.CAS(key, expected, new)` | shared.write | Use deep equality fix pending |
+| `SHARED.CAS(key, expected, new)` | shared.write | Scalar compare-and-swap; structured-value equality is a follow-up |
 
 ## TEXT — mediated files
 

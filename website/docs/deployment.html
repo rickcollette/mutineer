@@ -21,21 +21,16 @@ docker compose up -d --build
 </code></pre>
 <table>
 <tr><th>Setting</th><th>Default</th></tr>
-<table>
-<tr><th>Published port</th><th><code>2929</code></th></tr>
-<table>
-<tr><th>Config</th><th><code>conf/mutineer.docker.conf</code></th></tr>
-<table>
-<tr><th>Data volume</th><th><code>mutineer-bbs_mutineer-data</code> → <code>/opt/mutineer/data</code></th></tr>
-<table>
-<tr><th>Logs volume</th><th><code>mutineer-bbs_mutineer-logs</code> → <code>/opt/mutineer/logs</code></th></tr>
+<tr><td>Published port</td><td><code>2929</code></td></tr>
+<tr><td>Config</td><td><code>conf/mutineer.docker.conf</code></td></tr>
+<tr><td>Data volume</td><td><code>mutineer-bbs_mutineer-data</code> → <code>/opt/mutineer/data</code></td></tr>
+<tr><td>Logs volume</td><td><code>mutineer-bbs_mutineer-logs</code> → <code>/opt/mutineer/logs</code></td></tr>
 </table>
 <p>First start runs <code>mutineer-initbbs -y</code> if <code>data/mutineer.db</code> is missing.</p>
 <h3>Environment</h3>
 <table>
 <tr><th>Variable</th><th>Purpose</th></tr>
-<table>
-<tr><th><code>MUTINEER_CONFIG</code></th><th>Config file path inside container (default <code>conf/mutineer.docker.conf</code>)</th></tr>
+<tr><td><code>MUTINEER_CONFIG</code></td><td>Config file path inside container (default <code>conf/mutineer.docker.conf</code>)</td></tr>
 </table>
 <h3>WFC in Docker</h3>
 <p>The default Docker config sets <code>wfc_enabled=0</code> because detached containers have no TTY. Use <code>scripts/open-wfc.sh</code> for an interactive WFC session on port 2930, or run the daemon on the host with a real terminal.</p>
@@ -70,16 +65,11 @@ WantedBy=multi-user.target
 <h3>Helper scripts</h3>
 <table>
 <tr><th>Script</th><th>Purpose</th></tr>
-<table>
-<tr><th><code>scripts/start</code></th><th>Background start</th></tr>
-<table>
-<tr><th><code>scripts/stop</code></th><th>Stop daemon</th></tr>
-<table>
-<tr><th><code>scripts/start-screen</code></th><th>GNU screen session</th></tr>
-<table>
-<tr><th><code>scripts/watchdog</code></th><th>Restart on failure</th></tr>
-<table>
-<tr><th><code>scripts/backup</code></th><th>Database backup</th></tr>
+<tr><td><code>scripts/start</code></td><td>Background start</td></tr>
+<tr><td><code>scripts/stop</code></td><td>Stop daemon</td></tr>
+<tr><td><code>scripts/start-screen</code></td><td>GNU screen session</td></tr>
+<tr><td><code>scripts/watchdog</code></td><td>Restart on failure</td></tr>
+<tr><td><code>scripts/backup</code></td><td>Database backup</td></tr>
 </table>
 <h3>Firewall</h3>
 <p>Open the configured <code>port</code> (default <strong>2929/tcp</strong>). Use a reverse proxy only if you understand telnet protocol limitations — BBS clients expect raw telnet, not HTTP.</p>

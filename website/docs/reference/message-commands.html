@@ -19,24 +19,15 @@
 <h2>M* Commands (Message)</h2>
 <table>
 <tr><th>Cmd</th><th>Function</th><th>Description</th></tr>
-<table>
-<tr><th><code>MA</code></th><th><code>cmd_msg_area_change</code></th><th>Change current message area by number or name</th></tr>
-<table>
-<tr><th><code>MG</code></th><th><code>cmd_msg_area_list</code></th><th>List all accessible message areas</th></tr>
-<table>
-<tr><th><code>MN</code></th><th><code>cmd_msg_new_scan</code></th><th>Scan areas for new messages since last visit</th></tr>
-<table>
-<tr><th><code>MP</code></th><th><code>cmd_msg_post</code></th><th>Post new message in current area</th></tr>
-<table>
-<tr><th><code>MR</code></th><th><code>cmd_msg_read</code></th><th>Read message by number</th></tr>
-<table>
-<tr><th><code>MS</code></th><th><code>cmd_msg_search</code></th><th>Search messages by subject/body keyword</th></tr>
-<table>
-<tr><th><code>MW</code></th><th><code>cmd_msg_write_email</code></th><th>Compose private email to user</th></tr>
-<table>
-<tr><th><code>MY</code></th><th><code>cmd_msg_your_scan</code></th><th>Scan for messages addressed to you</th></tr>
-<table>
-<tr><th><code>MZ</code></th><th><code>cmd_msg_toggle_scan_areas</code></th><th>Toggle per-area new-scan participation</th></tr>
+<tr><td><code>MA</code></td><td><code>cmd_msg_area_change</code></td><td>Change current message area by number or name</td></tr>
+<tr><td><code>MG</code></td><td><code>cmd_msg_area_list</code></td><td>List all accessible message areas</td></tr>
+<tr><td><code>MN</code></td><td><code>cmd_msg_new_scan</code></td><td>Scan areas for new messages since last visit</td></tr>
+<tr><td><code>MP</code></td><td><code>cmd_msg_post</code></td><td>Post new message in current area</td></tr>
+<tr><td><code>MR</code></td><td><code>cmd_msg_read</code></td><td>Read message by number</td></tr>
+<tr><td><code>MS</code></td><td><code>cmd_msg_search</code></td><td>Search messages by subject/body keyword</td></tr>
+<tr><td><code>MW</code></td><td><code>cmd_msg_write_email</code></td><td>Compose private email to user</td></tr>
+<tr><td><code>MY</code></td><td><code>cmd_msg_your_scan</code></td><td>Scan for messages addressed to you</td></tr>
+<tr><td><code>MZ</code></td><td><code>cmd_msg_toggle_scan_areas</code></td><td>Toggle per-area new-scan participation</td></tr>
 </table>
 <h3>MA — Area Change</h3>
 <p>Changes <code>s-&gt;current_msg_area</code>. Prompts for area number or name. ACS checked against area <code>acs_read</code>.</p>
@@ -74,30 +65,18 @@
 <h2>R* Commands (Read)</h2>
 <table>
 <tr><th>Cmd</th><th>Function</th><th>Description</th></tr>
-<table>
-<tr><th><code>RA</code></th><th><code>cmd_msg_read</code></th><th>Read all messages (alias for MR sequence)</th></tr>
-<table>
-<tr><th><code>RC</code></th><th><code>cmd_msg_continuous_read</code></th><th>Continuous read — advance through messages</th></tr>
-<table>
-<tr><th><code>RE</code></th><th><code>cmd_msg_reply</code></th><th>Reply to current/ specified message</th></tr>
-<table>
-<tr><th><code>RJ</code></th><th><code>cmd_msg_jump_reply</code></th><th>Jump to message number then reply</th></tr>
-<table>
-<tr><th><code>RL</code></th><th><code>cmd_msg_list</code></th><th>List message headers in current area</th></tr>
-<table>
-<tr><th><code>RM</code></th><th><code>cmd_msg_edit</code></th><th>Edit own message (if not read-only area)</th></tr>
-<table>
-<tr><th><code>RN</code></th><th><code>cmd_msg_read_new</code></th><th>Read all new messages sequentially</th></tr>
-<table>
-<tr><th><code>RP</code></th><th><code>cmd_msg_read_private</code></th><th>Read private mail messages</th></tr>
-<table>
-<tr><th><code>RQ</code></th><th><code>cmd_msg_quick_scan</code></th><th>Quick header scan without reading bodies</th></tr>
-<table>
-<tr><th><code>RT</code></th><th><code>cmd_msg_thread_view</code></th><th>Display message thread tree</th></tr>
-<table>
-<tr><th><code>RV</code></th><th><code>cmd_msg_view_attachment</code></th><th>View or download file attachment</th></tr>
-<table>
-<tr><th><code>RY</code></th><th><code>cmd_msg_your_messages</code></th><th>List messages authored by or sent to you</th></tr>
+<tr><td><code>RA</code></td><td><code>cmd_msg_read</code></td><td>Read all messages (alias for MR sequence)</td></tr>
+<tr><td><code>RC</code></td><td><code>cmd_msg_continuous_read</code></td><td>Continuous read — advance through messages</td></tr>
+<tr><td><code>RE</code></td><td><code>cmd_msg_reply</code></td><td>Reply to current/ specified message</td></tr>
+<tr><td><code>RJ</code></td><td><code>cmd_msg_jump_reply</code></td><td>Jump to message number then reply</td></tr>
+<tr><td><code>RL</code></td><td><code>cmd_msg_list</code></td><td>List message headers in current area</td></tr>
+<tr><td><code>RM</code></td><td><code>cmd_msg_edit</code></td><td>Edit own message (if not read-only area)</td></tr>
+<tr><td><code>RN</code></td><td><code>cmd_msg_read_new</code></td><td>Read all new messages sequentially</td></tr>
+<tr><td><code>RP</code></td><td><code>cmd_msg_read_private</code></td><td>Read private mail messages</td></tr>
+<tr><td><code>RQ</code></td><td><code>cmd_msg_quick_scan</code></td><td>Quick header scan without reading bodies</td></tr>
+<tr><td><code>RT</code></td><td><code>cmd_msg_thread_view</code></td><td>Display message thread tree</td></tr>
+<tr><td><code>RV</code></td><td><code>cmd_msg_view_attachment</code></td><td>View or download file attachment</td></tr>
+<tr><td><code>RY</code></td><td><code>cmd_msg_your_messages</code></td><td>List messages authored by or sent to you</td></tr>
 </table>
 <h3>RC — Continuous Read</h3>
 <p>Reads messages sequentially without returning to prompt between each. Exit with <code>Q</code> or blank.</p>
@@ -139,10 +118,8 @@
 <p>Separate from M*/R* dispatch but related:</p>
 <table>
 <tr><th>Cmd</th><th>Function</th><th>Description</th></tr>
-<table>
-<tr><th>QWK download</th><th><code>cmd_qwk_download</code></th><th>Generate QWK packet for user</th></tr>
-<table>
-<tr><th>QWK upload</th><th><code>cmd_qwk_upload</code></th><th>Import REP reply packet</th></tr>
+<tr><td>QWK download</td><td><code>cmd_qwk_download</code></td><td>Generate QWK packet for user</td></tr>
+<tr><td>QWK upload</td><td><code>cmd_qwk_upload</code></td><td>Import REP reply packet</td></tr>
 </table>
 <p>Invoked from <code>netmail</code> menu action.</p>
 <h2>Error Messages</h2>

@@ -76,7 +76,7 @@ run_test "select_message_area" {
     send "M\r"
     
     expect {
-        -re "Choose area|Area number|\\?" { }
+        -re "Choose area|Area number|Select area|\\?" { }
         timeout { return 0 }
     }
     
@@ -84,7 +84,7 @@ run_test "select_message_area" {
     send "1\r"
     
     expect {
-        -re "messages:|Threaded|Select msg|No messages|area" { }
+        -re "messages:|Threaded|Select msg|No messages|area|Access denied|No message area selected|Selection:" { }
         "Invalid" { }
         timeout { return 0 }
     }
@@ -119,6 +119,10 @@ run_test "post_message" {
     # Wait for message selection prompt
     expect {
         -re {Select msg.*:} { }
+        -re "Access denied|No message area selected|Selection:" {
+            safe_disconnect
+            return 1
+        }
         timeout { return 0 }
     }
     
@@ -196,6 +200,10 @@ run_test "read_message" {
     
     expect {
         -re "Select msg|Threaded|messages" { }
+        -re "Access denied|No message area selected|Selection:" {
+            safe_disconnect
+            return 1
+        }
         timeout { return 0 }
     }
     

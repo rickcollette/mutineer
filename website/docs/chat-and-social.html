@@ -34,18 +34,12 @@ void split_chat_start(Session* s, Session* other);
 <p>Multi-user chat rooms with DB-backed state:</p>
 <table>
 <tr><th>Function</th><th>Purpose</th></tr>
-<table>
-<tr><th><code>teleconf_create_room()</code></th><th>Create room with name, topic, privacy, password</th></tr>
-<table>
-<tr><th><code>teleconf_join_room()</code></th><th>Join by room ID</th></tr>
-<table>
-<tr><th><code>teleconf_leave_room()</code></th><th>Leave current room</th></tr>
-<table>
-<tr><th><code>teleconf_broadcast()</code></th><th>Send message to all room members</th></tr>
-<table>
-<tr><th><code>teleconf_list_rooms()</code></th><th>List active rooms</th></tr>
-<table>
-<tr><th><code>teleconf_who_in_room()</code></th><th>Show participants</th></tr>
+<tr><td><code>teleconf_create_room()</code></td><td>Create room with name, topic, privacy, password</td></tr>
+<tr><td><code>teleconf_join_room()</code></td><td>Join by room ID</td></tr>
+<tr><td><code>teleconf_leave_room()</code></td><td>Leave current room</td></tr>
+<tr><td><code>teleconf_broadcast()</code></td><td>Send message to all room members</td></tr>
+<tr><td><code>teleconf_list_rooms()</code></td><td>List active rooms</td></tr>
+<tr><td><code>teleconf_who_in_room()</code></td><td>Show participants</td></tr>
 </table>
 <p>Initialized at startup via <code>teleconf_init()</code> with DB handle from <code>teleconf_set_db()</code>.</p>
 <h2>Sysop Paging</h2>
@@ -75,20 +69,16 @@ void split_chat_start(Session* s, Session* other);
 <p>One-line public messages stored in <code>oneliners</code> table:</p>
 <table>
 <tr><th>Field</th><th>Purpose</th></tr>
-<table>
-<tr><th><code>user_id</code> / <code>user_handle</code></th><th>Author</th></tr>
-<table>
-<tr><th><code>text</code></th><th>Oneliner content</th></tr>
-<table>
-<tr><th><code>posted_at</code></th><th>Timestamp</th></tr>
+<tr><td><code>user_id</code> / <code>user_handle</code></td><td>Author</td></tr>
+<tr><td><code>text</code></td><td>Oneliner content</td></tr>
+<tr><td><code>posted_at</code></td><td>Timestamp</td></tr>
 </table>
 <p>Menu action <code>oneliners</code> displays recent oneliners and allows posting new ones.</p>
 <h2>Short Messages (SMW)</h2>
 <p>Short Messages Waiting — private brief messages between users:</p>
 <table>
 <tr><th>Table</th><th>Purpose</th></tr>
-<table>
-<tr><th><code>short_messages</code></th><th>Message store with read flag</th></tr>
+<tr><td><code>short_messages</code></td><td>Message store with read flag</td></tr>
 </table>
 <p>Menu action <code>smw</code> checks and displays waiting short messages. User field <code>smw</code> tracks waiting count.</p>
 <p>Fields: <code>from_user</code>, <code>to_user</code>, <code>from_handle</code>, <code>to_handle</code>, <code>message</code>, <code>read_flag</code>.</p>
@@ -97,31 +87,21 @@ void split_chat_start(Session* s, Session* other);
 <p>Additionally, <code>chat_logs</code> table stores structured logs:</p>
 <table>
 <tr><th>Field</th><th>Purpose</th></tr>
-<table>
-<tr><th><code>chat_type</code></th><th><code>split</code>, <code>teleconf</code>, or <code>sysop</code></th></tr>
-<table>
-<tr><th><code>room_id</code></th><th>Teleconference room (if applicable)</th></tr>
-<table>
-<tr><th><code>from_user</code> / <code>from_handle</code></th><th>Sender</th></tr>
-<table>
-<tr><th><code>to_user</code> / <code>to_handle</code></th><th>Recipient (split chat)</th></tr>
-<table>
-<tr><th><code>message</code></th><th>Content</th></tr>
-<table>
-<tr><th><code>logged_at</code></th><th>Timestamp</th></tr>
+<tr><td><code>chat_type</code></td><td><code>split</code>, <code>teleconf</code>, or <code>sysop</code></td></tr>
+<tr><td><code>room_id</code></td><td>Teleconference room (if applicable)</td></tr>
+<tr><td><code>from_user</code> / <code>from_handle</code></td><td>Sender</td></tr>
+<tr><td><code>to_user</code> / <code>to_handle</code></td><td>Recipient (split chat)</td></tr>
+<tr><td><code>message</code></td><td>Content</td></tr>
+<tr><td><code>logged_at</code></td><td>Timestamp</td></tr>
 </table>
 <p>Empty <code>chat_log_path</code> disables file logging; DB logging may still occur depending on code path.</p>
 <h2>Restrictions</h2>
 <table>
 <tr><th>Flag</th><th>Effect</th></tr>
-<table>
-<tr><th><code>AC_RCHAT</code></th><th>Restricted from chat (ACS <code>RC</code>)</th></tr>
-<table>
-<tr><th><code>STATUS_NOCHAT</code></th><th>Not available for chat requests</th></tr>
-<table>
-<tr><th><code>STATUS_NOPAGE</code></th><th>Cannot be paged</th></tr>
-<table>
-<tr><th><code>AC_RUSERLIST</code></th><th>Cannot view who&#x27;s online (<code>who</code> action)</th></tr>
+<tr><td><code>AC_RCHAT</code></td><td>Restricted from chat (ACS <code>RC</code>)</td></tr>
+<tr><td><code>STATUS_NOCHAT</code></td><td>Not available for chat requests</td></tr>
+<tr><td><code>STATUS_NOPAGE</code></td><td>Cannot be paged</td></tr>
+<tr><td><code>AC_RUSERLIST</code></td><td>Cannot view who&#x27;s online (<code>who</code> action)</td></tr>
 </table>
 <h2>Who&#x27;s Online</h2>
 <p>Menu action <code>who</code> (key <code>W</code> on main menu) lists active nodes:</p>

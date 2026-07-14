@@ -20,6 +20,29 @@
 #include <sqlite3.h>
 #endif
 
+static bool plank_make_temp_file(const char *prefix, char *path, size_t path_size, int *fd_out)
+{
+    if (!path || path_size == 0 || !fd_out)
+        return false;
+    const char *tmpdir = getenv("TMPDIR");
+    if (!tmpdir || !tmpdir[0])
+        tmpdir = "/tmp";
+    int n = snprintf(path, path_size, "%s/%s_XXXXXX", tmpdir, prefix ? prefix : "plank");
+    if (n < 0 || (size_t)n >= path_size)
+    {
+        plank_set_error("Temporary path too long");
+        return false;
+    }
+    int fd = mkstemp(path);
+    if (fd < 0)
+    {
+        plank_set_error("Failed to create temporary bundle file: %s", strerror(errno));
+        return false;
+    }
+    *fd_out = fd;
+    return true;
+}
+
 /* ============================================================================
  * BUNDLE WRITER
  * ============================================================================ */
@@ -970,13 +993,10 @@ plank_bundle_reader_t *plank_bundle_reader_open_mem(const uint8_t *data, size_t 
     if (!data || len == 0)
         return NULL;
 
-    char tmp_path[] = "/tmp/plank_bundle_XXXXXX";
-    int fd = mkstemp(tmp_path);
-    if (fd < 0)
-    {
-        plank_set_error("Failed to create temporary bundle file: %s", strerror(errno));
+    char tmp_path[512];
+    int fd = -1;
+    if (!plank_make_temp_file("plank_bundle", tmp_path, sizeof(tmp_path), &fd))
         return NULL;
-    }
 
     size_t written = 0;
     while (written < len)
@@ -1403,13 +1423,10 @@ bool plank_bundle_import_mem(plank_store_t *store, const uint8_t *data, size_t l
     if (!store || !data || len == 0 || !result)
         return false;
 
-    char tmp_path[] = "/tmp/plank_bundle_XXXXXX";
-    int fd = mkstemp(tmp_path);
-    if (fd < 0)
-    {
-        plank_set_error("Failed to create temporary bundle file: %s", strerror(errno));
+    char tmp_path[512];
+    int fd = -1;
+    if (!plank_make_temp_file("plank_bundle", tmp_path, sizeof(tmp_path), &fd))
         return false;
-    }
 
     size_t written = 0;
     while (written < len)

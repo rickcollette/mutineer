@@ -13,6 +13,7 @@
 #include <time.h>
 #include <ctype.h>
 #include <dirent.h>
+#include <errno.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -429,17 +430,13 @@ void cmd_file_upload(Session* s, const char* data) {
   /* Ask for extended description */
   send_str(s, "\r\nEnter extended description (blank line to end):\r\n");
   extended_desc[0] = '\0';
-  size_t ext_len = 0;
   for (int line_num = 0; line_num < 20; line_num++) {
     char line_buf[128];
     prompt_line(s, "> ", line_buf, sizeof(line_buf));
     if (!line_buf[0]) break;
-    size_t line_len = strlen(line_buf);
-    if (ext_len + line_len + 3 < sizeof(extended_desc)) {
-      strcat(extended_desc, line_buf);
-      strcat(extended_desc, "\r\n");
-      ext_len += line_len + 2;
-    }
+    if (!bbs_str_append(extended_desc, sizeof(extended_desc), line_buf) ||
+        !bbs_str_append(extended_desc, sizeof(extended_desc), "\r\n"))
+      break;
   }
   
   send_str(s, "\r\nSelect protocol: (Z)modem, (Y)modem, (X)modem: ");
@@ -1101,11 +1098,13 @@ void cmd_file_batch_upload(Session* s, const char* data) {
   }
   DbProtocol* proto = &protos[pidx];
 
-  /* Build a temp receive directory for this session */
-  char recvdir[256];
-  snprintf(recvdir, sizeof(recvdir), "%s/upload_%d_%ld",
-           area.path, s->user.id, (long)time(NULL));
-  if (mkdir(recvdir, 0755) != 0) {
+  if (!bbs_mkdir_p(area.path, 0755)) {
+    send_str(s, "\r\nUpload area is not writable.\r\n");
+    return;
+  }
+
+  char recvdir[512];
+  if (!bbs_make_temp_dir("mutineer_upload", recvdir, sizeof(recvdir))) {
     send_str(s, "\r\nCould not create upload staging directory.\r\n");
     return;
   }
@@ -1128,26 +1127,40 @@ void cmd_file_batch_upload(Session* s, const char* data) {
     while ((ent = readdir(dir)) != NULL) {
       if (ent->d_name[0] == '.') continue;
 
+      if (!bbs_safe_filename(ent->d_name, sizeof(((DbFileRec*)0)->filename) - 1)) {
+        snprintf(buf, sizeof(buf), "  Rejected unsafe filename: %s\r\n", ent->d_name);
+        send_str(s, buf);
+        continue;
+      }
+
       char srcpath[512], destpath[512];
-      snprintf(srcpath, sizeof(srcpath), "%s/%s", recvdir, ent->d_name);
-      snprintf(destpath, sizeof(destpath), "%s/%s", area.path, ent->d_name);
+      path_join(recvdir, ent->d_name, srcpath, sizeof(srcpath));
+      if (!file_area_resolve(area.path, ent->d_name, destpath, sizeof(destpath))) {
+        snprintf(buf, sizeof(buf), "  Rejected path outside area: %s\r\n", ent->d_name);
+        send_str(s, buf);
+        continue;
+      }
 
       struct stat st;
-      if (stat(srcpath, &st) != 0) continue;
+      if (lstat(srcpath, &st) != 0 || !S_ISREG(st.st_mode)) {
+        snprintf(buf, sizeof(buf), "  Rejected non-regular upload: %s\r\n", ent->d_name);
+        send_str(s, buf);
+        continue;
+      }
+      if (access(destpath, F_OK) == 0) {
+        snprintf(buf, sizeof(buf), "  Rejected duplicate filename: %s\r\n", ent->d_name);
+        send_str(s, buf);
+        continue;
+      }
 
-      /* Move file to area directory */
+      int size = (int)st.st_size;
       if (rename(srcpath, destpath) != 0) {
-        /* Cross-device: fall back to copy */
-        FILE* fin  = fopen(srcpath, "rb");
-        FILE* fout = fopen(destpath, "wb");
-        if (fin && fout) {
-          char chunk[4096];
-          size_t n;
-          while ((n = fread(chunk, 1, sizeof(chunk), fin)) > 0)
-            fwrite(chunk, 1, n, fout);
+        if (errno != EXDEV || !file_copy(srcpath, destpath, &size)) {
+          snprintf(buf, sizeof(buf), "  Could not move upload: %s\r\n", ent->d_name);
+          send_str(s, buf);
+          unlink(destpath);
+          continue;
         }
-        if (fin)  fclose(fin);
-        if (fout) fclose(fout);
         unlink(srcpath);
       }
 
@@ -1156,7 +1169,6 @@ void cmd_file_batch_upload(Session* s, const char* data) {
       snprintf(prompt_buf, sizeof(prompt_buf), "Description for %s: ", ent->d_name);
       prompt_line(s, prompt_buf, desc, sizeof(desc));
 
-      int size = (int)st.st_size;
       if (db_file_add_ex(s->db, s->current_file_area, ent->d_name, desc, "", NULL,
                          size, s->user.id, 0, FILE_FLAG_NOTVAL)) {
         s->user.uploads++;
@@ -1173,7 +1185,7 @@ void cmd_file_batch_upload(Session* s, const char* data) {
     closedir(dir);
   }
 
-  rmdir(recvdir);
+  bbs_remove_tree(recvdir);
 
   snprintf(buf, sizeof(buf), "\r\nBatch upload complete. %d file(s) accepted.\r\n", uploaded);
   send_str(s, buf);

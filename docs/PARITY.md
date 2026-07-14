@@ -77,7 +77,7 @@ Statuses: ✅ implemented, 🟡 partial/stubbed, ❌ missing, 🎨 theme-only.
 - Time bank, vote booths (Vote Editor `*V`), bulletins, automsg. **Status:** ✅
 - Conference Editor (`*R`), Protocol Editor (`*X`). **Status:** ✅
 - Last callers display, subscription management. **Status:** ✅
-- Logging/audit (audit + trap logs). **Status:** 🟡 (more detail pending).
+- Logging/audit (audit + trap logs). **Status:** ✅ (runtime audit hooks and matrix regression coverage are in place for current security-sensitive paths).
 
 ## Display files / art
 

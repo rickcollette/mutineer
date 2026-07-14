@@ -24,14 +24,10 @@ cmake --build build
 <h3>CMake Targets</h3>
 <table>
 <tr><th>Target</th><th>Output</th></tr>
-<table>
-<tr><th><code>mutineer</code></th><th>Main BBS server</th></tr>
-<table>
-<tr><th><code>tools</code></th><th>All BBS CLI utilities</th></tr>
-<table>
-<tr><th><code>plank</code></th><th>PLANK daemons and tools</th></tr>
-<table>
-<tr><th><code>plugins</code></th><th>Sample plugins (hello, chat)</th></tr>
+<tr><td><code>mutineer</code></td><td>Main BBS server</td></tr>
+<tr><td><code>tools</code></td><td>All BBS CLI utilities</td></tr>
+<tr><td><code>plank</code></td><td>PLANK daemons and tools</td></tr>
+<tr><td><code>plugins</code></td><td>Sample plugins (hello, chat)</td></tr>
 </table>
 <h3>Compile Flags</h3>
 <ul>
@@ -75,22 +71,14 @@ conf/              Default configuration
 <h2>Key Entry Points</h2>
 <table>
 <tr><th>Function</th><th>File</th><th>When Called</th></tr>
-<table>
-<tr><th><code>main()</code></th><th><code>main.c</code></th><th>Process start</th></tr>
-<table>
-<tr><th><code>net_run_listener()</code></th><th><code>net_listener.c</code></th><th>Accept loop</th></tr>
-<table>
-<tr><th><code>session_run()</code></th><th><code>session.c</code></th><th>Per-connection thread</th></tr>
-<table>
-<tr><th><code>handle_action()</code></th><th><code>session.c</code></th><th>Menu selection</th></tr>
-<table>
-<tr><th><code>handle_msg_command()</code></th><th><code>msg_cmds.c</code></th><th>M*/R* input</th></tr>
-<table>
-<tr><th><code>handle_file_command()</code></th><th><code>file_cmds.c</code></th><th>F* input</th></tr>
-<table>
-<tr><th><code>cfg_load()</code></th><th><code>config.c</code></th><th>Config parse</th></tr>
-<table>
-<tr><th><code>db_open()</code></th><th><code>db.c</code></th><th>Database open</th></tr>
+<tr><td><code>main()</code></td><td><code>main.c</code></td><td>Process start</td></tr>
+<tr><td><code>net_run_listener()</code></td><td><code>net_listener.c</code></td><td>Accept loop</td></tr>
+<tr><td><code>session_run()</code></td><td><code>session.c</code></td><td>Per-connection thread</td></tr>
+<tr><td><code>handle_action()</code></td><td><code>session.c</code></td><td>Menu selection</td></tr>
+<tr><td><code>handle_msg_command()</code></td><td><code>msg_cmds.c</code></td><td>M*/R* input</td></tr>
+<tr><td><code>handle_file_command()</code></td><td><code>file_cmds.c</code></td><td>F* input</td></tr>
+<tr><td><code>cfg_load()</code></td><td><code>config.c</code></td><td>Config parse</td></tr>
+<tr><td><code>db_open()</code></td><td><code>db.c</code></td><td>Database open</td></tr>
 </table>
 <h2>Adding a Menu Action</h2>
 <ol>
@@ -124,26 +112,16 @@ ctest --test-dir build --exclude-regex &quot;tools_cli|expect_suite&quot;
 </code></pre>
 <table>
 <tr><th>Test</th><th>Covers</th></tr>
-<table>
-<tr><th><code>test_acs</code></th><th>ACS expression parser</th></tr>
-<table>
-<tr><th><code>test_mci</code></th><th>MCI token expansion</th></tr>
-<table>
-<tr><th><code>test_menu</code></th><th>Menu file parsing</th></tr>
-<table>
-<tr><th><code>test_menu_template</code></th><th>Template rendering</th></tr>
-<table>
-<tr><th><code>test_doors</code></th><th>Door launcher</th></tr>
-<table>
-<tr><th><code>test_plugin</code></th><th>Plugin loader</th></tr>
-<table>
-<tr><th><code>test_plank_*</code></th><th>PLANK subsystems</th></tr>
-<table>
-<tr><th><code>test_tools</code></th><th>CLI tool DB operations</th></tr>
-<table>
-<tr><th><code>test_file_cmds</code></th><th>File command logic</th></tr>
-<table>
-<tr><th><code>test_smoke</code></th><th>Basic integration</th></tr>
+<tr><td><code>test_acs</code></td><td>ACS expression parser</td></tr>
+<tr><td><code>test_mci</code></td><td>MCI token expansion</td></tr>
+<tr><td><code>test_menu</code></td><td>Menu file parsing</td></tr>
+<tr><td><code>test_menu_template</code></td><td>Template rendering</td></tr>
+<tr><td><code>test_doors</code></td><td>Door launcher</td></tr>
+<tr><td><code>test_plugin</code></td><td>Plugin loader</td></tr>
+<tr><td><code>test_plank_*</code></td><td>PLANK subsystems</td></tr>
+<tr><td><code>test_tools</code></td><td>CLI tool DB operations</td></tr>
+<tr><td><code>test_file_cmds</code></td><td>File command logic</td></tr>
+<tr><td><code>test_smoke</code></td><td>Basic integration</td></tr>
 </table>
 <h3>CLI Tests</h3>
 <pre><code class="bash">

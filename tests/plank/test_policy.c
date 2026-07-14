@@ -47,7 +47,8 @@ static plank_policy_t *test_policy = NULL;
 } while(0)
 
 static void setup(void) {
-    snprintf(test_db_path, sizeof(test_db_path), "/tmp/plank_policy_test_%d.db", getpid());
+    snprintf(test_db_path, sizeof(test_db_path), "%s/plank_policy_test_%d.db",
+             getenv("TMPDIR") ? getenv("TMPDIR") : "/tmp", getpid());
 
     test_db = db_open(test_db_path);
     ASSERT(test_db != NULL);

@@ -4,6 +4,37 @@
 #include <stdint.h>
 
 typedef struct BbsDb BbsDb;
+
+typedef enum DbBindType
+{
+  DB_BIND_NULL = 0,
+  DB_BIND_INT,
+  DB_BIND_INT64,
+  DB_BIND_TEXT,
+  DB_BIND_BLOB
+} DbBindType;
+
+typedef struct DbBind
+{
+  DbBindType type;
+  union
+  {
+    int i;
+    int64_t i64;
+    const char *text;
+    struct
+    {
+      const void *data;
+      size_t len;
+    } blob;
+  } v;
+} DbBind;
+
+#define DB_BIND_NULL_VAL ((DbBind){DB_BIND_NULL, {.i64 = 0}})
+#define DB_BIND_INT_VAL(x) ((DbBind){DB_BIND_INT, {.i = (x)}})
+#define DB_BIND_INT64_VAL(x) ((DbBind){DB_BIND_INT64, {.i64 = (int64_t)(x)}})
+#define DB_BIND_TEXT_VAL(x) ((DbBind){DB_BIND_TEXT, {.text = (x)}})
+#define DB_BIND_BLOB_VAL(ptr, n) ((DbBind){DB_BIND_BLOB, {.blob = {(ptr), (n)}}})
 typedef struct DbUser
 {
   int id;
@@ -349,6 +380,8 @@ int db_changes(BbsDb *db);
 const char *db_last_error(BbsDb *db);
 bool db_query(BbsDb *db, const char *sql, bool (*row_cb)(void *row, void *ctx), void *ctx);
 int db_query_int(BbsDb *db, const char *sql, int default_val);
+bool db_exec_prepared(BbsDb *db, const char *sql, const DbBind *binds, int bind_count);
+int db_query_int_prepared(BbsDb *db, const char *sql, const DbBind *binds, int bind_count, int default_val);
 
 /* User helpers */
 bool db_user_fetch(BbsDb *db, const char *handle, DbUser *out);
@@ -429,6 +462,7 @@ bool db_file_area_manage(BbsDb *db, const char *name, const char *path, const ch
 
 /* Files */
 int db_file_list(DbFileArea *area, BbsDb *db, DbFileRec *out, int max);
+int db_file_list_older(BbsDb *db, int days, DbFileRec *out, int max);
 bool db_file_add(BbsDb *db, int area_id, const char *filename, const char *desc, int size_bytes, int user_id);
 bool db_file_add_ex(BbsDb *db, int area_id, const char *filename, const char *desc,
                     const char *extended_desc, const char *file_id_diz, int size_bytes,

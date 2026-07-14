@@ -55,6 +55,18 @@ static int g_link_count = 0;
 static int g_listen_fd = -1;
 static int g_listen_port = 0;
 
+static bool plankd_make_temp_file(const char* prefix, char* path, size_t path_size, int* fd_out) {
+    if (!path || path_size == 0 || !fd_out) return false;
+    const char* tmpdir = getenv("TMPDIR");
+    if (!tmpdir || !tmpdir[0]) tmpdir = "/tmp";
+    int n = snprintf(path, path_size, "%s/%s_XXXXXX", tmpdir, prefix ? prefix : "plankd");
+    if (n < 0 || (size_t)n >= path_size) return false;
+    int fd = mkstemp(path);
+    if (fd < 0) return false;
+    *fd_out = fd;
+    return true;
+}
+
 /* ============================================================================
  * SIGNAL HANDLERS
  * ============================================================================ */
@@ -117,35 +129,49 @@ static void on_bundle_received(plank_link_session_t* session,
     (void)session;
     
     if (len > 0 && data) {
-        char temp_path[256];
-        snprintf(temp_path, sizeof(temp_path), "/tmp/plank_bundle_%d.plb",
-                 (int)time(NULL));
-        
-        FILE* f = fopen(temp_path, "wb");
-        if (f) {
-            fwrite(data, 1, len, f);
-            fclose(f);
-            
-            plank_bundle_import_result_t result;
-            memset(&result, 0, sizeof(result));
-            
-            if (plank_bundle_import(g_store, temp_path, link->link_id, NULL, &result)) {
-                plank_log(PLANK_LOG_INFO, "plankd",
-                          "Imported bundle: %d objects",
-                          result.objects_accepted);
-                
-                plank_link_session_send_receipt(session, PLANK_RC_OK,
-                                                PLANK_TARGET_BUNDLE, bundle_id,
-                                                result.objects_accepted, result.objects_duplicate,
-                                                result.objects_rejected, result.objects_quarantined, NULL);
-            } else {
+        char temp_path[512];
+        int fd = -1;
+        if (!plankd_make_temp_file("plank_bundle", temp_path, sizeof(temp_path), &fd)) {
+            plank_link_session_send_receipt(session, PLANK_RC_REJECTED,
+                                            PLANK_TARGET_BUNDLE, bundle_id,
+                                            0, 0, 1, 0, "temporary file creation failed");
+            return;
+        }
+
+        size_t written = 0;
+        while (written < len) {
+            ssize_t n = write(fd, data + written, len - written);
+            if (n <= 0) {
+                close(fd);
+                unlink(temp_path);
                 plank_link_session_send_receipt(session, PLANK_RC_REJECTED,
                                                 PLANK_TARGET_BUNDLE, bundle_id,
-                                                0, 0, 1, 0, result.error);
+                                                0, 0, 1, 0, "temporary bundle write failed");
+                return;
             }
-            
-            unlink(temp_path);
+            written += (size_t)n;
         }
+        close(fd);
+
+        plank_bundle_import_result_t result;
+        memset(&result, 0, sizeof(result));
+
+        if (plank_bundle_import(g_store, temp_path, link->link_id, NULL, &result)) {
+            plank_log(PLANK_LOG_INFO, "plankd",
+                      "Imported bundle: %d objects",
+                      result.objects_accepted);
+
+            plank_link_session_send_receipt(session, PLANK_RC_OK,
+                                            PLANK_TARGET_BUNDLE, bundle_id,
+                                            result.objects_accepted, result.objects_duplicate,
+                                            result.objects_rejected, result.objects_quarantined, NULL);
+        } else {
+            plank_link_session_send_receipt(session, PLANK_RC_REJECTED,
+                                            PLANK_TARGET_BUNDLE, bundle_id,
+                                            0, 0, 1, 0, result.error);
+        }
+
+        unlink(temp_path);
     }
 }
 

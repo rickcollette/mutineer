@@ -1,0 +1,5 @@
+CAPABILITY "term.io"
+
+SUB Main()
+    TERM.PRINTLN("temp run ok")
+END SUB

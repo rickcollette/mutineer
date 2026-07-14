@@ -19,6 +19,8 @@ typedef struct TelnetState {
 
 /* Send initial negotiation requests. */
 void telnet_send_initial(int fd);
+void telnet_password_begin(int fd);
+void telnet_password_end(int fd);
 
 /* Feed bytes; strips telnet sequences.
    Returns number of output bytes written into out. */

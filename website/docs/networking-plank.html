@@ -32,27 +32,19 @@
 <h2>Protocol Stack</h2>
 <table>
 <tr><th>Layer</th><th>Implementation</th></tr>
-<table>
-<tr><th>Transport</th><th>TLS (OpenSSL) on default port 2930</th></tr>
-<table>
-<tr><th>Framing</th><th>Length-prefixed frames (<code>max_frame_bytes</code>)</th></tr>
-<table>
-<tr><th>Bundles</th><th>Compressed object collections (optional ZSTD)</th></tr>
-<table>
-<tr><th>Objects</th><th>CBOR-encoded, Ed25519 signed envelopes</th></tr>
-<table>
-<tr><th>Storage</th><th>Content-addressed <code>plank_objects</code> table</th></tr>
-<table>
-<tr><th>Sync</th><th>Journal-based cursor tracking per link</th></tr>
+<tr><td>Transport</td><td>TLS (OpenSSL) on default port 2930</td></tr>
+<tr><td>Framing</td><td>Length-prefixed frames (<code>max_frame_bytes</code>)</td></tr>
+<tr><td>Bundles</td><td>Compressed object collections (optional ZSTD)</td></tr>
+<tr><td>Objects</td><td>CBOR-encoded, Ed25519 signed envelopes</td></tr>
+<tr><td>Storage</td><td>Content-addressed <code>plank_objects</code> table</td></tr>
+<tr><td>Sync</td><td>Journal-based cursor tracking per link</td></tr>
 </table>
 <p>Sources: <code>src/plank/</code> — see <code>include/plank/plank.h</code> for public API.</p>
 <h2>Daemons</h2>
 <table>
 <tr><th>Daemon</th><th>Purpose</th></tr>
-<table>
-<tr><th><code>plankd</code></th><th>Link manager — outbound/inbound sync with peers</th></tr>
-<table>
-<tr><th><code>coved</code></th><th>COVE hub — fan-out to downstream nodes</th></tr>
+<tr><td><code>plankd</code></td><td>Link manager — outbound/inbound sync with peers</td></tr>
+<tr><td><code>coved</code></td><td>COVE hub — fan-out to downstream nodes</td></tr>
 </table>
 <p>Build:</p>
 <pre><code class="bash">
@@ -66,12 +58,9 @@ build/coved -c conf/mutineer.conf
 <h2>CLI Tools</h2>
 <table>
 <tr><th>Tool</th><th>Purpose</th></tr>
-<table>
-<tr><th><code>plankctl</code></th><th>Administrative control</th></tr>
-<table>
-<tr><th><code>plankpack</code></th><th>Bundle pack/unpack for offline exchange</th></tr>
-<table>
-<tr><th><code>plank-offline</code></th><th>Offline import/export operations</th></tr>
+<tr><td><code>plankctl</code></td><td>Administrative control</td></tr>
+<tr><td><code>plankpack</code></td><td>Bundle pack/unpack for offline exchange</td></tr>
+<tr><td><code>plank-offline</code></td><td>Offline import/export operations</td></tr>
 </table>
 <h3>plankctl Commands</h3>
 <pre><code class="bash">
@@ -101,65 +90,38 @@ sqlite3 data/mutineer.db &lt; sql/plank_schema.sql
 <h3>Core Tables</h3>
 <table>
 <tr><th>Table</th><th>Purpose</th></tr>
-<table>
-<tr><th><code>plank_node_identity</code></th><th>Local node ID, keys, name (singleton)</th></tr>
-<table>
-<tr><th><code>plank_peers</code></th><th>Known peer nodes and trust levels</th></tr>
-<table>
-<tr><th><code>plank_links</code></th><th>Configured links (host, port, direction)</th></tr>
-<table>
-<tr><th><code>plank_link_sessions</code></th><th>Active link sessions</th></tr>
-<table>
-<tr><th><code>plank_link_cursors</code></th><th>Sync cursors per link/direction</th></tr>
-<table>
-<tr><th><code>plank_areas</code></th><th>Network-aware message areas</th></tr>
-<table>
-<tr><th><code>plank_area_policies</code></th><th>Moderation and ACL policies</th></tr>
-<table>
-<tr><th><code>plank_subscriptions</code></th><th>Per-link area subscriptions</th></tr>
-<table>
-<tr><th><code>plank_objects</code></th><th>Immutable content-addressed objects</th></tr>
-<table>
-<tr><th><code>plank_messages</code></th><th>Denormalized message objects</th></tr>
-<table>
-<tr><th><code>plank_attachments</code></th><th>Attachment metadata</th></tr>
-<table>
-<tr><th><code>plank_journal</code></th><th>Append-only event log</th></tr>
-<table>
-<tr><th><code>plank_outbound_queue</code></th><th>Pending outbound objects</th></tr>
-<table>
-<tr><th><code>plank_import_history</code></th><th>Bundle import deduplication</th></tr>
-<table>
-<tr><th><code>plank_dedupe</code></th><th>Object deduplication window</th></tr>
-<table>
-<tr><th><code>plank_deadletters</code></th><th>Failed delivery queue</th></tr>
-<table>
-<tr><th><code>plank_quarantine</code></th><th>Policy-violating objects</th></tr>
-<table>
-<tr><th><code>plank_moderation</code></th><th>Moderation events</th></tr>
-<table>
-<tr><th><code>plank_receipts</code></th><th>Delivery acknowledgements</th></tr>
-<table>
-<tr><th><code>plank_routes</code></th><th>Direct message routing</th></tr>
-<table>
-<tr><th><code>plank_user_exports</code></th><th>Per-user offline packets</th></tr>
-<table>
-<tr><th><code>plank_user_replies</code></th><th>Imported user reply bundles</th></tr>
-<table>
-<tr><th><code>plank_audit</code></th><th>Audit trail</th></tr>
-<table>
-<tr><th><code>plank_config</code></th><th>PLANK-specific config key/value</th></tr>
+<tr><td><code>plank_node_identity</code></td><td>Local node ID, keys, name (singleton)</td></tr>
+<tr><td><code>plank_peers</code></td><td>Known peer nodes and trust levels</td></tr>
+<tr><td><code>plank_links</code></td><td>Configured links (host, port, direction)</td></tr>
+<tr><td><code>plank_link_sessions</code></td><td>Active link sessions</td></tr>
+<tr><td><code>plank_link_cursors</code></td><td>Sync cursors per link/direction</td></tr>
+<tr><td><code>plank_areas</code></td><td>Network-aware message areas</td></tr>
+<tr><td><code>plank_area_policies</code></td><td>Moderation and ACL policies</td></tr>
+<tr><td><code>plank_subscriptions</code></td><td>Per-link area subscriptions</td></tr>
+<tr><td><code>plank_objects</code></td><td>Immutable content-addressed objects</td></tr>
+<tr><td><code>plank_messages</code></td><td>Denormalized message objects</td></tr>
+<tr><td><code>plank_attachments</code></td><td>Attachment metadata</td></tr>
+<tr><td><code>plank_journal</code></td><td>Append-only event log</td></tr>
+<tr><td><code>plank_outbound_queue</code></td><td>Pending outbound objects</td></tr>
+<tr><td><code>plank_import_history</code></td><td>Bundle import deduplication</td></tr>
+<tr><td><code>plank_dedupe</code></td><td>Object deduplication window</td></tr>
+<tr><td><code>plank_deadletters</code></td><td>Failed delivery queue</td></tr>
+<tr><td><code>plank_quarantine</code></td><td>Policy-violating objects</td></tr>
+<tr><td><code>plank_moderation</code></td><td>Moderation events</td></tr>
+<tr><td><code>plank_receipts</code></td><td>Delivery acknowledgements</td></tr>
+<tr><td><code>plank_routes</code></td><td>Direct message routing</td></tr>
+<tr><td><code>plank_user_exports</code></td><td>Per-user offline packets</td></tr>
+<tr><td><code>plank_user_replies</code></td><td>Imported user reply bundles</td></tr>
+<tr><td><code>plank_audit</code></td><td>Audit trail</td></tr>
+<tr><td><code>plank_config</code></td><td>PLANK-specific config key/value</td></tr>
 </table>
 <p>Full table reference: <a href="reference/database.html">Database Schema</a>.</p>
 <h3>COVE Tables</h3>
 <table>
 <tr><th>Table</th><th>Purpose</th></tr>
-<table>
-<tr><th><code>cove_downstream</code></th><th>Downstream link tracking</th></tr>
-<table>
-<tr><th><code>cove_upstream</code></th><th>Upstream link tracking</th></tr>
-<table>
-<tr><th><code>cove_fanout_queue</code></th><th>Area fan-out delivery queue</th></tr>
+<tr><td><code>cove_downstream</code></td><td>Downstream link tracking</td></tr>
+<tr><td><code>cove_upstream</code></td><td>Upstream link tracking</td></tr>
+<tr><td><code>cove_fanout_queue</code></td><td>Area fan-out delivery queue</td></tr>
 </table>
 <h2>Node Identity</h2>
 <p><code>plankctl init</code> generates:</p>

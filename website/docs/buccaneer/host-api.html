@@ -18,172 +18,117 @@
 <h2>TERM — terminal I/O</h2>
 <table>
 <tr><th>Function</th><th>Cap</th><th>Args</th><th>Returns</th><th>Status</th></tr>
-<table>
-<tr><th><code>TERM.PRINT(text)</code></th><th>term.io</th><th>1</th><th>—</th><th>✅</th></tr>
-<table>
-<tr><th><code>TERM.PRINTLN(text)</code></th><th>term.io</th><th>0–1</th><th>—</th><th>✅</th></tr>
-<table>
-<tr><th><code>TERM.CLS()</code></th><th>term.io</th><th>0</th><th>—</th><th>✅</th></tr>
-<table>
-<tr><th><code>TERM.COLOR(fg, bg?)</code></th><th>term.io</th><th>1–2</th><th>—</th><th>✅</th></tr>
-<table>
-<tr><th><code>TERM.GOTOXY(x, y)</code></th><th>term.io</th><th>2</th><th>—</th><th>⚠️</th></tr>
-<table>
-<tr><th><code>TERM.GETKEY()</code></th><th>term.input</th><th>0</th><th>STRING</th><th>✅</th></tr>
-<table>
-<tr><th><code>TERM.INPUT(prompt, default)</code></th><th>term.input</th><th>0–2</th><th>STRING</th><th>✅</th></tr>
-<table>
-<tr><th><code>TERM.WIDTH()</code></th><th>term.query</th><th>0</th><th>INTEGER</th><th>✅</th></tr>
-<table>
-<tr><th><code>TERM.HEIGHT()</code></th><th>term.query</th><th>0</th><th>INTEGER</th><th>✅</th></tr>
-<table>
-<tr><th><code>TERM.PAUSE(ms)</code></th><th>term.io</th><th>—</th><th>—</th><th>❌</th></tr>
-<table>
-<tr><th><code>TERM.INPUT_PASSWORD(prompt)</code></th><th>term.input</th><th>—</th><th>STRING</th><th>❌</th></tr>
-<table>
-<tr><th><code>TERM.SUPPORTS_ANSI()</code></th><th>term.query</th><th>0</th><th>BOOLEAN</th><th>❌</th></tr>
+<tr><td><code>TERM.PRINT(text)</code></td><td>term.io</td><td>1</td><td>—</td><td>✅</td></tr>
+<tr><td><code>TERM.PRINTLN(text)</code></td><td>term.io</td><td>0–1</td><td>—</td><td>✅</td></tr>
+<tr><td><code>TERM.CLS()</code></td><td>term.io</td><td>0</td><td>—</td><td>✅</td></tr>
+<tr><td><code>TERM.COLOR(fg, bg?)</code></td><td>term.io</td><td>1–2</td><td>—</td><td>✅</td></tr>
+<tr><td><code>TERM.GOTOXY(x, y)</code></td><td>term.io</td><td>2</td><td>—</td><td>✅</td></tr>
+<tr><td><code>TERM.GETKEY()</code></td><td>term.input</td><td>0</td><td>STRING</td><td>✅</td></tr>
+<tr><td><code>TERM.INPUT(prompt, default)</code></td><td>term.input</td><td>0–2</td><td>STRING</td><td>✅</td></tr>
+<tr><td><code>TERM.WIDTH()</code></td><td>term.query</td><td>0</td><td>INTEGER</td><td>✅</td></tr>
+<tr><td><code>TERM.HEIGHT()</code></td><td>term.query</td><td>0</td><td>INTEGER</td><td>✅</td></tr>
+<tr><td><code>TERM.PAUSE(ms)</code></td><td>term.io</td><td>0-1</td><td>—</td><td>✅</td></tr>
+<tr><td><code>TERM.INPUT_PASSWORD(prompt)</code></td><td>term.input</td><td>0-1</td><td>STRING</td><td>✅</td></tr>
+<tr><td><code>TERM.SUPPORTS_ANSI()</code></td><td>term.query</td><td>0</td><td>BOOLEAN</td><td>✅</td></tr>
 </table>
 <h2>USER — current caller</h2>
 <table>
 <tr><th>Function</th><th>Cap</th><th>Returns</th></tr>
-<table>
-<tr><th><code>USER.NAME()</code></th><th>user.read</th><th>STRING</th></tr>
-<table>
-<tr><th><code>USER.ALIAS()</code></th><th>user.read</th><th>STRING</th></tr>
-<table>
-<tr><th><code>USER.ID()</code></th><th>user.read</th><th>INTEGER</th></tr>
-<table>
-<tr><th><code>USER.SECURITY()</code></th><th>user.read</th><th>INTEGER</th></tr>
-<table>
-<tr><th><code>USER.TIMELEFT()</code></th><th>user.read</th><th>INTEGER</th></tr>
+<tr><td><code>USER.NAME()</code></td><td>user.read</td><td>STRING</td></tr>
+<tr><td><code>USER.ALIAS()</code></td><td>user.read</td><td>STRING</td></tr>
+<tr><td><code>USER.ID()</code></td><td>user.read</td><td>INTEGER</td></tr>
+<tr><td><code>USER.SECURITY()</code></td><td>user.read</td><td>INTEGER</td></tr>
+<tr><td><code>USER.TIME_LEFT()</code></td><td>user.read</td><td>INTEGER</td></tr>
+<tr><td><code>USER.TIME_REMAINING()</code></td><td>user.read</td><td>INTEGER</td></tr>
 </table>
-<p>Spec name <code>USER.TIME_LEFT()</code> is not registered — use <code>USER.TIMELEFT()</code>.</p>
+<p><code>USER.TIMELEFT()</code> remains accepted as a compatibility alias.</p>
 <p><code>USER.FLAGS()</code> — spec struct field exists; not yet in dispatch table.</p>
 <h2>USERS — directory lookups</h2>
 <table>
 <tr><th>Function</th><th>Cap</th><th>Notes</th></tr>
-<table>
-<tr><th><code>USERS.FIND(query)</code></th><th>user.read</th><th>Throttled</th></tr>
-<table>
-<tr><th><code>USERS.GET(handle)</code></th><th>user.read</th><th></th></tr>
+<tr><td><code>USERS.FIND(query)</code></td><td>user.read</td><td>Throttled</td></tr>
+<tr><td><code>USERS.GET(handle)</code></td><td>user.read</td><td></td></tr>
 </table>
 <h2>SESSION — session-scoped state</h2>
 <table>
 <tr><th>Function</th><th>Cap</th><th>Notes</th></tr>
-<table>
-<tr><th><code>SESSION.GET(key, default)</code></th><th>session.read</th><th></th></tr>
-<table>
-<tr><th><code>SESSION.SET(key, value)</code></th><th>session.write</th><th></th></tr>
+<tr><td><code>SESSION.GET(key, default)</code></td><td>session.read</td><td></td></tr>
+<tr><td><code>SESSION.SET(key, value)</code></td><td>session.write</td><td></td></tr>
+<tr><td><code>SESSION.NODE()</code></td><td>session.read</td><td>Current node number</td></tr>
+<tr><td><code>SESSION.ELAPSED_MS()</code></td><td>session.read</td><td>Milliseconds since session start</td></tr>
 </table>
-<p>Spec also defines <code>SESSION.NODE()</code> and <code>SESSION.ELAPSED_MS()</code> — not yet implemented; use <code>BBS.NODE()</code> for node number today.</p>
 <h2>BBS — system queries and messaging</h2>
 <table>
 <tr><th>Function</th><th>Cap</th><th>Notes</th></tr>
-<table>
-<tr><th><code>BBS.SENDMSG(to, text)</code></th><th>bbs.message</th><th></th></tr>
-<table>
-<tr><th><code>BBS.ONLINE()</code></th><th>bbs.query</th><th></th></tr>
-<table>
-<tr><th><code>BBS.NODE()</code></th><th>bbs.query</th><th></th></tr>
+<tr><td><code>BBS.SENDMSG(to, text)</code></td><td>bbs.message</td><td></td></tr>
+<tr><td><code>BBS.ONLINE()</code></td><td>bbs.query</td><td></td></tr>
+<tr><td><code>BBS.NODE()</code></td><td>bbs.query</td><td></td></tr>
 </table>
 <h2>DOOR — control flow</h2>
 <table>
 <tr><th>Function</th><th>Cap</th><th>Notes</th></tr>
-<table>
-<tr><th><code>DOOR.EXIT(code?)</code></th><th>—</th><th>Exit door; exit code propagation incomplete</th></tr>
-<table>
-<tr><th><code>DOOR.CHAIN(target, args?)</code></th><th>door.chain</th><th>Use VM chain status (see GitHub BUG-1)</th></tr>
+<tr><td><code>DOOR.EXIT(code?)</code></td><td>—</td><td>Exit door and preserve the exit code</td></tr>
+<tr><td><code>DOOR.CHAIN(target, args?)</code></td><td>door.chain</td><td>Request a Buccaneer chain target and args</td></tr>
 </table>
 <h2>DATA — structured datasets</h2>
 <table>
 <tr><th>Function</th><th>Cap</th><th>Notes</th></tr>
-<table>
-<tr><th><code>DATA.INSERT(ds, row)</code></th><th>data.write</th><th></th></tr>
-<table>
-<tr><th><code>DATA.UPDATE(ds, id, row)</code></th><th>data.write</th><th></th></tr>
-<table>
-<tr><th><code>DATA.DELETE(ds, id)</code></th><th>data.write</th><th></th></tr>
-<table>
-<tr><th><code>DATA.GET(ds, id)</code></th><th>data.read</th><th></th></tr>
-<table>
-<tr><th><code>DATA.FIND(ds, filter…)</code></th><th>data.read</th><th></th></tr>
-<table>
-<tr><th><code>DATA.COUNT(ds, filter?)</code></th><th>data.read</th><th></th></tr>
-<table>
-<tr><th><code>DATA.BEGIN()</code></th><th>data.write</th><th>Transaction</th></tr>
-<table>
-<tr><th><code>DATA.COMMIT()</code></th><th>data.write</th><th></th></tr>
-<table>
-<tr><th><code>DATA.ROLLBACK()</code></th><th>data.write</th><th></th></tr>
+<tr><td><code>DATA.INSERT(ds, row)</code></td><td>data.write</td><td></td></tr>
+<tr><td><code>DATA.UPDATE(ds, id, row)</code></td><td>data.write</td><td></td></tr>
+<tr><td><code>DATA.DELETE(ds, id)</code></td><td>data.write</td><td></td></tr>
+<tr><td><code>DATA.GET(ds, id)</code></td><td>data.read</td><td></td></tr>
+<tr><td><code>DATA.FIND(ds, filter…)</code></td><td>data.read</td><td></td></tr>
+<tr><td><code>DATA.COUNT(ds, filter?)</code></td><td>data.read</td><td></td></tr>
+<tr><td><code>DATA.BEGIN()</code></td><td>data.write</td><td>Transaction</td></tr>
+<tr><td><code>DATA.COMMIT()</code></td><td>data.write</td><td></td></tr>
+<tr><td><code>DATA.ROLLBACK()</code></td><td>data.write</td><td></td></tr>
 </table>
 <h2>KV — key/value storage</h2>
 <table>
 <tr><th>Function</th><th>Cap</th></tr>
-<table>
-<tr><th><code>KV.GET(key, default)</code></th><th>kv.read</th></tr>
-<table>
-<tr><th><code>KV.SET(key, value)</code></th><th>kv.write</th></tr>
-<table>
-<tr><th><code>KV.DELETE(key)</code></th><th>kv.write</th></tr>
-<table>
-<tr><th><code>KV.EXISTS(key)</code></th><th>kv.read</th></tr>
+<tr><td><code>KV.GET(key, default)</code></td><td>kv.read</td></tr>
+<tr><td><code>KV.SET(key, value)</code></td><td>kv.write</td></tr>
+<tr><td><code>KV.DELETE(key)</code></td><td>kv.write</td></tr>
+<tr><td><code>KV.EXISTS(key)</code></td><td>kv.read</td></tr>
 </table>
 <h2>APP — application session state</h2>
 <table>
 <tr><th>Function</th><th>Cap</th></tr>
-<table>
-<tr><th><code>APP.GET(key, default)</code></th><th>—</th></tr>
-<table>
-<tr><th><code>APP.SET(key, value)</code></th><th>—</th></tr>
+<tr><td><code>APP.GET(key, default)</code></td><td>—</td></tr>
+<tr><td><code>APP.SET(key, value)</code></td><td>—</td></tr>
 </table>
 <h2>SHARED — cross-session app state</h2>
 <table>
 <tr><th>Function</th><th>Cap</th><th>Notes</th></tr>
-<table>
-<tr><th><code>SHARED.GET(key, default)</code></th><th>shared.read</th><th>Not mutex-protected yet</th></tr>
-<table>
-<tr><th><code>SHARED.SET(key, value)</code></th><th>shared.write</th><th></th></tr>
-<table>
-<tr><th><code>SHARED.CAS(key, expected, new)</code></th><th>shared.write</th><th>Use deep equality fix pending</th></tr>
+<tr><td><code>SHARED.GET(key, default)</code></td><td>shared.read</td><td>Not mutex-protected yet</td></tr>
+<tr><td><code>SHARED.SET(key, value)</code></td><td>shared.write</td><td></td></tr>
+<tr><td><code>SHARED.CAS(key, expected, new)</code></td><td>shared.write</td><td>Scalar compare-and-swap; structured-value equality is a follow-up</td></tr>
 </table>
 <h2>TEXT — mediated files</h2>
 <table>
 <tr><th>Function</th><th>Cap</th></tr>
-<table>
-<tr><th><code>TEXT.READALL(path)</code></th><th>text.read</th></tr>
-<table>
-<tr><th><code>TEXT.READLINES(path)</code></th><th>text.read</th></tr>
-<table>
-<tr><th><code>TEXT.WRITEALL(path, content)</code></th><th>text.write</th></tr>
-<table>
-<tr><th><code>TEXT.APPEND(path, content)</code></th><th>text.write</th></tr>
-<table>
-<tr><th><code>TEXT.EXISTS(path)</code></th><th>text.read</th></tr>
+<tr><td><code>TEXT.READALL(path)</code></td><td>text.read</td></tr>
+<tr><td><code>TEXT.READLINES(path)</code></td><td>text.read</td></tr>
+<tr><td><code>TEXT.WRITEALL(path, content)</code></td><td>text.write</td></tr>
+<tr><td><code>TEXT.APPEND(path, content)</code></td><td>text.write</td></tr>
+<tr><td><code>TEXT.EXISTS(path)</code></td><td>text.read</td></tr>
 </table>
 <p>Paths use door-managed roots (<code>data:/</code>, <code>temp:/</code>) as enforced by the host.</p>
 <h2>MSG / FILE — read-only BBS surfaces</h2>
 <table>
 <tr><th>Function</th><th>Cap</th></tr>
-<table>
-<tr><th><code>MSG.READ(…)</code></th><th>data.read</th></tr>
-<table>
-<tr><th><code>MSG.LIST(…)</code></th><th>data.read</th></tr>
-<table>
-<tr><th><code>MSG.POST(…)</code></th><th>data.write</th></tr>
-<table>
-<tr><th><code>FILE.LIST(…)</code></th><th>data.read</th></tr>
-<table>
-<tr><th><code>FILE.INFO(…)</code></th><th>data.read</th></tr>
+<tr><td><code>MSG.READ(…)</code></td><td>data.read</td></tr>
+<tr><td><code>MSG.LIST(…)</code></td><td>data.read</td></tr>
+<tr><td><code>MSG.POST(…)</code></td><td>data.write</td></tr>
+<tr><td><code>FILE.LIST(…)</code></td><td>data.read</td></tr>
+<tr><td><code>FILE.INFO(…)</code></td><td>data.read</td></tr>
 </table>
 <h2>SYS — utilities</h2>
 <table>
 <tr><th>Function</th><th>Args</th><th>Returns</th></tr>
-<table>
-<tr><th><code>SYS.NOW()</code></th><th>0</th><th>DATETIME</th></tr>
-<table>
-<tr><th><code>SYS.TODAY()</code></th><th>0</th><th>DATE</th></tr>
-<table>
-<tr><th><code>SYS.SLEEP(ms)</code></th><th>1</th><th>—</th></tr>
+<tr><td><code>SYS.NOW()</code></td><td>0</td><td>DATETIME</td></tr>
+<tr><td><code>SYS.TODAY()</code></td><td>0</td><td>DATE</td></tr>
+<tr><td><code>SYS.SLEEP(ms)</code></td><td>1</td><td>—</td></tr>
 </table>
 <h2>Error values</h2>
 <p>Host calls return error values (catchable via <code>TRY/CATCH</code>) when:</p>

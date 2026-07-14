@@ -51,24 +51,17 @@ make
 <h3>Required metadata</h3>
 <table>
 <tr><th>Header</th><th>Example</th><th>Purpose</th></tr>
-<table>
-<tr><th><code>PROGRAM</code></th><th><code>PROGRAM &quot;My Door&quot;</code></th><th>Display / package name</th></tr>
-<table>
-<tr><th><code>VERSION</code></th><th><code>VERSION &quot;1.0.0&quot;</code></th><th>Semver string</th></tr>
+<tr><td><code>PROGRAM</code></td><td><code>PROGRAM &quot;My Door&quot;</code></td><td>Display / package name</td></tr>
+<tr><td><code>VERSION</code></td><td><code>VERSION &quot;1.0.0&quot;</code></td><td>Semver string</td></tr>
 </table>
 <h3>Optional metadata</h3>
 <table>
 <tr><th>Header</th><th>Purpose</th></tr>
-<table>
-<tr><th><code>AUTHOR</code></th><th>Author string</th></tr>
-<table>
-<tr><th><code>DESCRIPTION</code></th><th>Short description</th></tr>
-<table>
-<tr><th><code>CAPABILITY</code></th><th>Requested host powers (repeatable)</th></tr>
-<table>
-<tr><th><code>DATASET</code></th><th>Declare logical datasets for <code>DATA.*</code></th></tr>
-<table>
-<tr><th><code>OPTION</code></th><th>Compiler/tool options</th></tr>
+<tr><td><code>AUTHOR</code></td><td>Author string</td></tr>
+<tr><td><code>DESCRIPTION</code></td><td>Short description</td></tr>
+<tr><td><code>CAPABILITY</code></td><td>Requested host powers (repeatable)</td></tr>
+<tr><td><code>DATASET</code></td><td>Declare logical datasets for <code>DATA.*</code></td></tr>
+<tr><td><code>OPTION</code></td><td>Compiler/tool options</td></tr>
 </table>
 <h3>Entry point</h3>
 <p>Exactly one main procedure:</p>
@@ -89,24 +82,15 @@ REM This is also a comment
 <h2>4. Types</h2>
 <table>
 <tr><th>Type</th><th>Description</th></tr>
-<table>
-<tr><th><code>INTEGER</code></th><th>Signed 64-bit integer</th></tr>
-<table>
-<tr><th><code>DOUBLE</code></th><th>IEEE-754 floating point</th></tr>
-<table>
-<tr><th><code>BOOLEAN</code></th><th><code>TRUE</code> / <code>FALSE</code></th></tr>
-<table>
-<tr><th><code>STRING</code></th><th>UTF-8 text</th></tr>
-<table>
-<tr><th><code>DATE</code></th><th>Date value</th></tr>
-<table>
-<tr><th><code>DATETIME</code></th><th>Date and time</th></tr>
-<table>
-<tr><th><code>NULL</code></th><th>Absence of value</th></tr>
-<table>
-<tr><th><code>ARRAY OF T</code></th><th>Homogeneous array</th></tr>
-<table>
-<tr><th><code>MAP OF STRING TO T</code></th><th>String-keyed map</th></tr>
+<tr><td><code>INTEGER</code></td><td>Signed 64-bit integer</td></tr>
+<tr><td><code>DOUBLE</code></td><td>IEEE-754 floating point</td></tr>
+<tr><td><code>BOOLEAN</code></td><td><code>TRUE</code> / <code>FALSE</code></td></tr>
+<tr><td><code>STRING</code></td><td>UTF-8 text</td></tr>
+<tr><td><code>DATE</code></td><td>Date value</td></tr>
+<tr><td><code>DATETIME</code></td><td>Date and time</td></tr>
+<tr><td><code>NULL</code></td><td>Absence of value</td></tr>
+<tr><td><code>ARRAY OF T</code></td><td>Homogeneous array</td></tr>
+<tr><td><code>MAP OF STRING TO T</code></td><td>String-keyed map</td></tr>
 </table>
 <h3>Variables</h3>
 <pre><code class="basic">
@@ -204,18 +188,12 @@ END TRY
 <h2>10. Exiting and chaining</h2>
 <table>
 <tr><th>Statement</th><th>Behavior</th></tr>
-<table>
-<tr><th><code>DOOR.EXIT()</code></th><th>Clean exit, code 0</th></tr>
-<table>
-<tr><th><code>DOOR.EXIT(1)</code></th><th>Clean exit with status code</th></tr>
-<table>
-<tr><th><code>HALT</code></th><th>Shorthand for <code>DOOR.EXIT(0)</code></th></tr>
-<table>
-<tr><th><code>RETURN</code></th><th>Exit current <code>SUB</code> only</th></tr>
-<table>
-<tr><th><code>CHAIN &quot;other_program&quot;</code></th><th>Transfer to another program in the same door package</th></tr>
-<table>
-<tr><th><code>CHAIN &quot;other&quot;, args</code></th><th>Chain with argument map</th></tr>
+<tr><td><code>DOOR.EXIT()</code></td><td>Clean exit, code 0</td></tr>
+<tr><td><code>DOOR.EXIT(1)</code></td><td>Clean exit with status code</td></tr>
+<tr><td><code>HALT</code></td><td>Shorthand for <code>DOOR.EXIT(0)</code></td></tr>
+<tr><td><code>RETURN</code></td><td>Exit current <code>SUB</code> only</td></tr>
+<tr><td><code>CHAIN &quot;other_program&quot;</code></td><td>Transfer to another program in the same door package</td></tr>
+<tr><td><code>CHAIN &quot;other&quot;, args</code></td><td>Chain with argument map</td></tr>
 </table>
 <p><code>CHAIN</code> never runs an OS executable — only declared Buccaneer programs in the same installed application.</p>
 <h3>Application state (APP)</h3>
@@ -229,20 +207,13 @@ area = APP.GET(&quot;area&quot;, &quot;default&quot;)
 <p>Primary namespace for user interaction. Implemented functions in Mutineer today include:</p>
 <table>
 <tr><th>Call</th><th>Purpose</th></tr>
-<table>
-<tr><th><code>TERM.PRINT(s)</code></th><th>Print without newline</th></tr>
-<table>
-<tr><th><code>TERM.PRINTLN(s)</code></th><th>Print line</th></tr>
-<table>
-<tr><th><code>TERM.CLS()</code></th><th>Clear screen</th></tr>
-<table>
-<tr><th><code>TERM.COLOR(fg, bg)</code></th><th>Set colors</th></tr>
-<table>
-<tr><th><code>TERM.GETKEY()</code></th><th>Read one key</th></tr>
-<table>
-<tr><th><code>TERM.INPUT(prompt, default)</code></th><th>Read line</th></tr>
-<table>
-<tr><th><code>TERM.WIDTH()</code> / <code>TERM.HEIGHT()</code></th><th>Terminal size</th></tr>
+<tr><td><code>TERM.PRINT(s)</code></td><td>Print without newline</td></tr>
+<tr><td><code>TERM.PRINTLN(s)</code></td><td>Print line</td></tr>
+<tr><td><code>TERM.CLS()</code></td><td>Clear screen</td></tr>
+<tr><td><code>TERM.COLOR(fg, bg)</code></td><td>Set colors</td></tr>
+<tr><td><code>TERM.GETKEY()</code></td><td>Read one key</td></tr>
+<tr><td><code>TERM.INPUT(prompt, default)</code></td><td>Read line</td></tr>
+<tr><td><code>TERM.WIDTH()</code> / <code>TERM.HEIGHT()</code></td><td>Terminal size</td></tr>
 </table>
 <p>Spec-defined but not yet wired in production host: <code>GOTOXY</code>, <code>PAUSE</code>, <code>INPUT_PASSWORD</code>, <code>SUPPORTS_ANSI</code>, paging helpers. The <strong>simulator</strong> implements more of the spec — test there first.</p>
 <p>See <a href="host-api.html">Host API Reference</a>.</p>
@@ -258,16 +229,11 @@ h = USER.NAME()
 <p>Doors <strong>cannot</strong> write the BBS user/message/file databases directly. Use:</p>
 <table>
 <tr><th>Namespace</th><th>Scope</th><th>Use for</th></tr>
-<table>
-<tr><th><code>KV</code></th><th>Door-persistent key/value</th><th>Settings, small state</th></tr>
-<table>
-<tr><th><code>DATA</code></th><th>Structured datasets</th><th>Scores, tables, records</th></tr>
-<table>
-<tr><th><code>APP</code></th><th>Session + app</th><th>Chain-local state</th></tr>
-<table>
-<tr><th><code>SHARED</code></th><th>App-wide concurrent</th><th>Leaderboards, locks (use carefully)</th></tr>
-<table>
-<tr><th><code>TEXT</code></th><th>Mediated files</th><th>Logs, data files under door roots</th></tr>
+<tr><td><code>KV</code></td><td>Door-persistent key/value</td><td>Settings, small state</td></tr>
+<tr><td><code>DATA</code></td><td>Structured datasets</td><td>Scores, tables, records</td></tr>
+<tr><td><code>APP</code></td><td>Session + app</td><td>Chain-local state</td></tr>
+<tr><td><code>SHARED</code></td><td>App-wide concurrent</td><td>Leaderboards, locks (use carefully)</td></tr>
+<tr><td><code>TEXT</code></td><td>Mediated files</td><td>Logs, data files under door roots</td></tr>
 </table>
 <p>Example:</p>
 <pre><code class="basic">
@@ -289,26 +255,16 @@ CAPABILITY &quot;kv.write&quot;
 <p>Common capability strings:</p>
 <table>
 <tr><th>Capability</th><th>Allows</th></tr>
-<table>
-<tr><th><code>term.io</code></th><th>Terminal input/output</th></tr>
-<table>
-<tr><th><code>term.query</code></th><th>Width/height queries</th></tr>
-<table>
-<tr><th><code>user.read</code></th><th><code>USER.*</code>, <code>USERS.FIND</code></th></tr>
-<table>
-<tr><th><code>data.read</code> / <code>data.write</code></th><th><code>DATA.*</code>, some <code>MSG.*</code> / <code>FILE.*</code></th></tr>
-<table>
-<tr><th><code>kv.read</code> / <code>kv.write</code></th><th><code>KV.*</code></th></tr>
-<table>
-<tr><th><code>text.read</code> / <code>text.write</code></th><th><code>TEXT.*</code></th></tr>
-<table>
-<tr><th><code>bbs.message</code></th><th><code>BBS.SENDMSG</code></th></tr>
-<table>
-<tr><th><code>bbs.query</code></th><th><code>BBS.ONLINE</code>, <code>BBS.NODE</code></th></tr>
-<table>
-<tr><th><code>door.chain</code></th><th><code>DOOR.CHAIN</code></th></tr>
-<table>
-<tr><th><code>shared.read</code> / <code>shared.write</code></th><th><code>SHARED.*</code></th></tr>
+<tr><td><code>term.io</code></td><td>Terminal input/output</td></tr>
+<tr><td><code>term.query</code></td><td>Width/height queries</td></tr>
+<tr><td><code>user.read</code></td><td><code>USER.*</code>, <code>USERS.FIND</code></td></tr>
+<tr><td><code>data.read</code> / <code>data.write</code></td><td><code>DATA.*</code>, some <code>MSG.*</code> / <code>FILE.*</code></td></tr>
+<tr><td><code>kv.read</code> / <code>kv.write</code></td><td><code>KV.*</code></td></tr>
+<tr><td><code>text.read</code> / <code>text.write</code></td><td><code>TEXT.*</code></td></tr>
+<tr><td><code>bbs.message</code></td><td><code>BBS.SENDMSG</code></td></tr>
+<tr><td><code>bbs.query</code></td><td><code>BBS.ONLINE</code>, <code>BBS.NODE</code></td></tr>
+<tr><td><code>door.chain</code></td><td><code>DOOR.CHAIN</code></td></tr>
+<tr><td><code>shared.read</code> / <code>shared.write</code></td><td><code>SHARED.*</code></td></tr>
 </table>
 <p>Full matrix: <a href="door-packages.html">Door Packages</a> and <code>DOOR_JSON_SCHEMA_SPEC.md</code>.</p>
 <h2>15. Style and best practices</h2>

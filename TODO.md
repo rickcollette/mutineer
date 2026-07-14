@@ -6,15 +6,14 @@ This file represents the full repository backlog for Mutineer BBS. It covers cur
 
 ## Current status
 
-- PLANK offline packet export/list/status and plankctl query-backed inspection support are implemented; remaining PLANK work is focused on regression tests.
+- PLANK offline packet export/list/status and plankctl query-backed inspection support are implemented; current status and validation snapshots are tracked in `feature-matrix.md`.
 - QWK upload/download and FidoNet netmail outbound export now use real persisted/transfer paths.
 - Database persistence requires SQLite and applies schema/migration checks explicitly.
 - Multi-login prevention, password expiration/recovery, guest account, vote results display, subscription management, last callers display, and event scheduling (daily/weekly/monthly/logon) are all implemented.
 - ACS conditions `PC` (post/call ratio) and `DR` (download ratio) added to `src/acs.c`.
 - File commands FP (set scan date), FT (archive test), FQ (archive extract), FK (batch remove), FJ (batch upload) implemented in `src/file_cmds.c`; wired as session actions and added to `menus/file.mnu`.
 - WFC console unknown-command hint added at `src/wfc.c:1244`.
-- The DOSBox door runner (SPECS/DOSDOORS/DOS_DOOR_CURSOR_PROMPT.md) is the main outstanding feature gap in section 5.
-- Art pack, display files, and documentation updates are the largest remaining polish items.
+- The DOSBox door runner, art pack, display files, and documentation parity work listed in earlier sections have current completion status in `feature-matrix.md`.
 
 ## 1. Build & persistence
 
@@ -58,7 +57,7 @@ This file represents the full repository backlog for Mutineer BBS. It covers cur
 - [x] Review BUCC host function support in `src/buccaneer/` and `src/doors.c`.
 - [x] Ensure door/NSS function calls are implemented or rejected cleanly with guidance.
 - [x] Implement DOSBox door runner per `SPECS/DOSDOORS/DOS_DOOR_CURSOR_PROMPT.md`:
-  - Refactor `door_launch()` in `src/doors.c` into a dispatcher with `door_launch_native()` and `door_launch_dosbox()` (current code uses bare `system()` for all doors).
+  - Refactor `door_launch()` in `src/doors.c` into a dispatcher with `door_launch_native()` and `door_launch_dosbox()`.
   - Extend the `doors` DB table with `runner`, `manifest`, `enabled`, `timeout_sec` columns and a schema migration.
   - Implement a JSON manifest parser for DOSBox doors (fields: `runner`, `name`, `master_dir`, `startup`, `dropfile`, `dropfile_dest`, `machine`, `memsize`, `core`, `cycles`, `serial_telnet`, `usedtr`, `timeout_sec`, `copy_mode`, `cleanup_on_exit`).
   - Add config keys: `dosbox_path`, `door_runtime_path`, `door_copy_mode`, `door_default_timeout_sec`, `door_cleanup_on_exit`, `door_keep_failed_runs`.

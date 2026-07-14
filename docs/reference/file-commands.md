@@ -123,7 +123,7 @@ Wildcard search (supports `*` and `?` patterns). Faster than FF for pattern matc
 
 ## Archive Commands
 
-Requires external tools (zip, tar, unrar, 7z) on PATH.
+Archive commands use Mutineer's libarchive-backed helpers; sysops do not need external archive command-line tools for these operations.
 
 ### FV — View Archive
 

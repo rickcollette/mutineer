@@ -1,303 +1,123 @@
 /*
- * test_file_cmds.c — Tests for archive command hooks (FT/FQ/FV).
+ * Tests for archive/file helper behavior used by file commands.
  *
- * Tests the extension-detection, command-building, and temp-dir logic
- * without requiring a live session. Uses a fake zip/tar to verify
- * the actual shell commands fire and produce output.
+ * These tests intentionally exercise Mutineer's libarchive-backed helpers
+ * directly. They do not depend on external zip/unzip/tar binaries.
  */
 
+#define _POSIX_C_SOURCE 200809L
+
+#include "bbs_archive.h"
+#include "bbs_util.h"
+
+#include <errno.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdbool.h>
-#include <unistd.h>
 #include <sys/stat.h>
-#include <errno.h>
+#include <unistd.h>
 
-static int g_pass = 0, g_fail = 0;
+static int g_pass = 0;
+static int g_fail = 0;
 
 #define CHECK(cond, msg) do { \
   if (cond) { printf("  PASS: %s\n", msg); g_pass++; } \
-  else       { printf("  FAIL: %s  (line %d)\n", msg, __LINE__); g_fail++; } \
-} while(0)
+  else { printf("  FAIL: %s  (line %d)\n", msg, __LINE__); g_fail++; } \
+} while (0)
 
-static void rm_rf(const char *path) {
-  char cmd[512];
-  snprintf(cmd, sizeof(cmd), "rm -rf '%s'", path);
-  (void)system(cmd);
+static bool make_temp_dir(char* out, size_t outcap, const char* prefix) {
+  const char* root = getenv("TMPDIR");
+  if (!root || !root[0]) root = "/tmp";
+  if (snprintf(out, outcap, "%s/%s_XXXXXX", root, prefix) >= (int)outcap) return false;
+  return mkdtemp(out) != NULL;
 }
 
-static char* read_source_file(const char* path) {
-  FILE* f = fopen(path, "rb");
-  if (!f) return NULL;
-  fseek(f, 0, SEEK_END);
-  long n = ftell(f);
-  fseek(f, 0, SEEK_SET);
-  char* buf = calloc(1, (size_t)n + 1);
-  if (!buf) {
-    fclose(f);
-    return NULL;
-  }
-  fread(buf, 1, (size_t)n, f);
+static bool write_text_file(const char* dir, const char* name, const char* text) {
+  char path[1024];
+  path_join(dir, name, path, sizeof(path));
+  FILE* f = fopen(path, "wb");
+  if (!f) return false;
+  bool ok = fwrite(text, 1, strlen(text), f) == strlen(text);
   fclose(f);
-  return buf;
+  return ok;
 }
 
-static void test_upload_protocol_only_flow(void) {
-  printf("\n[upload: protocol-only flow]\n");
-  char* src = read_source_file("src/file_cmds.c");
-  CHECK(src != NULL, "file_cmds source readable");
-  if (!src) return;
-  char* fn = strstr(src, "void cmd_file_upload");
-  char* proto_list = strstr(fn ? fn : src, "db_protocols_list(s->db, protos, 4, \"up\")");
-  char* no_proto = strstr(fn ? fn : src, "No upload protocols configured. Upload unavailable.");
-  char* filename_prompt = strstr(fn ? fn : src, "Filename: ");
-  CHECK(proto_list && filename_prompt && proto_list < filename_prompt,
-        "upload checks configured protocols before filename prompt");
-  CHECK(no_proto != NULL, "upload reports unavailable when no upload protocol exists");
-  CHECK(strstr(fn ? fn : src, "server-local") == NULL &&
-        strstr(fn ? fn : src, "server local") == NULL &&
-        strstr(fn ? fn : src, "Source path") == NULL,
-        "upload flow does not ask for a server-local source path");
-  free(src);
+static bool read_text_file(const char* dir, const char* name, char* out, size_t outcap) {
+  char path[1024];
+  path_join(dir, name, path, sizeof(path));
+  FILE* f = fopen(path, "rb");
+  if (!f) return false;
+  size_t n = fread(out, 1, outcap - 1, f);
+  out[n] = '\0';
+  fclose(f);
+  return true;
 }
 
-/* =========================================================================
- * Test: extension detection via command-line archive tools
- * ========================================================================= */
+static void test_archive_helpers_zip_round_trip(void) {
+  printf("\n[archive helpers: zip round trip]\n");
 
-static void test_archive_test_zip(void) {
-  printf("\n[archive test: zip via unzip -t]\n");
+  char src[512];
+  char dest[512];
+  char work[512];
+  CHECK(make_temp_dir(src, sizeof(src), "mutineer_archive_src"), "source temp dir created under TMPDIR");
+  CHECK(make_temp_dir(dest, sizeof(dest), "mutineer_archive_dest"), "dest temp dir created under TMPDIR");
+  CHECK(make_temp_dir(work, sizeof(work), "mutineer_archive_work"), "work temp dir created under TMPDIR");
 
-  if (system("which unzip > /dev/null 2>&1") != 0) {
-    printf("  SKIP: unzip not found\n");
-    return;
-  }
+  char archive_path[1024];
+  path_join(work, "packet.zip", archive_path, sizeof(archive_path));
+  CHECK(write_text_file(src, "hello.txt", "hello from libarchive\n"), "source file written");
+  CHECK(write_text_file(src, "notes.txt", "notes\n"), "second source file written");
 
-  /* Create a real zip file */
-  char dir[128], zipfile[200], testfile[200];
-  snprintf(dir,      sizeof(dir),      "/tmp/test_ft_%d",          (int)getpid());
-  snprintf(zipfile,  sizeof(zipfile),  "/tmp/test_ft_%d/test.zip",  (int)getpid());
-  snprintf(testfile, sizeof(testfile), "/tmp/test_ft_%d/hello.txt", (int)getpid());
-  rm_rf(dir);
-  mkdir(dir, 0755);
+  char err[256] = "";
+  CHECK(bbs_archive_create_zip_from_dir(src, archive_path, err, sizeof(err)), "zip created by libarchive helper");
+  if (err[0]) printf("  info: %s\n", err);
 
-  FILE *f = fopen(testfile, "w");
-  if (f) { fprintf(f, "hello\n"); fclose(f); }
-
-  char cmd[512];
-  snprintf(cmd, sizeof(cmd), "cd '%s' && zip test.zip hello.txt > /dev/null 2>&1", dir);
-  int rc = system(cmd);
-  CHECK(rc == 0, "zip created successfully");
-
-  /* Verify unzip -t works on it */
-  snprintf(cmd, sizeof(cmd), "unzip -t '%s' > /dev/null 2>&1", zipfile);
-  rc = system(cmd);
-  CHECK(rc == 0, "unzip -t reports archive OK");
-
-  rm_rf(dir);
-}
-
-static void test_archive_test_tar(void) {
-  printf("\n[archive test: tar via tar -tf]\n");
-
-  char dir[128], tarfile[200], testfile[200];
-  snprintf(dir,      sizeof(dir),      "/tmp/test_ft_tar_%d",          (int)getpid());
-  snprintf(tarfile,  sizeof(tarfile),  "/tmp/test_ft_tar_%d/test.tar",  (int)getpid());
-  snprintf(testfile, sizeof(testfile), "/tmp/test_ft_tar_%d/hello.txt", (int)getpid());
-  rm_rf(dir);
-  mkdir(dir, 0755);
-
-  FILE *f = fopen(testfile, "w");
-  if (f) { fprintf(f, "hello from tar\n"); fclose(f); }
-
-  char cmd[512];
-  snprintf(cmd, sizeof(cmd), "tar -cf '%s' -C '%s' hello.txt 2>/dev/null", tarfile, dir);
-  int rc = system(cmd);
-  CHECK(rc == 0, "tar created successfully");
-
-  /* Test with tar -tf */
-  snprintf(cmd, sizeof(cmd), "tar -tf '%s' > /dev/null 2>&1", tarfile);
-  rc = system(cmd);
-  CHECK(rc == 0, "tar -tf reports archive OK");
-
-  rm_rf(dir);
-}
-
-static void test_archive_extract_zip(void) {
-  printf("\n[archive extract: zip via unzip -o]\n");
-
-  if (system("which unzip > /dev/null 2>&1") != 0) {
-    printf("  SKIP: unzip not found\n");
-    return;
-  }
-
-  /* Create zip */
-  char srcdir[128], zipfile[200], destdir[200];
-  snprintf(srcdir,  sizeof(srcdir),  "/tmp/test_fq_src_%d",         (int)getpid());
-  snprintf(zipfile, sizeof(zipfile), "/tmp/test_fq_%d.zip",          (int)getpid());
-  snprintf(destdir, sizeof(destdir), "/tmp/test_fq_dest_%d",         (int)getpid());
-  rm_rf(srcdir); rm_rf(destdir);
-  mkdir(srcdir, 0755);
-
-  char textpath[256];
-  snprintf(textpath, sizeof(textpath), "%s/payload.txt", srcdir);
-  FILE *f = fopen(textpath, "w");
-  if (f) { fprintf(f, "payload\n"); fclose(f); }
-
-  char cmd[512];
-  snprintf(cmd, sizeof(cmd), "cd '%s' && zip '%s' payload.txt > /dev/null 2>&1", srcdir, zipfile);
-  int rc = system(cmd);
-  CHECK(rc == 0, "zip created for extraction test");
-
-  /* Extract */
-  mkdir(destdir, 0755);
-  snprintf(cmd, sizeof(cmd), "unzip -o '%s' -d '%s' > /dev/null 2>&1", zipfile, destdir);
-  rc = system(cmd);
-  CHECK(rc == 0, "unzip -o extraction succeeded");
-
-  /* Verify extracted file exists */
-  char extracted[300];
-  snprintf(extracted, sizeof(extracted), "%s/payload.txt", destdir);
   struct stat st;
-  CHECK(stat(extracted, &st) == 0 && S_ISREG(st.st_mode),
-        "extracted file present in dest dir");
+  CHECK(stat(archive_path, &st) == 0 && S_ISREG(st.st_mode), "archive file exists");
 
-  rm_rf(srcdir); rm_rf(destdir); unlink(zipfile);
+  err[0] = '\0';
+  CHECK(bbs_archive_test(archive_path, err, sizeof(err)), "archive validates through libarchive helper");
+
+  char listing[2048];
+  err[0] = '\0';
+  CHECK(bbs_archive_list_to_text(archive_path, listing, sizeof(listing), 10, err, sizeof(err)),
+        "archive listing succeeds through libarchive helper");
+  CHECK(strstr(listing, "hello.txt") != NULL && strstr(listing, "notes.txt") != NULL,
+        "archive listing contains expected entries");
+
+  err[0] = '\0';
+  CHECK(bbs_archive_extract_to_dir(archive_path, dest, err, sizeof(err)),
+        "archive extracts through libarchive helper");
+
+  char buf[128];
+  CHECK(read_text_file(dest, "hello.txt", buf, sizeof(buf)) &&
+        strcmp(buf, "hello from libarchive\n") == 0,
+        "extracted file content matches");
+
+  CHECK(bbs_remove_tree(src), "source temp tree removed");
+  CHECK(bbs_remove_tree(dest), "dest temp tree removed");
+  CHECK(bbs_remove_tree(work), "work temp tree removed");
 }
 
-static void test_archive_extract_tgz(void) {
-  printf("\n[archive extract: tgz via tar -xzf]\n");
-
-  char srcdir[128], tgzfile[200], destdir[200];
-  snprintf(srcdir,  sizeof(srcdir),  "/tmp/test_fq_tgz_src_%d",  (int)getpid());
-  snprintf(tgzfile, sizeof(tgzfile), "/tmp/test_fq_%d.tgz",       (int)getpid());
-  snprintf(destdir, sizeof(destdir), "/tmp/test_fq_tgz_dest_%d",  (int)getpid());
-  rm_rf(srcdir); rm_rf(destdir);
-  mkdir(srcdir, 0755);
-
-  char textpath[256];
-  snprintf(textpath, sizeof(textpath), "%s/data.txt", srcdir);
-  FILE *f = fopen(textpath, "w");
-  if (f) { fprintf(f, "tgz data\n"); fclose(f); }
-
-  char cmd[512];
-  snprintf(cmd, sizeof(cmd), "tar -czf '%s' -C '%s' data.txt 2>/dev/null", tgzfile, srcdir);
-  int rc = system(cmd);
-  CHECK(rc == 0, "tgz created");
-
-  mkdir(destdir, 0755);
-  snprintf(cmd, sizeof(cmd), "tar -xzf '%s' -C '%s' 2>/dev/null", tgzfile, destdir);
-  rc = system(cmd);
-  CHECK(rc == 0, "tar -xzf extraction succeeded");
-
-  char extracted[300];
-  snprintf(extracted, sizeof(extracted), "%s/data.txt", destdir);
-  struct stat st;
-  CHECK(stat(extracted, &st) == 0, "tgz extracted file present");
-
-  rm_rf(srcdir); rm_rf(destdir); unlink(tgzfile);
-}
-
-/* =========================================================================
- * Test: extension detection logic (mirrors what file_cmds.c does)
- * ========================================================================= */
-
-typedef struct {
-  const char *filename;
-  const char *expected_cmd_prefix; /* prefix of the archive command */
-} ExtCase;
-
-static const char *detect_archive_cmd_prefix(const char *filename) {
-  const char *ext = strrchr(filename, '.');
-  if (!ext) return NULL;
-  if (strcasecmp(ext, ".zip") == 0) return "unzip";
-  if (strcasecmp(ext, ".rar") == 0) return "unrar";
-  if (strcasecmp(ext, ".7z")  == 0) return "7z";
-  if (strcasecmp(ext, ".arj") == 0) return "arj";
-  if (strcasecmp(ext, ".lzh") == 0 || strcasecmp(ext, ".lha") == 0) return "lha";
-  if (strcasecmp(ext, ".tar") == 0) return "tar";
-  if (strcasecmp(ext, ".tgz") == 0) return "tar";
-  return NULL;
-}
-
-static void test_extension_detection(void) {
-  printf("\n[extension detection]\n");
-
-  static const ExtCase cases[] = {
-    { "game.zip",    "unzip" },
-    { "game.ZIP",    "unzip" },
-    { "archive.rar", "unrar" },
-    { "archive.7z",  "7z" },
-    { "file.arj",    "arj" },
-    { "pack.lzh",    "lha" },
-    { "pack.lha",    "lha" },
-    { "files.tar",   "tar" },
-    { "files.tgz",   "tar" },
-    { "noext",       NULL },
-    { "binary.exe",  NULL },
-  };
-
-  for (size_t i = 0; i < sizeof(cases)/sizeof(cases[0]); i++) {
-    const char *got = detect_archive_cmd_prefix(cases[i].filename);
-    bool ok;
-    if (cases[i].expected_cmd_prefix == NULL)
-      ok = (got == NULL);
-    else
-      ok = (got != NULL && strcmp(got, cases[i].expected_cmd_prefix) == 0);
-    char msg[128];
-    snprintf(msg, sizeof(msg), "detect_archive_cmd(%s) == %s",
-             cases[i].filename,
-             cases[i].expected_cmd_prefix ? cases[i].expected_cmd_prefix : "(null)");
-    CHECK(ok, msg);
-  }
-}
-
-/* =========================================================================
- * Test: temp directory isolation (mirrors cmd_file_archive_extract temp logic)
- * ========================================================================= */
-
-static void test_temp_dir_isolation(void) {
+static void test_temp_dir_mode(void) {
   printf("\n[temp dir isolation]\n");
 
-  char tmpdir[128];
-  snprintf(tmpdir, sizeof(tmpdir), "/tmp/mutineer_test_%d_%d", (int)getpid(), 42);
+  char tmpdir[512];
+  CHECK(make_temp_dir(tmpdir, sizeof(tmpdir), "mutineer_filecmd"), "temp dir created with mkdtemp");
 
-  rm_rf(tmpdir);
-  int rc = mkdir(tmpdir, 0700);
-  CHECK(rc == 0 || errno == EEXIST, "temp dir created");
-
-  /* Verify mode is 0700 */
   struct stat st;
-  CHECK(stat(tmpdir, &st) == 0, "stat temp dir");
-  CHECK(S_ISDIR(st.st_mode), "is a directory");
-  CHECK((st.st_mode & 0777) == 0700, "mode is 0700 (user-only)");
-
-  /* Verify it's isolated — another mkdir should fail with EEXIST */
-  errno = 0;
-  int rc2 = mkdir(tmpdir, 0700);
-  CHECK(rc2 != 0 && errno == EEXIST, "duplicate mkdir returns EEXIST");
-
-  rm_rf(tmpdir);
-
-  /* After cleanup, it should be gone */
-  CHECK(stat(tmpdir, &st) != 0, "temp dir removed after cleanup");
+  CHECK(stat(tmpdir, &st) == 0 && S_ISDIR(st.st_mode), "temp path is a directory");
+  CHECK((st.st_mode & 0777) == 0700, "temp directory mode is private");
+  CHECK(bbs_remove_tree(tmpdir), "temp dir removed recursively");
+  CHECK(stat(tmpdir, &st) != 0 && errno == ENOENT, "temp dir is gone after cleanup");
 }
 
-/* =========================================================================
- * main
- * ========================================================================= */
-
 int main(void) {
-  printf("=== test_file_cmds (archive hooks) ===\n");
+  printf("=== test_file_cmds (archive helpers) ===\n");
 
-  test_extension_detection();
-  test_temp_dir_isolation();
-  test_archive_test_zip();
-  test_archive_test_tar();
-  test_archive_extract_zip();
-  test_upload_protocol_only_flow();
-  test_archive_extract_tgz();
+  test_temp_dir_mode();
+  test_archive_helpers_zip_round_trip();
 
   printf("\n=== Results: %d passed, %d failed ===\n", g_pass, g_fail);
   return g_fail > 0 ? 1 : 0;

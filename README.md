@@ -2,8 +2,8 @@
 
 A classic telnet BBS server written in C (C11), styled after Renegade BBS with
 a green pirate theme. SQLite persistence, modern password hashing, DOSBox DOS
-door runner, PLANK store-and-forward networking, and an embedded scripting VM
-(Buccaneer).
+door runner, PLANK store-and-forward networking, and Buccaneer, Mutineer's
+interpreted language for addons, games, doors, and extensions.
 
 ## Quick start
 
@@ -32,12 +32,13 @@ Default telnet port: **2929**. See [docs/quick-start.md](docs/quick-start.md), [
 | SQLite3 | Yes | `libsqlite3-dev` |
 | OpenSSL | Yes | PBKDF2 password hashing |
 | pthreads | Yes | One thread per connection |
+| libarchive | Yes | Archive and QWK package handling |
 | libargon2 | Optional | Argon2 password upgrade path |
 | DOSBox | Optional | DOS door runner (`dosbox` on PATH) |
 
 Install on Debian/Ubuntu:
 ```bash
-apt-get install libsqlite3-dev libssl-dev libargon2-dev dosbox
+apt-get install libsqlite3-dev libssl-dev libarchive-dev libargon2-dev dosbox
 ```
 
 ## Features
@@ -46,13 +47,13 @@ apt-get install libsqlite3-dev libssl-dev libargon2-dev dosbox
 - **Full message system** — threaded boards, private email, QWK offline mail,
   FidoNet netmail export, CC recipients, taglines, full-screen editor
 - **File areas** — upload/download, credits/ratio enforcement, batch operations,
-  archive test/extract (zip, tar, rar, 7z)
+  libarchive-backed archive test/extract/view
 - **Doors** — native doors + DOSBox DOS door runner with per-launch isolation
   and serial nullmodem socket inheritance
 - **ACS system** — full expression parser: security levels, AR/AC flags, time,
   credits, conference membership, subscription presence, login counts
 - **PLANK networking** — store-and-forward offline packet protocol
-- **Buccaneer scripting VM** — embedded bytecode VM for interactive door scripts
+- **Buccaneer language** — interpreted addon/game/door language with capability-gated host APIs
 - **Sysop tools** — WFC console, remote F-key shortcuts, user/conference/
   protocol/vote/event editors, file validation
 - **Color schemes** — 8 named schemes, user-selectable via `pickscheme`
@@ -65,7 +66,7 @@ apt-get install libsqlite3-dev libssl-dev libargon2-dev dosbox
 src/           C source — BBS core, session, menus, messages, files, doors, chat
 src/tools/     Standalone CLI tools (qwkgen, stats, maint, initbbs, plankctl …)
 src/plank/     PLANK networking protocol implementation
-src/buccaneer/ Buccaneer scripting language (lexer, parser, VM, host bridge)
+src/buccaneer/ Buccaneer interpreted language (lexer, parser, bytecode runtime, host bridge)
 include/       Public headers
 sql/           SQLite schema and PLANK schema
 menus/         Menu definition files (.mnu) and ANSI/ASCII templates
@@ -127,7 +128,7 @@ A working test door (`TESTDOOR.COM`, real 16-bit DOS COM program) is included in
 
 ## Buccaneer scripting
 
-Buccaneer is an embedded language for native BBS doors (structured BASIC-like syntax, bytecode VM). Door authors: **[Programmer's Guide](docs/buccaneer/programmers-guide.md)**. Implementers: `SPECS/BUCCANEER/`. Track gaps via [GitHub issues](https://github.com/rickcollette/mutineer/issues?q=label%3Abuccaneer).
+Buccaneer is Mutineer's interpreted language for native BBS addons, games, doors, and extensions. It uses structured BASIC-like syntax, compiles to bytecode, and runs inside the BBS process through capability-gated host APIs. Door authors: **[Programmer's Guide](docs/buccaneer/programmers-guide.md)**. Implementers: `SPECS/BUCCANEER/`. Track gaps via [GitHub issues](https://github.com/rickcollette/mutineer/issues?q=label%3Abuccaneer).
 
 ## PLANK networking
 

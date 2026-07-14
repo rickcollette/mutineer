@@ -692,7 +692,7 @@ bucc_value_t bucc_host_shared_cas(bucc_host_context_t* ctx, bucc_value_t* args, 
     if (!current && BUCC_IS_NULL(args[1])) {
         matches = true;
     } else if (current) {
-        matches = bucc_value_equals(*current, args[1]);
+        matches = bucc_value_equal(current, &args[1]);
     }
     
     if (matches) {

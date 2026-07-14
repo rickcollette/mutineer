@@ -213,9 +213,26 @@ target_require_sqlite(test_tools)
 target_link_libraries(test_tools PRIVATE OpenSSL::Crypto)
 add_test(NAME tools COMMAND test_tools WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 
-add_executable(test_file_cmds tests/test_file_cmds.c)
+add_executable(test_file_cmds tests/test_file_cmds.c src/archive_util.c src/util.c)
 target_include_directories(test_file_cmds PRIVATE include)
+target_link_libraries(test_file_cmds PRIVATE ${LIBARCHIVE_LIBRARY})
 add_test(NAME file_cmds COMMAND test_file_cmds WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+
+add_executable(test_process_supervision tests/test_process_supervision.c src/process.c src/log.c)
+target_include_directories(test_process_supervision PRIVATE include)
+target_link_libraries(test_process_supervision PRIVATE Threads::Threads)
+add_test(NAME process_supervision COMMAND test_process_supervision)
+
+add_executable(test_telnet_password tests/test_telnet_password.c src/telnet.c src/util.c)
+target_include_directories(test_telnet_password PRIVATE include)
+add_test(NAME telnet_password COMMAND test_telnet_password)
+
+add_executable(test_string_builders tests/test_string_builders.c src/util.c)
+target_include_directories(test_string_builders PRIVATE include)
+add_test(NAME string_builders COMMAND test_string_builders WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+
+add_executable(test_temp_paths tests/test_temp_paths.c)
+add_test(NAME temp_paths COMMAND test_temp_paths WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 
 add_executable(test_first15_matrix tests/test_first15_matrix.c)
 target_include_directories(test_first15_matrix PRIVATE include)
@@ -244,6 +261,23 @@ add_test(NAME docker_quickstart_smoke
          COMMAND ${CMAKE_SOURCE_DIR}/tests/docker_quickstart_smoke.sh ${CMAKE_BINARY_DIR}
          WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 set_tests_properties(docker_quickstart_smoke PROPERTIES LABELS "docker")
+
+add_executable(test_plank_temp_policy tests/test_plank_temp_policy.c)
+target_compile_options(test_plank_temp_policy PRIVATE -Wall -Wextra -Wpedantic)
+add_test(NAME plank_temp_policy COMMAND test_plank_temp_policy WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+add_test(NAME plank_temp_policy_tmpdir
+         COMMAND ${CMAKE_COMMAND} -E env TMPDIR=${CMAKE_BINARY_DIR}/tmp $<TARGET_FILE:test_plank_temp_policy>
+         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+
+add_executable(test_docs_consistency tests/test_docs_consistency.c)
+target_compile_options(test_docs_consistency PRIVATE -Wall -Wextra -Wpedantic)
+add_test(NAME docs_consistency COMMAND test_docs_consistency WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+find_program(PYTHON3_EXECUTABLE python3)
+if(PYTHON3_EXECUTABLE)
+  add_test(NAME website_generation
+    COMMAND ${PYTHON3_EXECUTABLE} scripts/build-website.py --check-or-temp-output
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+endif()
 
 add_executable(test_fsedit tests/test_fsedit.c src/fsedit.c)
 target_include_directories(test_fsedit PRIVATE include)
@@ -534,3 +568,9 @@ add_executable(bucc
 )
 target_include_directories(bucc PRIVATE src/buccaneer)
 target_link_libraries(bucc PRIVATE buccaneer)
+
+file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/tmp)
+add_test(NAME bucc_run_temp_fixture
+         COMMAND ${CMAKE_COMMAND} -E env TMPDIR=${CMAKE_BINARY_DIR}/tmp $<TARGET_FILE:bucc> run ${CMAKE_SOURCE_DIR}/tests/fixtures/temp_run.bucc
+         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_tests_properties(bucc_run_temp_fixture PROPERTIES DEPENDS bucc)

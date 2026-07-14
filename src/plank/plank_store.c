@@ -238,26 +238,27 @@ bool plank_store_set_identity(plank_store_t *store, const plank_node_identity_t 
     if (!store || !identity)
         return false;
 
-    char node_id_hex[33], pub_hex[65], priv_hex[129];
-    plank_crypto_to_hex(identity->node_id, PLANK_NODE_ID_SIZE, node_id_hex);
-    plank_crypto_to_hex(identity->signing_key_pub, PLANK_PUBKEY_SIZE, pub_hex);
-    plank_crypto_to_hex(identity->signing_key_priv, PLANK_PRIVKEY_SIZE, priv_hex);
+    const char *sql =
+        "INSERT OR REPLACE INTO plank_node_identity "
+        "(id, node_id, node_name, network_name, signing_key_pub, signing_key_priv, "
+        "software_name, software_version, is_cove, max_bundle_bytes, max_frame_bytes, "
+        "poll_interval_sec, updated_at) VALUES "
+        "(1, ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, datetime('now'))";
+    DbBind binds[] = {
+        DB_BIND_BLOB_VAL(identity->node_id, PLANK_NODE_ID_SIZE),
+        DB_BIND_TEXT_VAL(identity->node_name),
+        DB_BIND_TEXT_VAL(identity->network_name),
+        DB_BIND_BLOB_VAL(identity->signing_key_pub, PLANK_PUBKEY_SIZE),
+        DB_BIND_BLOB_VAL(identity->signing_key_priv, PLANK_PRIVKEY_SIZE),
+        DB_BIND_TEXT_VAL(identity->software_name),
+        DB_BIND_TEXT_VAL(identity->software_version),
+        DB_BIND_INT_VAL(identity->is_cove ? 1 : 0),
+        DB_BIND_INT64_VAL(identity->max_bundle_bytes),
+        DB_BIND_INT64_VAL(identity->max_frame_bytes),
+        DB_BIND_INT64_VAL(identity->poll_interval_sec),
+    };
 
-    char sql[2048];
-    snprintf(sql, sizeof(sql),
-             "INSERT OR REPLACE INTO plank_node_identity "
-             "(id, node_id, node_name, network_name, signing_key_pub, signing_key_priv, "
-             "software_name, software_version, is_cove, max_bundle_bytes, max_frame_bytes, "
-             "poll_interval_sec, updated_at) VALUES "
-             "(1, X'%s', '%s', '%s', X'%s', X'%s', '%s', '%s', %d, %u, %u, %u, datetime('now'))",
-             node_id_hex, identity->node_name, identity->network_name,
-             pub_hex, priv_hex,
-             identity->software_name, identity->software_version,
-             identity->is_cove ? 1 : 0,
-             identity->max_bundle_bytes, identity->max_frame_bytes,
-             identity->poll_interval_sec);
-
-    if (!db_exec(store->db, sql))
+    if (!db_exec_prepared(store->db, sql, binds, (int)(sizeof(binds) / sizeof(binds[0]))))
     {
         plank_set_error("Failed to set identity: %s", db_last_error(store->db));
         return false;
@@ -327,25 +328,29 @@ bool plank_store_peer_upsert(plank_store_t *store, const plank_peer_t *peer)
     if (!store || !peer)
         return false;
 
-    char node_id_hex[33], pub_hex[65];
-    plank_crypto_to_hex(peer->node_id, PLANK_NODE_ID_SIZE, node_id_hex);
-    plank_crypto_to_hex(peer->signing_key_pub, PLANK_PUBKEY_SIZE, pub_hex);
+    const char *sql =
+        "INSERT INTO plank_peers "
+        "(node_id, node_name, network_name, node_addr, signing_key_pub, "
+        "tls_fingerprint, trust_level, status, notes) VALUES "
+        "(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9) "
+        "ON CONFLICT(node_id) DO UPDATE SET "
+        "node_name = excluded.node_name, network_name = excluded.network_name, "
+        "node_addr = excluded.node_addr, signing_key_pub = excluded.signing_key_pub, "
+        "tls_fingerprint = excluded.tls_fingerprint, trust_level = excluded.trust_level, "
+        "status = excluded.status, notes = excluded.notes";
+    DbBind binds[] = {
+        DB_BIND_BLOB_VAL(peer->node_id, PLANK_NODE_ID_SIZE),
+        DB_BIND_TEXT_VAL(peer->node_name),
+        DB_BIND_TEXT_VAL(peer->network_name),
+        DB_BIND_TEXT_VAL(peer->node_addr),
+        DB_BIND_BLOB_VAL(peer->signing_key_pub, PLANK_PUBKEY_SIZE),
+        DB_BIND_TEXT_VAL(peer->tls_fingerprint),
+        DB_BIND_INT_VAL(peer->trust_level),
+        DB_BIND_INT_VAL(peer->status),
+        DB_BIND_TEXT_VAL(peer->notes),
+    };
 
-    char sql[1024];
-    snprintf(sql, sizeof(sql),
-             "INSERT INTO plank_peers "
-             "(node_id, node_name, network_name, node_addr, signing_key_pub, "
-             "tls_fingerprint, trust_level, status, notes) VALUES "
-             "(X'%s', '%s', '%s', '%s', X'%s', '%s', %d, %d, '%s') "
-             "ON CONFLICT(node_id) DO UPDATE SET "
-             "node_name = excluded.node_name, network_name = excluded.network_name, "
-             "node_addr = excluded.node_addr, signing_key_pub = excluded.signing_key_pub, "
-             "tls_fingerprint = excluded.tls_fingerprint, trust_level = excluded.trust_level, "
-             "status = excluded.status, notes = excluded.notes",
-             node_id_hex, peer->node_name, peer->network_name, peer->node_addr,
-             pub_hex, peer->tls_fingerprint, peer->trust_level, peer->status, peer->notes);
-
-    if (!db_exec(store->db, sql))
+    if (!db_exec_prepared(store->db, sql, binds, (int)(sizeof(binds) / sizeof(binds[0]))))
     {
         plank_set_error("Failed to upsert peer: %s", db_last_error(store->db));
         return false;
@@ -363,21 +368,27 @@ bool plank_store_link_add(plank_store_t *store, const plank_link_t *link, int *i
     if (!store || !link)
         return false;
 
-    char link_id_hex[33];
-    plank_crypto_to_hex(link->link_id, PLANK_LINK_ID_SIZE, link_id_hex);
+    const char *sql =
+        "INSERT INTO plank_links "
+        "(link_id, link_name, peer_id, remote_host, remote_port, direction, "
+        "enabled, paused, retry_initial_sec, retry_max_sec, retry_limit, state) VALUES "
+        "(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)";
+    DbBind binds[] = {
+        DB_BIND_BLOB_VAL(link->link_id, PLANK_LINK_ID_SIZE),
+        DB_BIND_TEXT_VAL(link->link_name),
+        DB_BIND_INT_VAL(link->peer_id),
+        DB_BIND_TEXT_VAL(link->remote_host),
+        DB_BIND_INT_VAL(link->remote_port),
+        DB_BIND_INT_VAL(link->direction),
+        DB_BIND_INT_VAL(link->enabled ? 1 : 0),
+        DB_BIND_INT_VAL(link->paused ? 1 : 0),
+        DB_BIND_INT_VAL(link->retry_initial_sec),
+        DB_BIND_INT_VAL(link->retry_max_sec),
+        DB_BIND_INT_VAL(link->retry_limit),
+        DB_BIND_INT_VAL(link->state),
+    };
 
-    char sql[1024];
-    snprintf(sql, sizeof(sql),
-             "INSERT INTO plank_links "
-             "(link_id, link_name, peer_id, remote_host, remote_port, direction, "
-             "enabled, paused, retry_initial_sec, retry_max_sec, retry_limit, state) VALUES "
-             "(X'%s', '%s', %d, '%s', %d, %d, %d, %d, %d, %d, %d, %d)",
-             link_id_hex, link->link_name, link->peer_id, link->remote_host,
-             link->remote_port, link->direction, link->enabled ? 1 : 0,
-             link->paused ? 1 : 0, link->retry_initial_sec, link->retry_max_sec,
-             link->retry_limit, link->state);
-
-    if (!db_exec(store->db, sql))
+    if (!db_exec_prepared(store->db, sql, binds, (int)(sizeof(binds) / sizeof(binds[0]))))
     {
         plank_set_error("Failed to add link: %s", db_last_error(store->db));
         return false;
@@ -396,12 +407,13 @@ bool plank_store_link_set_state(plank_store_t *store, int link_id, plank_link_st
     if (!store)
         return false;
 
-    char sql[256];
-    snprintf(sql, sizeof(sql),
-             "UPDATE plank_links SET state = %d, updated_at = datetime('now') WHERE id = %d",
-             state, link_id);
-
-    return db_exec(store->db, sql);
+    DbBind binds[] = {
+        DB_BIND_INT_VAL(state),
+        DB_BIND_INT_VAL(link_id),
+    };
+    return db_exec_prepared(store->db,
+                            "UPDATE plank_links SET state = ?1, updated_at = datetime('now') WHERE id = ?2",
+                            binds, 2);
 }
 
 bool plank_store_link_set_error(plank_store_t *store, int link_id, const char *error)
@@ -409,12 +421,13 @@ bool plank_store_link_set_error(plank_store_t *store, int link_id, const char *e
     if (!store)
         return false;
 
-    char sql[512];
-    snprintf(sql, sizeof(sql),
-             "UPDATE plank_links SET last_error = '%s', updated_at = datetime('now') WHERE id = %d",
-             error ? error : "", link_id);
-
-    return db_exec(store->db, sql);
+    DbBind binds[] = {
+        DB_BIND_TEXT_VAL(error ? error : ""),
+        DB_BIND_INT_VAL(link_id),
+    };
+    return db_exec_prepared(store->db,
+                            "UPDATE plank_links SET last_error = ?1, updated_at = datetime('now') WHERE id = ?2",
+                            binds, 2);
 }
 
 /* ============================================================================
@@ -462,32 +475,41 @@ bool plank_store_area_upsert(plank_store_t *store, const plank_area_t *area, int
     if (!store || !area)
         return false;
 
-    char sql[2048];
-    snprintf(sql, sizeof(sql),
-             "INSERT INTO plank_areas "
-             "(area_addr, area_slug, origin_node_addr, title, description, "
-             "distribution_mode, default_retention, posting_policy, attachment_policy, "
-             "max_message_bytes, max_attachment_bytes, retention_days, max_hops, status) VALUES "
-             "('%s', '%s', '%s', '%s', '%s', %d, %d, %d, %d, %u, %u, %u, %u, %d) "
-             "ON CONFLICT(area_addr) DO UPDATE SET "
-             "title = excluded.title, description = excluded.description, "
-             "distribution_mode = excluded.distribution_mode, "
-             "default_retention = excluded.default_retention, "
-             "posting_policy = excluded.posting_policy, "
-             "attachment_policy = excluded.attachment_policy, "
-             "max_message_bytes = excluded.max_message_bytes, "
-             "max_attachment_bytes = excluded.max_attachment_bytes, "
-             "retention_days = excluded.retention_days, "
-             "max_hops = excluded.max_hops, status = excluded.status, "
-             "updated_at = datetime('now')",
-             area->area_addr, area->area_slug, area->origin_node_addr,
-             area->title, area->description,
-             area->distribution_mode, area->default_retention,
-             area->posting_policy, area->attachment_policy,
-             area->max_message_bytes, area->max_attachment_bytes,
-             area->retention_days, area->max_hops, area->status);
+    const char *sql =
+        "INSERT INTO plank_areas "
+        "(area_addr, area_slug, origin_node_addr, title, description, "
+        "distribution_mode, default_retention, posting_policy, attachment_policy, "
+        "max_message_bytes, max_attachment_bytes, retention_days, max_hops, status) VALUES "
+        "(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14) "
+        "ON CONFLICT(area_addr) DO UPDATE SET "
+        "title = excluded.title, description = excluded.description, "
+        "distribution_mode = excluded.distribution_mode, "
+        "default_retention = excluded.default_retention, "
+        "posting_policy = excluded.posting_policy, "
+        "attachment_policy = excluded.attachment_policy, "
+        "max_message_bytes = excluded.max_message_bytes, "
+        "max_attachment_bytes = excluded.max_attachment_bytes, "
+        "retention_days = excluded.retention_days, "
+        "max_hops = excluded.max_hops, status = excluded.status, "
+        "updated_at = datetime('now')";
+    DbBind binds[] = {
+        DB_BIND_TEXT_VAL(area->area_addr),
+        DB_BIND_TEXT_VAL(area->area_slug),
+        DB_BIND_TEXT_VAL(area->origin_node_addr),
+        DB_BIND_TEXT_VAL(area->title),
+        DB_BIND_TEXT_VAL(area->description),
+        DB_BIND_INT_VAL(area->distribution_mode),
+        DB_BIND_INT_VAL(area->default_retention),
+        DB_BIND_INT_VAL(area->posting_policy),
+        DB_BIND_INT_VAL(area->attachment_policy),
+        DB_BIND_INT64_VAL(area->max_message_bytes),
+        DB_BIND_INT64_VAL(area->max_attachment_bytes),
+        DB_BIND_INT64_VAL(area->retention_days),
+        DB_BIND_INT64_VAL(area->max_hops),
+        DB_BIND_INT_VAL(area->status),
+    };
 
-    if (!db_exec(store->db, sql))
+    if (!db_exec_prepared(store->db, sql, binds, (int)(sizeof(binds) / sizeof(binds[0]))))
     {
         plank_set_error("Failed to upsert area: %s", db_last_error(store->db));
         return false;
@@ -522,51 +544,24 @@ bool plank_store_object_put(plank_store_t *store, const plank_object_t *obj,
         return false;
     }
 
-    /* Insert object */
-    char node_id_hex[33], sig_hex[129];
-    plank_crypto_to_hex(obj->origin_node_id, PLANK_NODE_ID_SIZE, node_id_hex);
-    plank_crypto_to_hex(obj->signature, PLANK_SIGNATURE_SIZE, sig_hex);
+    const char *sql =
+        "INSERT INTO plank_objects "
+        "(object_id, object_class, origin_node_id, origin_node_addr, created_at_ts, "
+        "signature, sig_alg, body_cbor, envelope_cbor, verified) VALUES "
+        "(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 1)";
+    DbBind binds[] = {
+        DB_BIND_BLOB_VAL(obj->object_id, PLANK_OBJECT_ID_SIZE),
+        DB_BIND_INT_VAL(obj->object_class),
+        DB_BIND_BLOB_VAL(obj->origin_node_id, PLANK_NODE_ID_SIZE),
+        DB_BIND_TEXT_VAL(obj->origin_node_addr),
+        DB_BIND_INT64_VAL(obj->created_at),
+        DB_BIND_BLOB_VAL(obj->signature, PLANK_SIGNATURE_SIZE),
+        DB_BIND_INT_VAL(obj->sig_alg),
+        DB_BIND_BLOB_VAL(obj->body_cbor, obj->body_cbor_len),
+        DB_BIND_BLOB_VAL(obj->envelope_cbor, obj->envelope_cbor_len),
+    };
 
-    /* For body and envelope, we need to hex-encode the CBOR */
-    char *body_hex = malloc(obj->body_cbor_len * 2 + 1);
-    char *env_hex = malloc(obj->envelope_cbor_len * 2 + 1);
-    if (!body_hex || !env_hex)
-    {
-        free(body_hex);
-        free(env_hex);
-        plank_set_error("Failed to allocate hex buffers");
-        return false;
-    }
-
-    plank_crypto_to_hex(obj->body_cbor, obj->body_cbor_len, body_hex);
-    plank_crypto_to_hex(obj->envelope_cbor, obj->envelope_cbor_len, env_hex);
-
-    size_t sql_size = strlen(body_hex) + strlen(env_hex) + 1024;
-    char *sql = malloc(sql_size);
-    if (!sql)
-    {
-        free(body_hex);
-        free(env_hex);
-        plank_set_error("Failed to allocate SQL buffer");
-        return false;
-    }
-
-    snprintf(sql, sql_size,
-             "INSERT INTO plank_objects "
-             "(object_id, object_class, origin_node_id, origin_node_addr, created_at_ts, "
-             "signature, sig_alg, body_cbor, envelope_cbor, verified) VALUES "
-             "(X'%s', %d, X'%s', '%s', %llu, X'%s', %d, X'%s', X'%s', 1)",
-             obj_id_hex, obj->object_class, node_id_hex, obj->origin_node_addr,
-             (unsigned long long)obj->created_at, sig_hex, obj->sig_alg,
-             body_hex, env_hex);
-
-    bool result = db_exec(store->db, sql);
-
-    free(sql);
-    free(body_hex);
-    free(env_hex);
-
-    if (!result)
+    if (!db_exec_prepared(store->db, sql, binds, (int)(sizeof(binds) / sizeof(binds[0]))))
     {
         plank_set_error("Failed to store object: %s", db_last_error(store->db));
         return false;
@@ -575,24 +570,39 @@ bool plank_store_object_put(plank_store_t *store, const plank_object_t *obj,
     /* Add journal entry */
     int obj_db_id = db_last_insert_id(store->db);
 
-    char journal_sql[512];
+    bool journal_ok = false;
     if (source_link_id > 0)
     {
-        snprintf(journal_sql, sizeof(journal_sql),
-                 "INSERT INTO plank_journal "
-                 "(object_id, object_class, source_kind, source_link_id, processing_state) VALUES "
-                 "(X'%s', %d, %d, %d, 0)",
-                 obj_id_hex, obj->object_class, source, source_link_id);
+        DbBind journal_binds[] = {
+            DB_BIND_BLOB_VAL(obj->object_id, PLANK_OBJECT_ID_SIZE),
+            DB_BIND_INT_VAL(obj->object_class),
+            DB_BIND_INT_VAL(source),
+            DB_BIND_INT_VAL(source_link_id),
+        };
+        journal_ok = db_exec_prepared(store->db,
+                                      "INSERT INTO plank_journal "
+                                      "(object_id, object_class, source_kind, source_link_id, processing_state) VALUES "
+                                      "(?1, ?2, ?3, ?4, 0)",
+                                      journal_binds, 4);
     }
     else
     {
-        snprintf(journal_sql, sizeof(journal_sql),
-                 "INSERT INTO plank_journal "
-                 "(object_id, object_class, source_kind, processing_state) VALUES "
-                 "(X'%s', %d, %d, 0)",
-                 obj_id_hex, obj->object_class, source);
+        DbBind journal_binds[] = {
+            DB_BIND_BLOB_VAL(obj->object_id, PLANK_OBJECT_ID_SIZE),
+            DB_BIND_INT_VAL(obj->object_class),
+            DB_BIND_INT_VAL(source),
+        };
+        journal_ok = db_exec_prepared(store->db,
+                                      "INSERT INTO plank_journal "
+                                      "(object_id, object_class, source_kind, processing_state) VALUES "
+                                      "(?1, ?2, ?3, 0)",
+                                      journal_binds, 3);
     }
-    db_exec(store->db, journal_sql);
+    if (!journal_ok)
+    {
+        plank_set_error("Failed to journal object: %s", db_last_error(store->db));
+        return false;
+    }
 
     if (local_seq_out)
     {
@@ -648,25 +658,29 @@ bool plank_store_import_record(plank_store_t *store,
                                int duplicate_count,
                                int rejected_count)
 {
-    if (!store || !bundle_id)
+    if (!store || !bundle_id || !source_node_id)
         return false;
 
-    char bundle_id_hex[65], node_id_hex[33];
-    plank_crypto_to_hex(bundle_id, PLANK_BUNDLE_ID_SIZE, bundle_id_hex);
-    plank_crypto_to_hex(source_node_id, PLANK_NODE_ID_SIZE, node_id_hex);
+    const char *sql =
+        "INSERT INTO plank_import_history "
+        "(bundle_id, bundle_type, source_node_id, source_node_addr, import_result, "
+        "source_link_id, object_count, duplicate_count, rejected_count) VALUES "
+        "(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9) "
+        "ON CONFLICT(bundle_id) DO UPDATE SET "
+        "last_seen_at = datetime('now')";
+    DbBind binds[] = {
+        DB_BIND_BLOB_VAL(bundle_id, PLANK_BUNDLE_ID_SIZE),
+        DB_BIND_INT_VAL(bundle_type),
+        DB_BIND_BLOB_VAL(source_node_id, PLANK_NODE_ID_SIZE),
+        DB_BIND_TEXT_VAL(source_node_addr ? source_node_addr : ""),
+        DB_BIND_INT_VAL(result),
+        source_link_id > 0 ? DB_BIND_INT_VAL(source_link_id) : DB_BIND_NULL_VAL,
+        DB_BIND_INT_VAL(object_count),
+        DB_BIND_INT_VAL(duplicate_count),
+        DB_BIND_INT_VAL(rejected_count),
+    };
 
-    char sql[1024];
-    snprintf(sql, sizeof(sql),
-             "INSERT INTO plank_import_history "
-             "(bundle_id, bundle_type, source_node_id, source_node_addr, import_result, "
-             "source_link_id, object_count, duplicate_count, rejected_count) VALUES "
-             "(X'%s', %d, X'%s', '%s', %d, %d, %d, %d, %d) "
-             "ON CONFLICT(bundle_id) DO UPDATE SET "
-             "last_seen_at = datetime('now')",
-             bundle_id_hex, bundle_type, node_id_hex, source_node_addr,
-             result, source_link_id, object_count, duplicate_count, rejected_count);
-
-    return db_exec(store->db, sql);
+    return db_exec_prepared(store->db, sql, binds, (int)(sizeof(binds) / sizeof(binds[0])));
 }
 
 bool plank_store_import_exists(plank_store_t *store, const uint8_t *bundle_id)
@@ -766,59 +780,79 @@ bool plank_store_deadletter_add(plank_store_t *store,
     if (!store)
         return false;
 
-    /* Build JSON array of object IDs */
-    char obj_ids_json[4096] = "[";
-    for (int i = 0; i < object_count && i < 100; i++)
+    if (object_count < 0 || object_count > 100 || (object_count > 0 && !object_ids))
     {
+        plank_set_error("Invalid deadletter object count");
+        return false;
+    }
+
+    size_t obj_ids_json_cap = 3 + (size_t)object_count * 68;
+    char *obj_ids_json = malloc(obj_ids_json_cap);
+    if (!obj_ids_json)
+    {
+        plank_set_error("Failed to allocate deadletter object list");
+        return false;
+    }
+
+    size_t off = 0;
+    obj_ids_json[off++] = '[';
+    for (int i = 0; i < object_count; i++)
+    {
+        if (!object_ids[i])
+        {
+            free(obj_ids_json);
+            plank_set_error("Invalid deadletter object id");
+            return false;
+        }
         char hex[65];
         plank_crypto_to_hex(object_ids[i], PLANK_OBJECT_ID_SIZE, hex);
         if (i > 0)
-            strcat(obj_ids_json, ",");
-        strcat(obj_ids_json, "\"");
-        strcat(obj_ids_json, hex);
-        strcat(obj_ids_json, "\"");
+            obj_ids_json[off++] = ',';
+        obj_ids_json[off++] = '"';
+        memcpy(obj_ids_json + off, hex, 64);
+        off += 64;
+        obj_ids_json[off++] = '"';
     }
-    strcat(obj_ids_json, "]");
+    obj_ids_json[off++] = ']';
+    obj_ids_json[off] = '\0';
 
-    char bundle_id_hex[65] = "";
+    const char *sql_with_bundle =
+        "INSERT INTO plank_deadletters "
+        "(target_link_id, target_node_addr, object_ids, bundle_id, "
+        "last_error_code, last_error_text, state) VALUES "
+        "(?1, ?2, ?3, ?4, ?5, ?6, 0)";
+    const char *sql_without_bundle =
+        "INSERT INTO plank_deadletters "
+        "(target_link_id, target_node_addr, object_ids, "
+        "last_error_code, last_error_text, state) VALUES "
+        "(?1, ?2, ?3, ?4, ?5, 0)";
+    bool ok;
     if (bundle_id)
     {
-        plank_crypto_to_hex(bundle_id, PLANK_BUNDLE_ID_SIZE, bundle_id_hex);
-    }
-
-    /* Escape string values */
-    char addr_esc[512] = "";
-    char error_esc[512] = "";
-    escape_sql_string(addr_esc, sizeof(addr_esc), target_node_addr);
-    if (error_text)
-        escape_sql_string(error_esc, sizeof(error_esc), error_text);
-
-    char obj_json_esc[8192] = "";
-    escape_sql_string(obj_json_esc, sizeof(obj_json_esc), obj_ids_json);
-
-    char sql[8192];
-    if (bundle_id)
-    {
-        snprintf(sql, sizeof(sql),
-                 "INSERT INTO plank_deadletters "
-                 "(target_link_id, target_node_addr, object_ids, bundle_id, "
-                 "last_error_code, last_error_text, state) VALUES "
-                 "(%d, %s, %s, X'%s', %d, %s, 0)",
-                 target_link_id, addr_esc, obj_json_esc,
-                 bundle_id_hex, error_code, error_text ? error_esc : "NULL");
+        DbBind binds[] = {
+            DB_BIND_INT_VAL(target_link_id),
+            DB_BIND_TEXT_VAL(target_node_addr ? target_node_addr : ""),
+            DB_BIND_TEXT_VAL(obj_ids_json),
+            DB_BIND_BLOB_VAL(bundle_id, PLANK_BUNDLE_ID_SIZE),
+            DB_BIND_INT_VAL(error_code),
+            error_text ? DB_BIND_TEXT_VAL(error_text) : DB_BIND_NULL_VAL,
+        };
+        ok = db_exec_prepared(store->db, sql_with_bundle, binds, 6);
     }
     else
     {
-        snprintf(sql, sizeof(sql),
-                 "INSERT INTO plank_deadletters "
-                 "(target_link_id, target_node_addr, object_ids, "
-                 "last_error_code, last_error_text, state) VALUES "
-                 "(%d, %s, %s, %d, %s, 0)",
-                 target_link_id, addr_esc, obj_json_esc,
-                 error_code, error_text ? error_esc : "NULL");
+        DbBind binds[] = {
+            DB_BIND_INT_VAL(target_link_id),
+            DB_BIND_TEXT_VAL(target_node_addr ? target_node_addr : ""),
+            DB_BIND_TEXT_VAL(obj_ids_json),
+            DB_BIND_INT_VAL(error_code),
+            error_text ? DB_BIND_TEXT_VAL(error_text) : DB_BIND_NULL_VAL,
+        };
+        ok = db_exec_prepared(store->db, sql_without_bundle, binds, 5);
     }
 
-    return db_exec(store->db, sql);
+    free(obj_ids_json);
+    return ok;
 }
 
 bool plank_store_deadletter_requeue(plank_store_t *store, int id)
@@ -865,37 +899,22 @@ bool plank_store_quarantine_add(plank_store_t *store,
     if (!store || !object_id || !envelope_cbor)
         return false;
 
-    char obj_id_hex[65];
-    plank_crypto_to_hex(object_id, PLANK_OBJECT_ID_SIZE, obj_id_hex);
+    const char *sql =
+        "INSERT INTO plank_quarantine "
+        "(object_id, object_class, source_link_id, source_node_addr, "
+        "quarantine_reason, quarantine_text, envelope_cbor) VALUES "
+        "(?1, ?2, ?3, ?4, ?5, ?6, ?7)";
+    DbBind binds[] = {
+        DB_BIND_BLOB_VAL(object_id, PLANK_OBJECT_ID_SIZE),
+        DB_BIND_INT_VAL(object_class),
+        DB_BIND_INT_VAL(source_link_id),
+        DB_BIND_TEXT_VAL(source_node_addr ? source_node_addr : ""),
+        DB_BIND_INT_VAL(reason),
+        DB_BIND_TEXT_VAL(reason_text ? reason_text : ""),
+        DB_BIND_BLOB_VAL(envelope_cbor, envelope_cbor_len),
+    };
 
-    char *env_hex = malloc(envelope_cbor_len * 2 + 1);
-    if (!env_hex)
-        return false;
-    plank_crypto_to_hex(envelope_cbor, envelope_cbor_len, env_hex);
-
-    size_t sql_size = strlen(env_hex) + 1024;
-    char *sql = malloc(sql_size);
-    if (!sql)
-    {
-        free(env_hex);
-        return false;
-    }
-
-    snprintf(sql, sql_size,
-             "INSERT INTO plank_quarantine "
-             "(object_id, object_class, source_link_id, source_node_addr, "
-             "quarantine_reason, quarantine_text, envelope_cbor) VALUES "
-             "(X'%s', %d, %d, '%s', %d, '%s', X'%s')",
-             obj_id_hex, object_class, source_link_id,
-             source_node_addr ? source_node_addr : "",
-             reason, reason_text ? reason_text : "", env_hex);
-
-    bool result = db_exec(store->db, sql);
-
-    free(sql);
-    free(env_hex);
-
-    return result;
+    return db_exec_prepared(store->db, sql, binds, (int)(sizeof(binds) / sizeof(binds[0])));
 }
 
 /* ============================================================================
@@ -1015,38 +1034,20 @@ bool plank_store_audit_log(plank_store_t *store,
     if (!store || !event_type)
         return false;
 
-    char event_type_esc[256] = "";
-    char node_addr_esc[512] = "";
-    char user_handle_esc[256] = "";
-    char details_esc[1024] = "";
+    DbBind binds[] = {
+        DB_BIND_TEXT_VAL(event_type),
+        link_id > 0 ? DB_BIND_INT_VAL(link_id) : DB_BIND_NULL_VAL,
+        node_addr ? DB_BIND_TEXT_VAL(node_addr) : DB_BIND_NULL_VAL,
+        user_handle ? DB_BIND_TEXT_VAL(user_handle) : DB_BIND_NULL_VAL,
+        object_id ? DB_BIND_BLOB_VAL(object_id, PLANK_OBJECT_ID_SIZE) : DB_BIND_NULL_VAL,
+        details ? DB_BIND_TEXT_VAL(details) : DB_BIND_NULL_VAL,
+    };
 
-    escape_sql_string(event_type_esc, sizeof(event_type_esc), event_type);
-    if (node_addr)
-        escape_sql_string(node_addr_esc, sizeof(node_addr_esc), node_addr);
-    if (user_handle)
-        escape_sql_string(user_handle_esc, sizeof(user_handle_esc), user_handle);
-    if (details)
-        escape_sql_string(details_esc, sizeof(details_esc), details);
-
-    char obj_id_hex[65] = "";
-    if (object_id)
-    {
-        plank_crypto_to_hex(object_id, PLANK_OBJECT_ID_SIZE, obj_id_hex);
-    }
-
-    char sql[2048];
-    snprintf(sql, sizeof(sql),
-             "INSERT INTO plank_audit "
-             "(event_type, link_id, node_addr, user_handle, object_id, details) VALUES "
-             "(%s, %d, %s, %s, %s, %s)",
-             event_type_esc,
-             link_id,
-             node_addr ? node_addr_esc : "NULL",
-             user_handle ? user_handle_esc : "NULL",
-             object_id ? (char *)"" : "NULL", /* object_id handled separately */
-             details ? details_esc : "NULL");
-
-    return db_exec(store->db, sql);
+    return db_exec_prepared(store->db,
+                            "INSERT INTO plank_audit "
+                            "(event_type, link_id, node_addr, user_handle, object_id, details) VALUES "
+                            "(?1, ?2, ?3, ?4, ?5, ?6)",
+                            binds, 6);
 }
 
 /* ============================================================================
@@ -1058,12 +1059,10 @@ int plank_store_config_get_int(plank_store_t *store, const char *key, int defaul
     if (!store || !key)
         return default_val;
 
-    char sql[256];
-    snprintf(sql, sizeof(sql),
-             "SELECT CAST(v AS INTEGER) FROM plank_config WHERE k = '%s' LIMIT 1",
-             key);
-    int value = db_query_int(store->db, sql, default_val);
-    return value;
+    DbBind binds[] = {DB_BIND_TEXT_VAL(key)};
+    return db_query_int_prepared(store->db,
+                                 "SELECT CAST(v AS INTEGER) FROM plank_config WHERE k = ?1 LIMIT 1",
+                                 binds, 1, default_val);
 }
 
 bool plank_store_config_set(plank_store_t *store, const char *key, const char *value)
@@ -1071,13 +1070,14 @@ bool plank_store_config_set(plank_store_t *store, const char *key, const char *v
     if (!store || !key || !value)
         return false;
 
-    char sql[256];
-    snprintf(sql, sizeof(sql),
-             "INSERT INTO plank_config (k, v) VALUES ('%s', '%s') "
-             "ON CONFLICT(k) DO UPDATE SET v = excluded.v",
-             key, value);
-
-    return db_exec(store->db, sql);
+    DbBind binds[] = {
+        DB_BIND_TEXT_VAL(key),
+        DB_BIND_TEXT_VAL(value),
+    };
+    return db_exec_prepared(store->db,
+                            "INSERT INTO plank_config (k, v) VALUES (?1, ?2) "
+                            "ON CONFLICT(k) DO UPDATE SET v = excluded.v",
+                            binds, 2);
 }
 
 /* ============================================================================

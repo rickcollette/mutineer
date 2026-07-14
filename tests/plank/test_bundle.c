@@ -4,6 +4,7 @@
  */
 
 #include "plank/plank.h"
+#include "bbs_util.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -28,14 +29,13 @@ static int tests_passed = 0;
 static char g_temp_dir[256];
 
 static void setup_temp_dir(void) {
-    snprintf(g_temp_dir, sizeof(g_temp_dir), "/tmp/plank_test_%d", (int)getpid());
+    snprintf(g_temp_dir, sizeof(g_temp_dir), "%s/plank_test_%d",
+             getenv("TMPDIR") ? getenv("TMPDIR") : "/tmp", (int)getpid());
     mkdir(g_temp_dir, 0755);
 }
 
 static void cleanup_temp_dir(void) {
-    char cmd[512];
-    snprintf(cmd, sizeof(cmd), "rm -rf %s", g_temp_dir);
-    system(cmd);
+    bbs_remove_tree(g_temp_dir);
 }
 
 /* ============================================================================

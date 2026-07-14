@@ -68,10 +68,8 @@
 <h3>Background Threads</h3>
 <table>
 <tr><th>Thread</th><th>Source</th><th>Purpose</th></tr>
-<table>
-<tr><th>WFC</th><th><code>wfc.c</code></th><th>Local sysop console showing node grid</th></tr>
-<table>
-<tr><th>Scheduler</th><th><code>scheduler.c</code></th><th>Poll <code>events</code> table, run scheduled/logon/permission events</th></tr>
+<tr><td>WFC</td><td><code>wfc.c</code></td><td>Local sysop console showing node grid</td></tr>
+<tr><td>Scheduler</td><td><code>scheduler.c</code></td><td>Poll <code>events</code> table, run scheduled/logon/permission events</td></tr>
 </table>
 <p>PLANK daemons (<code>plankd</code>, <code>coved</code>) run as <strong>separate processes</strong>, not inside <code>mutineer</code>.</p>
 <h2>Session Lifecycle</h2>
@@ -120,114 +118,67 @@ graph TD
 <h2>Key Abstractions</h2>
 <table>
 <tr><th>Abstraction</th><th>File</th><th>Description</th></tr>
-<table>
-<tr><th><code>BbsConfig</code></th><th><code>include/bbs_config.h</code></th><th>Runtime configuration struct</th></tr>
-<table>
-<tr><th><code>Session</code></th><th><code>include/bbs_session.h</code></th><th>Per-connection state and I/O</th></tr>
-<table>
-<tr><th><code>BbsDb</code></th><th><code>include/bbs_db.h</code></th><th>SQLite wrapper with typed queries</th></tr>
-<table>
-<tr><th><code>Menu</code> / <code>MenuItem</code></th><th><code>include/bbs_menu.h</code></th><th>Parsed menu with ACS and flags</th></tr>
-<table>
-<tr><th><code>acs_allows()</code></th><th><code>src/acs.c</code></th><th>ACS expression evaluator</th></tr>
-<table>
-<tr><th><code>mci_expand()</code></th><th><code>src/mci.c</code></th><th>MCI template token expansion</th></tr>
-<table>
-<tr><th><code>handle_action()</code></th><th><code>src/session.c</code></th><th>Menu action dispatcher</th></tr>
-<table>
-<tr><th><code>handle_msg_command()</code></th><th><code>src/msg_cmds.c</code></th><th>M*/R* message commands</th></tr>
-<table>
-<tr><th><code>handle_file_command()</code></th><th><code>src/file_cmds.c</code></th><th>F* file commands</th></tr>
-<table>
-<tr><th><code>door_launch()</code></th><th><code>src/doors.c</code></th><th>Native and DOSBox door runner</th></tr>
-<table>
-<tr><th><code>bbs_plugin_desc_t</code></th><th><code>include/bbs_plugin_api.h</code></th><th>Plugin ABI descriptor</th></tr>
-<table>
-<tr><th><code>plank_store_t</code></th><th><code>include/plank/plank_store.h</code></th><th>PLANK object store</th></tr>
+<tr><td><code>BbsConfig</code></td><td><code>include/bbs_config.h</code></td><td>Runtime configuration struct</td></tr>
+<tr><td><code>Session</code></td><td><code>include/bbs_session.h</code></td><td>Per-connection state and I/O</td></tr>
+<tr><td><code>BbsDb</code></td><td><code>include/bbs_db.h</code></td><td>SQLite wrapper with typed queries</td></tr>
+<tr><td><code>Menu</code> / <code>MenuItem</code></td><td><code>include/bbs_menu.h</code></td><td>Parsed menu with ACS and flags</td></tr>
+<tr><td><code>acs_allows()</code></td><td><code>src/acs.c</code></td><td>ACS expression evaluator</td></tr>
+<tr><td><code>mci_expand()</code></td><td><code>src/mci.c</code></td><td>MCI template token expansion</td></tr>
+<tr><td><code>handle_action()</code></td><td><code>src/session.c</code></td><td>Menu action dispatcher</td></tr>
+<tr><td><code>handle_msg_command()</code></td><td><code>src/msg_cmds.c</code></td><td>M*/R* message commands</td></tr>
+<tr><td><code>handle_file_command()</code></td><td><code>src/file_cmds.c</code></td><td>F* file commands</td></tr>
+<tr><td><code>door_launch()</code></td><td><code>src/doors.c</code></td><td>Native and DOSBox door runner</td></tr>
+<tr><td><code>bbs_plugin_desc_t</code></td><td><code>include/bbs_plugin_api.h</code></td><td>Plugin ABI descriptor</td></tr>
+<tr><td><code>plank_store_t</code></td><td><code>include/plank/plank_store.h</code></td><td>PLANK object store</td></tr>
 </table>
 <h2>Source Map</h2>
 <h3>Core (<code>src/</code>)</h3>
 <table>
 <tr><th>File</th><th>Responsibility</th></tr>
-<table>
-<tr><th><code>main.c</code></th><th>Entry point, startup orchestration</th></tr>
-<table>
-<tr><th><code>config.c</code></th><th>Config file loading</th></tr>
-<table>
-<tr><th><code>db.c</code></th><th>All SQLite operations</th></tr>
-<table>
-<tr><th><code>session.c</code></th><th>Session thread, login, menus, <code>handle_action()</code></th></tr>
-<table>
-<tr><th><code>telnet.c</code></th><th>Telnet protocol (IAC, NAWS, echo)</th></tr>
-<table>
-<tr><th><code>net_listener.c</code></th><th>TCP accept loop, thread spawn</th></tr>
-<table>
-<tr><th><code>startup.c</code></th><th>Sanity checks, DB initialization</th></tr>
-<table>
-<tr><th><code>menu.c</code></th><th>Menu file parser and renderer</th></tr>
-<table>
-<tr><th><code>menu_template.c</code></th><th>ANSI template display with MCI</th></tr>
-<table>
-<tr><th><code>mci.c</code></th><th>MCI token expansion</th></tr>
-<table>
-<tr><th><code>acs.c</code></th><th>ACS expression parser/evaluator</th></tr>
-<table>
-<tr><th><code>msg_cmds.c</code></th><th>Message area commands</th></tr>
-<table>
-<tr><th><code>file_cmds.c</code></th><th>File area commands</th></tr>
-<table>
-<tr><th><code>doors.c</code></th><th>Door launch (native + DOSBox)</th></tr>
-<table>
-<tr><th><code>chat.c</code></th><th>Split chat, teleconference, paging</th></tr>
-<table>
-<tr><th><code>qwk.c</code></th><th>QWK packet generation/import</th></tr>
-<table>
-<tr><th><code>fido_netmail.c</code></th><th>FidoNet netmail export</th></tr>
-<table>
-<tr><th><code>wfc.c</code></th><th>Who&#x27;s On Full Color console</th></tr>
-<table>
-<tr><th><code>scheduler.c</code></th><th>Event scheduler thread</th></tr>
-<table>
-<tr><th><code>maint.c</code></th><th>In-BBS maintenance menu actions</th></tr>
-<table>
-<tr><th><code>hash.c</code></th><th>Password hashing (PBKDF2/Argon2)</th></tr>
-<table>
-<tr><th><code>log.c</code></th><th>File logging</th></tr>
-<table>
-<tr><th><code>util.c</code></th><th>String/path/file helpers</th></tr>
-<table>
-<tr><th><code>plugin_loader.c</code></th><th>dlopen plugin loading</th></tr>
-<table>
-<tr><th><code>plugin_registry.c</code></th><th>Loaded plugin registry</th></tr>
-<table>
-<tr><th><code>plugin_host_api.c</code></th><th>Host API implementation for plugins</th></tr>
+<tr><td><code>main.c</code></td><td>Entry point, startup orchestration</td></tr>
+<tr><td><code>config.c</code></td><td>Config file loading</td></tr>
+<tr><td><code>db.c</code></td><td>All SQLite operations</td></tr>
+<tr><td><code>session.c</code></td><td>Session thread, login, menus, <code>handle_action()</code></td></tr>
+<tr><td><code>telnet.c</code></td><td>Telnet protocol (IAC, NAWS, echo)</td></tr>
+<tr><td><code>net_listener.c</code></td><td>TCP accept loop, thread spawn</td></tr>
+<tr><td><code>startup.c</code></td><td>Sanity checks, DB initialization</td></tr>
+<tr><td><code>menu.c</code></td><td>Menu file parser and renderer</td></tr>
+<tr><td><code>menu_template.c</code></td><td>ANSI template display with MCI</td></tr>
+<tr><td><code>mci.c</code></td><td>MCI token expansion</td></tr>
+<tr><td><code>acs.c</code></td><td>ACS expression parser/evaluator</td></tr>
+<tr><td><code>msg_cmds.c</code></td><td>Message area commands</td></tr>
+<tr><td><code>file_cmds.c</code></td><td>File area commands</td></tr>
+<tr><td><code>doors.c</code></td><td>Door launch (native + DOSBox)</td></tr>
+<tr><td><code>chat.c</code></td><td>Split chat, teleconference, paging</td></tr>
+<tr><td><code>qwk.c</code></td><td>QWK packet generation/import</td></tr>
+<tr><td><code>fido_netmail.c</code></td><td>FidoNet netmail export</td></tr>
+<tr><td><code>wfc.c</code></td><td>Who&#x27;s On Full Color console</td></tr>
+<tr><td><code>scheduler.c</code></td><td>Event scheduler thread</td></tr>
+<tr><td><code>maint.c</code></td><td>In-BBS maintenance menu actions</td></tr>
+<tr><td><code>hash.c</code></td><td>Password hashing (PBKDF2/Argon2)</td></tr>
+<tr><td><code>log.c</code></td><td>File logging</td></tr>
+<tr><td><code>util.c</code></td><td>String/path/file helpers</td></tr>
+<tr><td><code>plugin_loader.c</code></td><td>dlopen plugin loading</td></tr>
+<tr><td><code>plugin_registry.c</code></td><td>Loaded plugin registry</td></tr>
+<tr><td><code>plugin_host_api.c</code></td><td>Host API implementation for plugins</td></tr>
 </table>
 <h3>Tools (<code>src/tools/</code>)</h3>
 <p>Standalone binaries sharing <code>db.c</code>, <code>config.c</code>, etc. See <a href="cli-tools.html">CLI Tools</a>.</p>
 <h3>PLANK (<code>src/plank/</code>)</h3>
 <table>
 <tr><th>File</th><th>Responsibility</th></tr>
-<table>
-<tr><th><code>plank_core.c</code></th><th>Protocol constants, init</th></tr>
-<table>
-<tr><th><code>plank_cbor.c</code></th><th>CBOR encode/decode</th></tr>
-<table>
-<tr><th><code>plank_crypto.c</code></th><th>Ed25519/X25519 signing</th></tr>
-<table>
-<tr><th><code>plank_object.c</code></th><th>Object envelope handling</th></tr>
-<table>
-<tr><th><code>plank_store.c</code></th><th>SQLite object persistence</th></tr>
-<table>
-<tr><th><code>plank_bundle.c</code></th><th>Bundle pack/unpack</th></tr>
-<table>
-<tr><th><code>plank_link.c</code></th><th>Link session protocol</th></tr>
-<table>
-<tr><th><code>plank_route.c</code></th><th>Message routing</th></tr>
-<table>
-<tr><th><code>plank_policy.c</code></th><th>Moderation policy enforcement</th></tr>
+<tr><td><code>plank_core.c</code></td><td>Protocol constants, init</td></tr>
+<tr><td><code>plank_cbor.c</code></td><td>CBOR encode/decode</td></tr>
+<tr><td><code>plank_crypto.c</code></td><td>Ed25519/X25519 signing</td></tr>
+<tr><td><code>plank_object.c</code></td><td>Object envelope handling</td></tr>
+<tr><td><code>plank_store.c</code></td><td>SQLite object persistence</td></tr>
+<tr><td><code>plank_bundle.c</code></td><td>Bundle pack/unpack</td></tr>
+<tr><td><code>plank_link.c</code></td><td>Link session protocol</td></tr>
+<tr><td><code>plank_route.c</code></td><td>Message routing</td></tr>
+<tr><td><code>plank_policy.c</code></td><td>Moderation policy enforcement</td></tr>
 </table>
 <h3>Buccaneer (<code>src/buccaneer/</code>)</h3>
-<p>Lexer, parser, semantic analyzer, bytecode emitter, VM, host bridge, and <code>bucc</code> compiler toolchain. See <a href="buccaneer.html">Buccaneer</a>.</p>
+<p>Lexer, parser, semantic analyzer, bytecode emitter, runtime, host bridge, and <code>bucc</code> compiler toolchain. See <a href="buccaneer.html">Buccaneer</a>.</p>
 <h2>Data Flow: Menu Selection</h2>
 <ol>
 <li>User presses a key on the main menu</li>
@@ -255,24 +206,15 @@ graph TD
 <h2>Directory Structure Rationale</h2>
 <table>
 <tr><th>Directory</th><th>Why</th></tr>
-<table>
-<tr><th><code>include/</code></th><th>Public headers consumed by core, tools, plugins</th></tr>
-<table>
-<tr><th><code>src/</code></th><th>Implementation; tools and subsystems in subdirs</th></tr>
-<table>
-<tr><th><code>sql/</code></th><th>Schema as source of truth for DB layout</th></tr>
-<table>
-<tr><th><code>menus/</code></th><th>Operator-editable menu definitions separate from code</th></tr>
-<table>
-<tr><th><code>art/</code></th><th>Display art editable without recompile</th></tr>
-<table>
-<tr><th><code>conf/</code></th><th>Default config shipped with the project</th></tr>
-<table>
-<tr><th><code>plugins/</code></th><th>Sample plugins with isolated build targets</th></tr>
-<table>
-<tr><th><code>doors/</code></th><th>Door programs and manifests</th></tr>
-<table>
-<tr><th><code>tests/</code></th><th>ctest unit tests and expect integration tests</th></tr>
+<tr><td><code>include/</code></td><td>Public headers consumed by core, tools, plugins</td></tr>
+<tr><td><code>src/</code></td><td>Implementation; tools and subsystems in subdirs</td></tr>
+<tr><td><code>sql/</code></td><td>Schema as source of truth for DB layout</td></tr>
+<tr><td><code>menus/</code></td><td>Operator-editable menu definitions separate from code</td></tr>
+<tr><td><code>art/</code></td><td>Display art editable without recompile</td></tr>
+<tr><td><code>conf/</code></td><td>Default config shipped with the project</td></tr>
+<tr><td><code>plugins/</code></td><td>Sample plugins with isolated build targets</td></tr>
+<tr><td><code>doors/</code></td><td>Door programs and manifests</td></tr>
+<tr><td><code>tests/</code></td><td>ctest unit tests and expect integration tests</td></tr>
 </table>
 <h2>Thread Safety</h2>
 <ul>
@@ -286,7 +228,7 @@ graph TD
 <ol>
 <li><strong>Menu actions</strong> — Add cases to <code>handle_action()</code> or invoke via existing command handlers</li>
 <li><strong>Plugins</strong> — Shared objects exporting <code>bbs_plugin_query()</code></li>
-<li><strong>Buccaneer scripts</strong> — Compiled <code>.bucc</code> modules run in VM with host bridge</li>
+<li><strong>Buccaneer scripts</strong> — Compiled <code>.bucc</code> modules run in the in-process runtime with host bridge</li>
 <li><strong>Scheduler events</strong> — DB-driven commands run by <code>scheduler.c</code></li>
 <li><strong>PLANK objects</strong> — New object classes via plank subsystem</li>
 </ol>

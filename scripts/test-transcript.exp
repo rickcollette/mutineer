@@ -7,7 +7,8 @@ append transcript $expect_out(buffer)
 send "Y\r"
 expect -re {Handle:}
 append transcript $expect_out(buffer)
-set fd [open /tmp/transcript.ansi w]
+set tmpdir [expr {[info exists env(TMPDIR)] && $env(TMPDIR) ne "" ? $env(TMPDIR) : "/tmp"}]
+set fd [open [file join $tmpdir transcript.[pid].ansi] w]
 puts -nonewline $fd $transcript
 close $fd
 puts "len=[string length $transcript]"

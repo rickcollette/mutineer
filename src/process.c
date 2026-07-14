@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/socket.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -153,10 +154,20 @@ bool bbs_argv_parse_template(const char* command, const char* filepath,
   return true;
 }
 
-bool bbs_exec_argv(char** argv, const char* label, const char* workdir,
-                   int stdin_fd, int stdout_fd, int stderr_fd,
-                   int timeout_sec, BbsProcessResult* result,
-                   char* errbuf, size_t errcap) {
+static bool cancel_fd_closed(int fd) {
+  if (fd < 0) return false;
+  char ch;
+  ssize_t n = recv(fd, &ch, 1, MSG_PEEK | MSG_DONTWAIT);
+  if (n == 0) return true;
+  if (n < 0 && errno != EAGAIN && errno != EWOULDBLOCK && errno != EINTR) return true;
+  return false;
+}
+
+bool bbs_exec_argv_cancel(char** argv, const char* label, const char* workdir,
+                          int stdin_fd, int stdout_fd, int stderr_fd,
+                          int timeout_sec, int cancel_fd,
+                          BbsProcessResult* result,
+                          char* errbuf, size_t errcap) {
   if (result) memset(result, 0, sizeof(*result));
   if (!argv || !argv[0]) {
     if (errbuf) snprintf(errbuf, errcap, "empty argv");
@@ -202,6 +213,18 @@ bool bbs_exec_argv(char** argv, const char* label, const char* workdir,
       }
       break;
     }
+    if (cancel_fd_closed(cancel_fd)) {
+      if (result) result->cancelled = true;
+      log_warn("%s cancelled by disconnect; terminating process group %d",
+               label ? label : argv[0], (int)pid);
+      kill(-pid, SIGTERM);
+      sleep(1);
+      if (waitpid(pid, &status, WNOHANG) != pid) {
+        kill(-pid, SIGKILL);
+        while (waitpid(pid, &status, 0) < 0 && errno == EINTR) {}
+      }
+      break;
+    }
     struct timespec delay;
     delay.tv_sec = 0;
     delay.tv_nsec = 100000000;
@@ -233,4 +256,12 @@ bool bbs_exec_argv(char** argv, const char* label, const char* workdir,
 
   log_warn("%s terminated abnormally", label ? label : argv[0]);
   return false;
+}
+
+bool bbs_exec_argv(char** argv, const char* label, const char* workdir,
+                   int stdin_fd, int stdout_fd, int stderr_fd,
+                   int timeout_sec, BbsProcessResult* result,
+                   char* errbuf, size_t errcap) {
+  return bbs_exec_argv_cancel(argv, label, workdir, stdin_fd, stdout_fd, stderr_fd,
+                              timeout_sec, -1, result, errbuf, errcap);
 }

@@ -129,7 +129,7 @@ static int test_filepack_logic(void) {
     
     /* Create a file area pointing to a temp directory */
     char tmpdir[256];
-    snprintf(tmpdir, sizeof(tmpdir), "/tmp/test_filepack_%d", (int)getpid());
+    snprintf(tmpdir, sizeof(tmpdir), "%s/test_filepack_%d", getenv("TMPDIR") ? getenv("TMPDIR") : "/tmp", (int)getpid());
     mkdir(tmpdir, 0755);
     
     TEST_ASSERT(db_file_area_seed(db, "Test Files", tmpdir), "failed to seed file area");
@@ -291,7 +291,7 @@ static int test_fido_netmail_export(void) {
     TEST_ASSERT(db != NULL, "failed to setup test db");
 
     char tmpdir[256];
-    snprintf(tmpdir, sizeof(tmpdir), "/tmp/test_netmail_export_%d", (int)getpid());
+    snprintf(tmpdir, sizeof(tmpdir), "%s/test_netmail_export_%d", getenv("TMPDIR") ? getenv("TMPDIR") : "/tmp", (int)getpid());
     mkdir(tmpdir, 0755);
 
     DbFidoNetmail nm;

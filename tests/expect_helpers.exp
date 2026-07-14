@@ -24,7 +24,9 @@ set current_spawn_id ""
 
 # Safely disconnect from BBS - handles already closed connections
 proc safe_disconnect {} {
-    global spawn_id current_spawn_id
+    global spawn_id current_spawn_id timeout
+    set old_timeout $timeout
+    set timeout 5
     
     # Try to quit cleanly first
     catch {
@@ -33,7 +35,10 @@ proc safe_disconnect {} {
             eof { }
             "Selection:" {
                 send "Q\r"
-                expect eof
+                expect {
+                    eof { }
+                    timeout { }
+                }
             }
             timeout { }
         }
@@ -42,6 +47,7 @@ proc safe_disconnect {} {
     catch { close }
     catch { wait }
     set current_spawn_id ""
+    set timeout $old_timeout
 }
 
 # Connect to the BBS via telnet

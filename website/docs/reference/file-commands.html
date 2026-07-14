@@ -19,44 +19,25 @@
 <h2>Command Table</h2>
 <table>
 <tr><th>Cmd</th><th>Function</th><th>Description</th></tr>
-<table>
-<tr><th><code>FA</code></th><th><code>cmd_file_area_change</code></th><th>Change current file area</th></tr>
-<table>
-<tr><th><code>FB</code></th><th><code>cmd_file_batch_download</code></th><th>Download all files in batch queue</th></tr>
-<table>
-<tr><th><code>FC</code></th><th><code>cmd_file_batch_clear</code></th><th>Clear batch download queue</th></tr>
-<table>
-<tr><th><code>FD</code></th><th><code>cmd_file_download</code></th><th>Download file by number</th></tr>
-<table>
-<tr><th><code>FE</code></th><th><code>cmd_file_extended</code></th><th>Show extended description</th></tr>
-<table>
-<tr><th><code>FF</code></th><th><code>cmd_file_find</code></th><th>Find files by name/description</th></tr>
-<table>
-<tr><th><code>FG</code></th><th><code>cmd_file_area_list</code></th><th>List accessible file areas</th></tr>
-<table>
-<tr><th><code>FJ</code></th><th><code>cmd_file_batch_upload</code></th><th>Batch upload multiple files</th></tr>
-<table>
-<tr><th><code>FK</code></th><th><code>cmd_file_batch_remove</code></th><th>Remove entry from batch queue</th></tr>
-<table>
-<tr><th><code>FL</code></th><th><code>cmd_file_list</code></th><th>List files in current area</th></tr>
-<table>
-<tr><th><code>FN</code></th><th><code>cmd_file_new_scan</code></th><th>List files uploaded since scan date</th></tr>
-<table>
-<tr><th><code>FP</code></th><th><code>cmd_file_set_scan_date</code></th><th>Set new-file scan cutoff date</th></tr>
-<table>
-<tr><th><code>FQ</code></th><th><code>cmd_file_archive_extract</code></th><th>Extract archive to temp directory</th></tr>
-<table>
-<tr><th><code>FR</code></th><th><code>cmd_file_raw_dir</code></th><th>Raw directory listing (expert)</th></tr>
-<table>
-<tr><th><code>FT</code></th><th><code>cmd_file_archive_test</code></th><th>Test archive integrity</th></tr>
-<table>
-<tr><th><code>FU</code></th><th><code>cmd_file_upload</code></th><th>Upload file to current area</th></tr>
-<table>
-<tr><th><code>FV</code></th><th><code>cmd_file_view_archive</code></th><th>View archive contents listing</th></tr>
-<table>
-<tr><th><code>FX</code></th><th><code>cmd_file_expert_toggle</code></th><th>Toggle expert mode display</th></tr>
-<table>
-<tr><th><code>FZ</code></th><th><code>cmd_file_zippy_search</code></th><th>Fast wildcard filename search</th></tr>
+<tr><td><code>FA</code></td><td><code>cmd_file_area_change</code></td><td>Change current file area</td></tr>
+<tr><td><code>FB</code></td><td><code>cmd_file_batch_download</code></td><td>Download all files in batch queue</td></tr>
+<tr><td><code>FC</code></td><td><code>cmd_file_batch_clear</code></td><td>Clear batch download queue</td></tr>
+<tr><td><code>FD</code></td><td><code>cmd_file_download</code></td><td>Download file by number</td></tr>
+<tr><td><code>FE</code></td><td><code>cmd_file_extended</code></td><td>Show extended description</td></tr>
+<tr><td><code>FF</code></td><td><code>cmd_file_find</code></td><td>Find files by name/description</td></tr>
+<tr><td><code>FG</code></td><td><code>cmd_file_area_list</code></td><td>List accessible file areas</td></tr>
+<tr><td><code>FJ</code></td><td><code>cmd_file_batch_upload</code></td><td>Batch upload multiple files</td></tr>
+<tr><td><code>FK</code></td><td><code>cmd_file_batch_remove</code></td><td>Remove entry from batch queue</td></tr>
+<tr><td><code>FL</code></td><td><code>cmd_file_list</code></td><td>List files in current area</td></tr>
+<tr><td><code>FN</code></td><td><code>cmd_file_new_scan</code></td><td>List files uploaded since scan date</td></tr>
+<tr><td><code>FP</code></td><td><code>cmd_file_set_scan_date</code></td><td>Set new-file scan cutoff date</td></tr>
+<tr><td><code>FQ</code></td><td><code>cmd_file_archive_extract</code></td><td>Extract archive to temp directory</td></tr>
+<tr><td><code>FR</code></td><td><code>cmd_file_raw_dir</code></td><td>Raw directory listing (expert)</td></tr>
+<tr><td><code>FT</code></td><td><code>cmd_file_archive_test</code></td><td>Test archive integrity</td></tr>
+<tr><td><code>FU</code></td><td><code>cmd_file_upload</code></td><td>Upload file to current area</td></tr>
+<tr><td><code>FV</code></td><td><code>cmd_file_view_archive</code></td><td>View archive contents listing</td></tr>
+<tr><td><code>FX</code></td><td><code>cmd_file_expert_toggle</code></td><td>Toggle expert mode display</td></tr>
+<tr><td><code>FZ</code></td><td><code>cmd_file_zippy_search</code></td><td>Fast wildcard filename search</td></tr>
 </table>
 <h2>Area Commands</h2>
 <h3>FA — Area Change</h3>
@@ -106,14 +87,10 @@
 <p>Session maintains in-memory batch queue (max size defined in session struct).</p>
 <table>
 <tr><th>Cmd</th><th>Action</th></tr>
-<table>
-<tr><th>Queue</th><th>Select file number during FL or at prompt</th></tr>
-<table>
-<tr><th><code>FK</code></th><th>Remove specific queue entry by index</th></tr>
-<table>
-<tr><th><code>FC</code></th><th>Clear entire queue</th></tr>
-<table>
-<tr><th><code>FB</code></th><th>Download all queued</th></tr>
+<tr><td>Queue</td><td>Select file number during FL or at prompt</td></tr>
+<tr><td><code>FK</code></td><td>Remove specific queue entry by index</td></tr>
+<tr><td><code>FC</code></td><td>Clear entire queue</td></tr>
+<tr><td><code>FB</code></td><td>Download all queued</td></tr>
 </table>
 <p>Menu action <code>batchrun</code> triggers batch download from main menu.</p>
 <h2>Search Commands</h2>
@@ -122,7 +99,7 @@
 <h3>FZ — Zippy Search</h3>
 <p>Wildcard search (supports <code>*</code> and <code>?</code> patterns). Faster than FF for pattern matching.</p>
 <h2>Archive Commands</h2>
-<p>Requires external tools (zip, tar, unrar, 7z) on PATH.</p>
+<p>Archive commands use Mutineer&#x27;s libarchive-backed helpers; sysops do not need external archive command-line tools for these operations.</p>
 <h3>FV — View Archive</h3>
 <p>Lists contents of archive file without extracting.</p>
 <h3>FT — Archive Test</h3>

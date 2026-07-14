@@ -30,7 +30,10 @@ static int contains(const char* haystack, const char* needle) {
 }
 
 static int test_config_roundtrip(void) {
-  char path[] = "/tmp/mutineer-cfg-XXXXXX";
+  const char* tmpdir = getenv("TMPDIR");
+  if (!tmpdir || !tmpdir[0]) tmpdir = "/tmp";
+  char path[256];
+  snprintf(path, sizeof(path), "%s/mutineer-cfg-XXXXXX", tmpdir);
   int fd = mkstemp(path);
   CHECK(fd >= 0, "mkstemp config");
   FILE* f = fdopen(fd, "w");
@@ -138,8 +141,10 @@ int main(void) {
         !contains(maint, "cp '"),
         "mutineer-maint backup has no shell fallback");
 
-  CHECK(contains(session, "FILE_FLAG_NOTVAL") &&
-        contains(session, "cmd_file_download(s, idbuf)") &&
+  CHECK(contains(session, "handle_file_command(s, \"FG\", NULL)") &&
+        contains(session, "handle_file_command(s, \"FA\", NULL)") &&
+        contains(session, "handle_file_command(s, \"FL\", NULL)") &&
+        contains(filecmds, "file_download_allowed") &&
         contains(filecmds, "FILE_FLAG_NOTVAL"),
         "interactive file validation visibility and downloads use hardened policy");
 
@@ -155,9 +160,11 @@ int main(void) {
         contains(cmake, "sanitizer"),
         "Docker and sanitizer/load coverage are registered");
 
-  CHECK(contains(matrix, "| P3 | 100% | Complete | Load/soak/sanitizer coverage") &&
-        contains(matrix, "tests/docker_quickstart_smoke.sh"),
-        "feature matrix marks this batch complete");
+  CHECK(contains(matrix, "| P0 | 100% | Complete | PLANK deadletter storage") &&
+        contains(matrix, "| P1 | 100% | Complete | `SHARED.CAS`") &&
+        contains(matrix, "| P1 | 100% | Complete | Release/update tooling") &&
+        contains(matrix, "Validation Snapshot"),
+        "feature matrix marks current reviewed batch complete");
 
   free(cmake); free(session); free(mainc); free(wfc); free(sched); free(maint);
   free(config); free(filecmds); free(coved); free(docs); free(conf); free(matrix);

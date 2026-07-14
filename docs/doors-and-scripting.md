@@ -9,7 +9,7 @@ Mutineer BBS supports four extension mechanisms for interactive programs: native
 | Feature | Native Door | DOSBox Door | Buccaneer Script | Plugin (.so) |
 |---------|-------------|-------------|------------------|--------------|
 | Language | Any executable | DOS (16/32-bit) | Buccaneer (.bucc) | C |
-| Isolation | fork/exec | DOSBox VM + runtime dir | In-process VM | In-process dlopen |
+| Isolation | fork/exec | DOSBox emulator + runtime dir | In-process interpreted runtime | In-process dlopen |
 | Dropfiles | Yes | Yes | Via host bridge | Via host API |
 | Serial I/O | Socket inherit | Nullmodem socket | Terminal I/O | Terminal I/O |
 | Hot reload | No | No | Recompile | Reload .so |
@@ -96,7 +96,7 @@ Buccaneer is Mutineer's interpreted language for BBS addons, games, and extensio
 | `bucc` | Compiler (.bucc → bytecode module) |
 | `bucc-linter` | Static analysis |
 | `bucc-formatter` | Source formatting |
-| `bucc-simulator` | Standalone VM testing |
+| `bucc-simulator` | Standalone Buccaneer runtime testing |
 
 Build with the top-level CMake project. The standalone `src/buccaneer/Makefile` remains useful for focused language work.
 
@@ -111,13 +111,6 @@ Build with the top-level CMake project. The standalone `src/buccaneer/Makefile` 
 ### BBS Launch
 
 Door records can use `runner=bucc`. The door's `manifest` field is treated as the Buccaneer door manifest path, and the BBS binds session, terminal, user, and BBS host APIs before running the package. Manifest capabilities are enforced at host dispatch time.
-
-Known remaining Buccaneer runtime work:
-
-- `DOOR.CHAIN` sets wrong VM status (should be `VM_CHAIN`)
-- `DOOR.EXIT` discards exit code
-- `OP_DISPATCH_CALL` emits incorrect proc IDs
-- Several VM edge cases (array allocation, stack consistency)
 
 Use `bucc-simulator` during development, then register the package as a `runner=bucc` door for BBS launch testing.
 

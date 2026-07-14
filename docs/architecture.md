@@ -187,7 +187,7 @@ Standalone binaries sharing `db.c`, `config.c`, etc. See [CLI Tools](cli-tools.m
 
 ### Buccaneer (`src/buccaneer/`)
 
-Lexer, parser, semantic analyzer, bytecode emitter, VM, host bridge, and `bucc` compiler toolchain. See [Buccaneer](buccaneer.md).
+Lexer, parser, semantic analyzer, bytecode emitter, runtime, host bridge, and `bucc` compiler toolchain. See [Buccaneer](buccaneer.md).
 
 ## Data Flow: Menu Selection
 
@@ -237,7 +237,7 @@ Lexer, parser, semantic analyzer, bytecode emitter, VM, host bridge, and `bucc` 
 
 1. **Menu actions** — Add cases to `handle_action()` or invoke via existing command handlers
 2. **Plugins** — Shared objects exporting `bbs_plugin_query()`
-3. **Buccaneer scripts** — Compiled `.bucc` modules run in VM with host bridge
+3. **Buccaneer scripts** — Compiled `.bucc` modules run in the in-process runtime with host bridge
 4. **Scheduler events** — DB-driven commands run by `scheduler.c`
 5. **PLANK objects** — New object classes via plank subsystem
 

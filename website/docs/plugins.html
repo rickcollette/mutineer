@@ -50,10 +50,8 @@ cmake --build build --target plugins
 <p>Stable ABI defined in <code>include/bbs_plugin_api.h</code>:</p>
 <table>
 <tr><th>Constant</th><th>Value</th></tr>
-<table>
-<tr><th><code>BBS_PLUGIN_ABI_VERSION</code></th><th><code>0x00010000</code> (v1.0)</th></tr>
-<table>
-<tr><th><code>BBS_PLUGIN_MAGIC</code></th><th><code>0x4250534F</code> (&#x27;BPSO&#x27;)</th></tr>
+<tr><td><code>BBS_PLUGIN_ABI_VERSION</code></td><td><code>0x00010000</code> (v1.0)</td></tr>
+<tr><td><code>BBS_PLUGIN_MAGIC</code></td><td><code>0x4250534F</code> (&#x27;BPSO&#x27;)</td></tr>
 </table>
 <h3>Required Export</h3>
 <p>Every plugin must export:</p>
@@ -85,12 +83,9 @@ typedef struct bbs_plugin_desc {
 <h3>Capabilities</h3>
 <table>
 <tr><th>Flag</th><th>Meaning</th></tr>
-<table>
-<tr><th><code>BBS_CAP_INTERACTIVE</code></th><th>Interactive session plugin</th></tr>
-<table>
-<tr><th><code>BBS_CAP_COMMANDS</code></th><th>Registers slash commands</th></tr>
-<table>
-<tr><th><code>BBS_CAP_BACKGROUND</code></th><th>Background task capable</th></tr>
+<tr><td><code>BBS_CAP_INTERACTIVE</code></td><td>Interactive session plugin</td></tr>
+<tr><td><code>BBS_CAP_COMMANDS</code></td><td>Registers slash commands</td></tr>
+<tr><td><code>BBS_CAP_BACKGROUND</code></td><td>Background task capable</td></tr>
 </table>
 <h2>Instance Vtable</h2>
 <p>Per-session plugin instance:</p>
@@ -113,36 +108,25 @@ void (*log)(bbs_log_level_t lvl, const char* subsystem, const char* msg);
 <h3>Terminal I/O (<code>bbs_io_t</code>)</h3>
 <table>
 <tr><th>Method</th><th>Purpose</th></tr>
-<table>
-<tr><th><code>write()</code></th><th>Raw write to terminal</th></tr>
-<table>
-<tr><th><code>printf()</code></th><th>Formatted output</th></tr>
-<table>
-<tr><th><code>readline()</code></th><th>Read line with echo control</th></tr>
-<table>
-<tr><th><code>cls()</code></th><th>Clear screen</th></tr>
+<tr><td><code>write()</code></td><td>Raw write to terminal</td></tr>
+<tr><td><code>printf()</code></td><td>Formatted output</td></tr>
+<tr><td><code>readline()</code></td><td>Read line with echo control</td></tr>
+<tr><td><code>cls()</code></td><td>Clear screen</td></tr>
 </table>
 <h3>Scheduler (<code>bbs_sched_t</code>)</h3>
 <table>
 <tr><th>Method</th><th>Purpose</th></tr>
-<table>
-<tr><th><code>enqueue()</code></th><th>Run task on worker thread</th></tr>
-<table>
-<tr><th><code>after_ms()</code></th><th>Delayed task</th></tr>
-<table>
-<tr><th><code>cancel()</code></th><th>Cancel scheduled task</th></tr>
+<tr><td><code>enqueue()</code></td><td>Run task on worker thread</td></tr>
+<tr><td><code>after_ms()</code></td><td>Delayed task</td></tr>
+<tr><td><code>cancel()</code></td><td>Cancel scheduled task</td></tr>
 </table>
 <h3>Session Info</h3>
 <table>
 <tr><th>Method</th><th>Returns</th></tr>
-<table>
-<tr><th><code>session_username()</code></th><th>User handle</th></tr>
-<table>
-<tr><th><code>session_user_id()</code></th><th>Numeric user ID</th></tr>
-<table>
-<tr><th><code>session_user_flags()</code></th><th>AR flags</th></tr>
-<table>
-<tr><th><code>session_remote_addr()</code></th><th>Client IP</th></tr>
+<tr><td><code>session_username()</code></td><td>User handle</td></tr>
+<tr><td><code>session_user_id()</code></td><td>Numeric user ID</td></tr>
+<tr><td><code>session_user_flags()</code></td><td>AR flags</td></tr>
+<tr><td><code>session_remote_addr()</code></td><td>Client IP</td></tr>
 </table>
 <h3>Key-Value Store</h3>
 <pre><code class="c">
@@ -158,14 +142,10 @@ bbs_rc_t (*plugin_data_dir)(const char* plugin_id, char* out, size_t out_sz);
 <p>Global and per-session events:</p>
 <table>
 <tr><th>Event</th><th>Type</th></tr>
-<table>
-<tr><th>Login</th><th><code>BBS_EVT_LOGIN</code></th></tr>
-<table>
-<tr><th>Logout</th><th><code>BBS_EVT_LOGOUT</code></th></tr>
-<table>
-<tr><th>Tick</th><th><code>BBS_EVT_TICK_1S</code></th></tr>
-<table>
-<tr><th>Shutdown</th><th><code>BBS_EVT_SHUTDOWN</code></th></tr>
+<tr><td>Login</td><td><code>BBS_EVT_LOGIN</code></td></tr>
+<tr><td>Logout</td><td><code>BBS_EVT_LOGOUT</code></td></tr>
+<tr><td>Tick</td><td><code>BBS_EVT_TICK_1S</code></td></tr>
+<tr><td>Shutdown</td><td><code>BBS_EVT_SHUTDOWN</code></td></tr>
 </table>
 <h2>Building a Plugin</h2>
 <p>CMake helper in root <code>CMakeLists.txt</code>:</p>
@@ -209,20 +189,13 @@ gcc -shared -fPIC -DBBS_PLUGIN_IMPL=1 \
 <h2>Return Codes</h2>
 <table>
 <tr><th>Code</th><th>Meaning</th></tr>
-<table>
-<tr><th><code>BBS_OK</code></th><th>Success</th></tr>
-<table>
-<tr><th><code>BBS_EINVAL</code></th><th>Invalid argument</th></tr>
-<table>
-<tr><th><code>BBS_EUNSUPPORTED</code></th><th>Unsupported operation</th></tr>
-<table>
-<tr><th><code>BBS_EIO</code></th><th>I/O error (disconnect)</th></tr>
-<table>
-<tr><th><code>BBS_EPERM</code></th><th>Permission denied</th></tr>
-<table>
-<tr><th><code>BBS_EINTERNAL</code></th><th>Internal error</th></tr>
-<table>
-<tr><th><code>BBS_ETIMEOUT</code></th><th>Timeout</th></tr>
+<tr><td><code>BBS_OK</code></td><td>Success</td></tr>
+<tr><td><code>BBS_EINVAL</code></td><td>Invalid argument</td></tr>
+<tr><td><code>BBS_EUNSUPPORTED</code></td><td>Unsupported operation</td></tr>
+<tr><td><code>BBS_EIO</code></td><td>I/O error (disconnect)</td></tr>
+<tr><td><code>BBS_EPERM</code></td><td>Permission denied</td></tr>
+<tr><td><code>BBS_EINTERNAL</code></td><td>Internal error</td></tr>
+<tr><td><code>BBS_ETIMEOUT</code></td><td>Timeout</td></tr>
 </table>
 <h2>Testing</h2>
 <pre><code class="bash">
@@ -233,16 +206,11 @@ ctest --test-dir build -R plugin
 <h2>Comparison</h2>
 <table>
 <tr><th>Aspect</th><th>Plugin</th><th>Buccaneer</th><th>Native Door</th></tr>
-<table>
-<tr><th>Language</th><th>C</th><th>Buccaneer script</th><th>Any</th></tr>
-<table>
-<tr><th>Process isolation</th><th>No (in-process)</th><th>No (VM)</th><th>Yes (fork)</th></tr>
-<table>
-<tr><th>ABI stability</th><th>Published v1.0</th><th>Internal</th><th>N/A</th></tr>
-<table>
-<tr><th>Hot reload</th><th>Replace .so + restart</th><th>Recompile</th><th>Replace binary</th></tr>
-<table>
-<tr><th>Best for</th><th>Rich native features</th><th>Scripts (WIP)</th><th>Legacy DOS/Linux doors</th></tr>
+<tr><td>Language</td><td>C</td><td>Buccaneer script</td><td>Any</td></tr>
+<tr><td>Process isolation</td><td>No (in-process)</td><td>No (in-process runtime)</td><td>Yes (fork)</td></tr>
+<tr><td>ABI stability</td><td>Published v1.0</td><td>Internal</td><td>N/A</td></tr>
+<tr><td>Hot reload</td><td>Replace .so + restart</td><td>Recompile</td><td>Replace binary</td></tr>
+<tr><td>Best for</td><td>Rich native features</td><td>Interpreted addons/games/doors</td><td>Legacy DOS/Linux doors</td></tr>
 </table>
 <h2>Security Notes</h2>
 <ul>

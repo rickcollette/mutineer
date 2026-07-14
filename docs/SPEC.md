@@ -2,7 +2,7 @@
 
 ## 1. Purpose
 
-Build a **Mutineer-style** BBS experience (ANSI + menu-driven) using **telnet sockets** instead of modems, with **multiuser sessions as the default**. Shipping features now include WFC console, event scheduler, ACS/MCI, message/file bases, chat, doors, and protocol stubs.
+Build a **Mutineer-style** BBS experience (ANSI + menu-driven) using **telnet sockets** instead of modems, with **multiuser sessions as the default**. Shipping features now include WFC console, event scheduler, ACS/MCI, message/file bases, chat, native/DOSBox/Buccaneer doors, and supervised file-transfer protocols.
 
 This project is a **clean-room** implementation: it recreates the *experience* (menus, message bases, file bases, doors) without copying proprietary assets or source.
 
@@ -16,12 +16,11 @@ This project is a **clean-room** implementation: it recreates the *experience* (
 - Telnet WFC console for node control.
 - Event scheduler backed by `events` table.
 
-## 3. Non-goals (for the skeleton)
+## 3. Non-goals
 
 - Full ANSI art pack / exact Mutineer file formats.
 - Full door dropfile compatibility with legacy BBSes.
 - SSH/TLS natively (use a TLS terminator first).
-- Full message base / file base features beyond basic stubs.
 
 ## 4. Architecture
 

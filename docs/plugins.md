@@ -249,10 +249,10 @@ ctest --test-dir build -R plugin
 | Aspect | Plugin | Buccaneer | Native Door |
 |--------|--------|-----------|-------------|
 | Language | C | Buccaneer script | Any |
-| Process isolation | No (in-process) | No (VM) | Yes (fork) |
+| Process isolation | No (in-process) | No (in-process runtime) | Yes (fork) |
 | ABI stability | Published v1.0 | Internal | N/A |
 | Hot reload | Replace .so + restart | Recompile | Replace binary |
-| Best for | Rich native features | Scripts (WIP) | Legacy DOS/Linux doors |
+| Best for | Rich native features | Interpreted addons/games/doors | Legacy DOS/Linux doors |
 
 ## Security Notes
 

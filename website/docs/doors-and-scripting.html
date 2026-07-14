@@ -14,40 +14,29 @@
   <nav class="doc-nav"><a href="index.html" class="home">← Home</a><a href="quick-start.html">Quick Start</a><a href="windows.html">Windows</a><a href="getting-started.html">Getting Started</a><a href="deployment.html">Deployment</a><a href="overview.html">Overview</a><a href="configuration.html">Configuration</a><a href="architecture.html">Architecture</a><a href="menus-and-ui.html">Menus & UI</a><a href="messages-and-mail.html">Messages & Mail</a><a href="files-and-protocols.html">Files & Protocols</a><a href="chat-and-social.html">Chat & Social</a><a href="doors-and-scripting.html" class="active">Doors & Scripting</a><a href="sysop-guide.html">Sysop Guide</a><a href="networking-plank.html">PLANK</a><a href="buccaneer/programmers-guide.html">BUCC Guide</a><a href="buccaneer/host-api.html">BUCC API</a><a href="plugins.html">Plugins</a><a href="developer-guide.html">Developer</a><a href="cli-tools.html">CLI Tools</a><a href="reference/menu-actions.html">Menu Actions</a><a href="reference/message-commands.html">Messages Ref</a><a href="reference/file-commands.html">Files Ref</a><a href="reference/acs-mci.html">ACS & MCI</a><a href="reference/database.html">Database</a></nav>
   <main class="doc-content"><p>&lt;!-- generated-by: gsd-doc-writer --&gt;</p>
 <h1>Doors and Scripting</h1>
-<p>Mutineer BBS supports three extension mechanisms for interactive programs: native executable doors, DOSBox-hosted DOS doors, Buccaneer VM scripts, and loadable <code>.so</code> plugins.</p>
+<p>Mutineer BBS supports four extension mechanisms for interactive programs: native executable doors, DOSBox-hosted DOS doors, Buccaneer scripts, and loadable <code>.so</code> plugins.</p>
 <h2>Door Types Comparison</h2>
 <table>
 <tr><th>Feature</th><th>Native Door</th><th>DOSBox Door</th><th>Buccaneer Script</th><th>Plugin (.so)</th></tr>
-<table>
-<tr><th>Language</th><th>Any executable</th><th>DOS (16/32-bit)</th><th>Buccaneer (.bucc)</th><th>C</th></tr>
-<table>
-<tr><th>Isolation</th><th>fork/exec</th><th>DOSBox VM + runtime dir</th><th>In-process VM</th><th>In-process dlopen</th></tr>
-<table>
-<tr><th>Dropfiles</th><th>Yes</th><th>Yes</th><th>Via host bridge</th><th>Via host API</th></tr>
-<table>
-<tr><th>Serial I/O</th><th>Socket inherit</th><th>Nullmodem socket</th><th>Terminal I/O</th><th>Terminal I/O</th></tr>
-<table>
-<tr><th>Hot reload</th><th>No</th><th>No</th><th>Recompile</th><th>Reload .so</th></tr>
-<table>
-<tr><th>Best for</th><th>Linux ports</th><th>Classic DOS doors</th><th>New interactive scripts</th><th>Complex native logic</th></tr>
+<tr><td>Language</td><td>Any executable</td><td>DOS (16/32-bit)</td><td>Buccaneer (.bucc)</td><td>C</td></tr>
+<tr><td>Isolation</td><td>fork/exec</td><td>DOSBox emulator + runtime dir</td><td>In-process interpreted runtime</td><td>In-process dlopen</td></tr>
+<tr><td>Dropfiles</td><td>Yes</td><td>Yes</td><td>Via host bridge</td><td>Via host API</td></tr>
+<tr><td>Serial I/O</td><td>Socket inherit</td><td>Nullmodem socket</td><td>Terminal I/O</td><td>Terminal I/O</td></tr>
+<tr><td>Hot reload</td><td>No</td><td>No</td><td>Recompile</td><td>Reload .so</td></tr>
+<tr><td>Best for</td><td>Linux ports</td><td>Classic DOS doors</td><td>New interactive scripts</td><td>Complex native logic</td></tr>
 </table>
 <h2>Native Doors</h2>
 <p>Native doors are executables launched via <code>fork</code>/<code>exec</code> from <code>src/doors.c</code>.</p>
+<p>Native door commands are argv templates, not shell scripts. Mutineer parses quoted arguments and backslash escapes, then launches the child directly with <code>execvp()</code>. Shell metacharacters such as pipes, redirects, command substitution, <code>;</code>, <code>&amp;&amp;</code>, and <code>||</code> are rejected.</p>
 <h3>Database Record (<code>doors</code> table)</h3>
 <table>
 <tr><th>Field</th><th>Purpose</th></tr>
-<table>
-<tr><th><code>name</code></th><th>Door display name</th></tr>
-<table>
-<tr><th><code>command</code></th><th>Executable command line</th></tr>
-<table>
-<tr><th><code>dropfile</code></th><th>Dropfile format (DOOR.SYS, DORINFO1.DEF)</th></tr>
-<table>
-<tr><th><code>workdir</code></th><th>Working directory</th></tr>
-<table>
-<tr><th><code>acs</code></th><th>Access control</th></tr>
-<table>
-<tr><th><code>flags</code></th><th>Door flags</th></tr>
+<tr><td><code>name</code></td><td>Door display name</td></tr>
+<tr><td><code>command</code></td><td>Executable argv template</td></tr>
+<tr><td><code>dropfile</code></td><td>Dropfile format (DOOR.SYS, DORINFO1.DEF)</td></tr>
+<tr><td><code>workdir</code></td><td>Working directory</td></tr>
+<tr><td><code>acs</code></td><td>Access control</td></tr>
+<tr><td><code>flags</code></td><td>Door flags</td></tr>
 </table>
 <h3>Launch Flow</h3>
 <ol>
@@ -91,45 +80,30 @@ door_keep_failed_runs=0
 <h3>Included Examples</h3>
 <table>
 <tr><th>Path</th><th>Description</th></tr>
-<table>
-<tr><th><code>doors/testdoor/</code></th><th>TESTDOOR.COM — real 16-bit DOS COM</th></tr>
-<table>
-<tr><th><code>SPECS/DOSDOORS/aladdin/</code></th><th>Aladdin Adventure (1992) with manifest</th></tr>
+<tr><td><code>doors/testdoor/</code></td><td>TESTDOOR.COM — real 16-bit DOS COM</td></tr>
+<tr><td><code>SPECS/DOSDOORS/aladdin/</code></td><td>Aladdin Adventure (1992) with manifest</td></tr>
 </table>
 <h2>Buccaneer Scripting</h2>
-<p>Buccaneer is an embedded Pascal-like language compiled to bytecode and executed in-process. Sources in <code>src/buccaneer/</code>.</p>
+<p>Buccaneer is Mutineer&#x27;s interpreted language for BBS addons, games, and extensions. Source modules compile to bytecode and execute in-process through the Buccaneer runtime in <code>src/buccaneer/</code>.</p>
 <h3>Toolchain</h3>
 <table>
 <tr><th>Tool</th><th>Purpose</th></tr>
-<table>
-<tr><th><code>bucc</code></th><th>Compiler (.bucc → bytecode module)</th></tr>
-<table>
-<tr><th><code>bucc-linter</code></th><th>Static analysis</th></tr>
-<table>
-<tr><th><code>bucc-formatter</code></th><th>Source formatting</th></tr>
-<table>
-<tr><th><code>bucc-simulator</code></th><th>Standalone VM testing</th></tr>
+<tr><td><code>bucc</code></td><td>Compiler (.bucc → bytecode module)</td></tr>
+<tr><td><code>bucc-linter</code></td><td>Static analysis</td></tr>
+<tr><td><code>bucc-formatter</code></td><td>Source formatting</td></tr>
+<tr><td><code>bucc-simulator</code></td><td>Standalone Buccaneer runtime testing</td></tr>
 </table>
-<p>Build from <code>src/buccaneer/Makefile</code> or integrate via CMake subproject.</p>
+<p>Build with the top-level CMake project. The standalone <code>src/buccaneer/Makefile</code> remains useful for focused language work.</p>
 <h3>Example Scripts</h3>
 <table>
 <tr><th>File</th><th>Description</th></tr>
-<table>
-<tr><th><code>examples/hello.bucc</code></th><th>Hello world</th></tr>
-<table>
-<tr><th><code>examples/guess.bucc</code></th><th>Number guessing game</th></tr>
-<table>
-<tr><th><code>examples/scoreboard.bucc</code></th><th>Score tracking demo</th></tr>
+<tr><td><code>examples/hello.bucc</code></td><td>Hello world</td></tr>
+<tr><td><code>examples/guess.bucc</code></td><td>Number guessing game</td></tr>
+<tr><td><code>examples/scoreboard.bucc</code></td><td>Score tracking demo</td></tr>
 </table>
-<h3>Integration Status</h3>
-<p>Buccaneer VM, compiler, and host bridge are implemented but <strong>not fully wired into the main BBS door launcher</strong>. Track open work on <a href="https://github.com/rickcollette/mutineer/issues?q=label%3Abuccaneer">GitHub (label: buccaneer)</a>:</p>
-<ul>
-<li><code>DOOR.CHAIN</code> sets wrong VM status (should be <code>VM_CHAIN</code>)</li>
-<li><code>DOOR.EXIT</code> discards exit code</li>
-<li><code>OP_DISPATCH_CALL</code> emits incorrect proc IDs</li>
-<li>Several VM edge cases (array allocation, stack consistency)</li>
-</ul>
-<p><strong>Current recommendation:</strong> Use Buccaneer via <code>bucc-simulator</code> for development. Production doors should use native or DOSBox runners until integration gaps are closed.</p>
+<h3>BBS Launch</h3>
+<p>Door records can use <code>runner=bucc</code>. The door&#x27;s <code>manifest</code> field is treated as the Buccaneer door manifest path, and the BBS binds session, terminal, user, and BBS host APIs before running the package. Manifest capabilities are enforced at host dispatch time.</p>
+<p>Use <code>bucc-simulator</code> during development, then register the package as a <code>runner=bucc</code> door for BBS launch testing.</p>
 <p>See the <a href="buccaneer/programmers-guide.html">Buccaneer Programmer&#x27;s Guide</a> and <a href="buccaneer/index.html">Buccaneer hub</a>.</p>
 <h2>Plugins</h2>
 <p>Loadable shared objects providing interactive experiences without modifying core BBS.</p>
@@ -159,10 +133,8 @@ plugins_denylist=
 <p>Dropfiles pass session context to doors:</p>
 <table>
 <tr><th>Format</th><th>Use</th></tr>
-<table>
-<tr><th>DOOR.SYS</th><th>Wildcat/TradeWars standard</th></tr>
-<table>
-<tr><th>DORINFO1.DEF</th><th>PCBoard format</th></tr>
+<tr><td>DOOR.SYS</td><td>Wildcat/TradeWars standard</td></tr>
+<tr><td>DORINFO1.DEF</td><td>PCBoard format</td></tr>
 </table>
 <p>Written to <code>dropfile_path</code> before door launch with:</p>
 <ul>
@@ -187,7 +159,7 @@ ctest --test-dir build -R doors
 </code></pre>
 <h2>Related Documentation</h2>
 <ul>
-<li><a href="buccaneer.html">Buccaneer</a></li>
+<li><a href="buccaneer/programmers-guide.html">Buccaneer Programmer&#x27;s Guide</a></li>
 <li><a href="plugins.html">Plugins</a></li>
 <li><a href="configuration.html">Configuration</a> — DOSBox settings</li>
 <li><a href="sysop-guide.html">Sysop Guide</a> — door administration</li>

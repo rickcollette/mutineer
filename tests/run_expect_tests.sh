@@ -90,7 +90,7 @@ prepare_runtime() {
     fi
 
     if [[ -z "$RUNTIME_DIR" ]]; then
-        RUNTIME_DIR="$(mktemp -d /tmp/mutineer-expect.XXXXXX)"
+        RUNTIME_DIR="$(mktemp -d "${TMPDIR:-/tmp}/mutineer-expect.XXXXXX")"
     else
         mkdir -p "$RUNTIME_DIR"
     fi

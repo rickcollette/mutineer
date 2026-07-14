@@ -23,270 +23,172 @@ sqlite3 data/mutineer.db &lt; sql/plank_schema.sql
 <h2>Meta</h2>
 <table>
 <tr><th>Table</th><th>Purpose</th></tr>
-<table>
-<tr><th><code>meta</code></th><th>Key/value store for schema version and flags</th></tr>
+<tr><td><code>meta</code></td><td>Key/value store for schema version and flags</td></tr>
 </table>
 <h2>Users and Security</h2>
 <table>
 <tr><th>Table</th><th>Purpose</th></tr>
-<table>
-<tr><th><code>security_levels</code></th><th>Level definitions, time limits, ratios, permissions</th></tr>
-<table>
-<tr><th><code>validation_levels</code></th><th>Account validation workflow rules</th></tr>
-<table>
-<tr><th><code>users</code></th><th>User accounts (handle, password hash, profile, stats)</th></tr>
-<table>
-<tr><th><code>access_lists</code></th><th>Named ACS expressions</th></tr>
-<table>
-<tr><th><code>subscription_types</code></th><th>Subscription product definitions</th></tr>
-<table>
-<tr><th><code>user_subscriptions</code></th><th>Active/expired user subscriptions</th></tr>
-<table>
-<tr><th><code>user_votes</code></th><th>Per-user vote answers (topics 1–25)</th></tr>
+<tr><td><code>security_levels</code></td><td>Level definitions, time limits, ratios, permissions</td></tr>
+<tr><td><code>validation_levels</code></td><td>Account validation workflow rules</td></tr>
+<tr><td><code>users</code></td><td>User accounts (handle, password hash, profile, stats)</td></tr>
+<tr><td><code>access_lists</code></td><td>Named ACS expressions</td></tr>
+<tr><td><code>subscription_types</code></td><td>Subscription product definitions</td></tr>
+<tr><td><code>user_subscriptions</code></td><td>Active/expired user subscriptions</td></tr>
+<tr><td><code>user_votes</code></td><td>Per-user vote answers (topics 1–25)</td></tr>
 </table>
 <h3>users Key Columns</h3>
 <table>
 <tr><th>Column</th><th>Purpose</th></tr>
-<table>
-<tr><th><code>handle</code></th><th>Login name (unique)</th></tr>
-<table>
-<tr><th><code>pw_hash</code></th><th>Password hash (PBKDF2/Argon2)</th></tr>
-<table>
-<tr><th><code>security_level_id</code></th><th>FK to security_levels</th></tr>
-<table>
-<tr><th><code>flags</code></th><th>AR flags bitset (A–Z)</th></tr>
-<table>
-<tr><th><code>ac_flags</code></th><th>Restriction flags</th></tr>
-<table>
-<tr><th><code>status_flags</code></th><th>locked/deleted/expert/ansi/etc.</th></tr>
-<table>
-<tr><th><code>credits</code> / <code>file_points</code></th><th>Economy</th></tr>
-<table>
-<tr><th><code>timebank</code></th><th>Stored minutes</th></tr>
-<table>
-<tr><th><code>logged_on</code> / <code>msg_post</code> / <code>uploads</code> / <code>downloads</code></th><th>Stats</th></tr>
-<table>
-<tr><th><code>expires_at</code></th><th>Account expiration</th></tr>
-<table>
-<tr><th><code>signature</code> / <code>tagline</code></th><th>Message appendages</th></tr>
+<tr><td><code>handle</code></td><td>Login name (unique)</td></tr>
+<tr><td><code>pw_hash</code></td><td>Password hash (PBKDF2/Argon2)</td></tr>
+<tr><td><code>security_level_id</code></td><td>FK to security_levels</td></tr>
+<tr><td><code>flags</code></td><td>AR flags bitset (A–Z)</td></tr>
+<tr><td><code>ac_flags</code></td><td>Restriction flags</td></tr>
+<tr><td><code>status_flags</code></td><td>locked/deleted/expert/ansi/etc.</td></tr>
+<tr><td><code>credits</code> / <code>file_points</code></td><td>Economy</td></tr>
+<tr><td><code>timebank</code></td><td>Stored minutes</td></tr>
+<tr><td><code>logged_on</code> / <code>msg_post</code> / <code>uploads</code> / <code>downloads</code></td><td>Stats</td></tr>
+<tr><td><code>expires_at</code></td><td>Account expiration</td></tr>
+<tr><td><code>signature</code> / <code>tagline</code></td><td>Message appendages</td></tr>
 </table>
 <h2>Nodes and Sessions</h2>
 <table>
 <tr><th>Table</th><th>Purpose</th></tr>
-<table>
-<tr><th><code>nodes</code></th><th>Active node status (node_num, user_id, status, IP)</th></tr>
-<table>
-<tr><th><code>call_history</code></th><th>Login/logout history with duration</th></tr>
+<tr><td><code>nodes</code></td><td>Active node status (node_num, user_id, status, IP)</td></tr>
+<tr><td><code>call_history</code></td><td>Login/logout history with duration</td></tr>
 </table>
 <h2>Conferences</h2>
 <table>
 <tr><th>Table</th><th>Purpose</th></tr>
-<table>
-<tr><th><code>conferences</code></th><th>Conference definitions (key, name, ACS)</th></tr>
-<table>
-<tr><th><code>conference_membership</code></th><th>User ↔ conference joins</th></tr>
+<tr><td><code>conferences</code></td><td>Conference definitions (key, name, ACS)</td></tr>
+<tr><td><code>conference_membership</code></td><td>User ↔ conference joins</td></tr>
 </table>
 <h2>Messages</h2>
 <table>
 <tr><th>Table</th><th>Purpose</th></tr>
-<table>
-<tr><th><code>message_areas</code></th><th>Area definitions with ACS and anon policy</th></tr>
-<table>
-<tr><th><code>messages</code></th><th>Message records (threading, attributes)</th></tr>
-<table>
-<tr><th><code>mail_packets</code></th><th>Generated QWK/Fido mail packets</th></tr>
-<table>
-<tr><th><code>drafts</code></th><th>Auto-saved composition drafts</th></tr>
-<table>
-<tr><th><code>user_msg_scan_areas</code></th><th>Per-user scan toggle (MZ command)</th></tr>
+<tr><td><code>message_areas</code></td><td>Area definitions with ACS and anon policy</td></tr>
+<tr><td><code>messages</code></td><td>Message records (threading, attributes)</td></tr>
+<tr><td><code>mail_packets</code></td><td>Generated QWK/Fido mail packets</td></tr>
+<tr><td><code>drafts</code></td><td>Auto-saved composition drafts</td></tr>
+<tr><td><code>user_msg_scan_areas</code></td><td>Per-user scan toggle (MZ command)</td></tr>
 </table>
 <h3>messages Key Columns</h3>
 <table>
 <tr><th>Column</th><th>Purpose</th></tr>
-<table>
-<tr><th><code>area_id</code></th><th>FK to message_areas</th></tr>
-<table>
-<tr><th><code>reply_to</code> / <code>thread_root</code></th><th>Threading</th></tr>
-<table>
-<tr><th><code>to_user</code></th><th>Private mail recipient</th></tr>
-<table>
-<tr><th><code>attr</code> / <code>net_attr</code></th><th>Local and FidoNet attributes</th></tr>
-<table>
-<tr><th><code>file_attached</code></th><th>Attachment filename</th></tr>
+<tr><td><code>area_id</code></td><td>FK to message_areas</td></tr>
+<tr><td><code>reply_to</code> / <code>thread_root</code></td><td>Threading</td></tr>
+<tr><td><code>to_user</code></td><td>Private mail recipient</td></tr>
+<tr><td><code>attr</code> / <code>net_attr</code></td><td>Local and FidoNet attributes</td></tr>
+<tr><td><code>file_attached</code></td><td>Attachment filename</td></tr>
 </table>
 <h2>Files</h2>
 <table>
 <tr><th>Table</th><th>Purpose</th></tr>
-<table>
-<tr><th><code>file_areas</code></th><th>File area definitions</th></tr>
-<table>
-<tr><th><code>files</code></th><th>File records with metadata and hash</th></tr>
-<table>
-<tr><th><code>upload_queue</code></th><th>Pending upload approvals</th></tr>
-<table>
-<tr><th><code>download_queue</code></th><th>Pending download requests</th></tr>
+<tr><td><code>file_areas</code></td><td>File area definitions</td></tr>
+<tr><td><code>files</code></td><td>File records with metadata and hash</td></tr>
+<tr><td><code>upload_queue</code></td><td>Pending upload approvals</td></tr>
+<tr><td><code>download_queue</code></td><td>Pending download requests</td></tr>
 </table>
 <h2>Voting</h2>
 <table>
 <tr><th>Table</th><th>Purpose</th></tr>
-<table>
-<tr><th><code>votes</code></th><th>Vote topics</th></tr>
-<table>
-<tr><th><code>vote_choices</code></th><th>Answer choices</th></tr>
-<table>
-<tr><th><code>vote_ballots</code></th><th>Cast ballots (one per user per vote)</th></tr>
+<tr><td><code>votes</code></td><td>Vote topics</td></tr>
+<tr><td><code>vote_choices</code></td><td>Answer choices</td></tr>
+<tr><td><code>vote_ballots</code></td><td>Cast ballots (one per user per vote)</td></tr>
 </table>
 <h2>System Content</h2>
 <table>
 <tr><th>Table</th><th>Purpose</th></tr>
-<table>
-<tr><th><code>automsg</code></th><th>Single auto-message (id=1)</th></tr>
-<table>
-<tr><th><code>bulletins</code></th><th>Sysop bulletins with ACS</th></tr>
-<table>
-<tr><th><code>oneliners</code></th><th>Public one-liner messages</th></tr>
-<table>
-<tr><th><code>short_messages</code></th><th>Private short messages (SMW)</th></tr>
+<tr><td><code>automsg</code></td><td>Single auto-message (id=1)</td></tr>
+<tr><td><code>bulletins</code></td><td>Sysop bulletins with ACS</td></tr>
+<tr><td><code>oneliners</code></td><td>Public one-liner messages</td></tr>
+<tr><td><code>short_messages</code></td><td>Private short messages (SMW)</td></tr>
 </table>
 <h2>Events and Doors</h2>
 <table>
 <tr><th>Table</th><th>Purpose</th></tr>
-<table>
-<tr><th><code>events</code></th><th>Scheduler events (cron, logon, permission)</th></tr>
-<table>
-<tr><th><code>doors</code></th><th>Door program definitions</th></tr>
-<table>
-<tr><th><code>protocols</code></th><th>File transfer protocol definitions</th></tr>
+<tr><td><code>events</code></td><td>Scheduler events (cron, logon, permission)</td></tr>
+<tr><td><code>doors</code></td><td>Door program definitions</td></tr>
+<tr><td><code>protocols</code></td><td>File transfer protocol definitions</td></tr>
 </table>
 <h2>Statistics</h2>
 <table>
 <tr><th>Table</th><th>Purpose</th></tr>
-<table>
-<tr><th><code>stats</code></th><th>Lifetime counters (singleton id=1)</th></tr>
-<table>
-<tr><th><code>daily_stats</code></th><th>Today&#x27;s counters (singleton)</th></tr>
-<table>
-<tr><th><code>history</code></th><th>Per-day archived stats</th></tr>
-<table>
-<tr><th><code>system_info</code></th><th>BBS metadata (name, totals)</th></tr>
-<table>
-<tr><th><code>logs</code></th><th>Application log entries</th></tr>
+<tr><td><code>stats</code></td><td>Lifetime counters (singleton id=1)</td></tr>
+<tr><td><code>daily_stats</code></td><td>Today&#x27;s counters (singleton)</td></tr>
+<tr><td><code>history</code></td><td>Per-day archived stats</td></tr>
+<tr><td><code>system_info</code></td><td>BBS metadata (name, totals)</td></tr>
+<tr><td><code>logs</code></td><td>Application log entries</td></tr>
 </table>
 <h2>FidoNet</h2>
 <table>
 <tr><th>Table</th><th>Purpose</th></tr>
-<table>
-<tr><th><code>fido_akas</code></th><th>AKA addresses (zone:net/node.point)</th></tr>
-<table>
-<tr><th><code>fido_echolinks</code></th><th>Echo tag ↔ message area links</th></tr>
-<table>
-<tr><th><code>fido_netmail</code></th><th>Outbound netmail queue</th></tr>
-<table>
-<tr><th><code>fido_echomail_queue</code></th><th>Echomail export queue</th></tr>
+<tr><td><code>fido_akas</code></td><td>AKA addresses (zone:net/node.point)</td></tr>
+<tr><td><code>fido_echolinks</code></td><td>Echo tag ↔ message area links</td></tr>
+<tr><td><code>fido_netmail</code></td><td>Outbound netmail queue</td></tr>
+<tr><td><code>fido_echomail_queue</code></td><td>Echomail export queue</td></tr>
 </table>
 <h2>QWK Network</h2>
 <table>
 <tr><th>Table</th><th>Purpose</th></tr>
-<table>
-<tr><th><code>qwk_hubs</code></th><th>QWK hub definitions</th></tr>
-<table>
-<tr><th><code>qwk_area_links</code></th><th>Local area ↔ hub conference mapping</th></tr>
-<table>
-<tr><th><code>qwk_packet_queue</code></th><th>Pending QWK/REP packets</th></tr>
+<tr><td><code>qwk_hubs</code></td><td>QWK hub definitions</td></tr>
+<tr><td><code>qwk_area_links</code></td><td>Local area ↔ hub conference mapping</td></tr>
+<tr><td><code>qwk_packet_queue</code></td><td>Pending QWK/REP packets</td></tr>
 </table>
 <h2>Chat</h2>
 <table>
 <tr><th>Table</th><th>Purpose</th></tr>
-<table>
-<tr><th><code>chat_logs</code></th><th>Structured chat message log</th></tr>
+<tr><td><code>chat_logs</code></td><td>Structured chat message log</td></tr>
 </table>
 <h2>PLANK Core (<code>sql/plank_schema.sql</code>)</h2>
 <table>
 <tr><th>Table</th><th>Purpose</th></tr>
-<table>
-<tr><th><code>plank_node_identity</code></th><th>Local node ID and keys (singleton)</th></tr>
-<table>
-<tr><th><code>plank_peers</code></th><th>Known peer nodes</th></tr>
-<table>
-<tr><th><code>plank_links</code></th><th>Configured network links</th></tr>
-<table>
-<tr><th><code>plank_link_sessions</code></th><th>Active link sessions</th></tr>
-<table>
-<tr><th><code>plank_link_cursors</code></th><th>Sync cursors per link</th></tr>
-<table>
-<tr><th><code>plank_areas</code></th><th>Network message areas</th></tr>
-<table>
-<tr><th><code>plank_area_policies</code></th><th>Moderation policies</th></tr>
-<table>
-<tr><th><code>plank_subscriptions</code></th><th>Per-link area subscriptions</th></tr>
-<table>
-<tr><th><code>plank_objects</code></th><th>Content-addressed CBOR objects</th></tr>
-<table>
-<tr><th><code>plank_messages</code></th><th>Denormalized message objects</th></tr>
-<table>
-<tr><th><code>plank_attachments</code></th><th>Attachment metadata</th></tr>
-<table>
-<tr><th><code>plank_message_attachments</code></th><th>Message ↔ attachment map</th></tr>
-<table>
-<tr><th><code>plank_journal</code></th><th>Append-only object journal</th></tr>
-<table>
-<tr><th><code>plank_moderation</code></th><th>Moderation events</th></tr>
-<table>
-<tr><th><code>plank_receipts</code></th><th>Delivery acknowledgements</th></tr>
-<table>
-<tr><th><code>plank_import_history</code></th><th>Bundle import dedup</th></tr>
-<table>
-<tr><th><code>plank_dedupe</code></th><th>Object deduplication window</th></tr>
-<table>
-<tr><th><code>plank_deadletters</code></th><th>Failed delivery queue</th></tr>
-<table>
-<tr><th><code>plank_quarantine</code></th><th>Policy-violating objects</th></tr>
-<table>
-<tr><th><code>plank_user_exports</code></th><th>User offline packet exports</th></tr>
-<table>
-<tr><th><code>plank_user_replies</code></th><th>Imported user reply bundles</th></tr>
-<table>
-<tr><th><code>plank_routes</code></th><th>Direct message routing</th></tr>
-<table>
-<tr><th><code>plank_outbound_queue</code></th><th>Pending outbound objects</th></tr>
-<table>
-<tr><th><code>plank_audit</code></th><th>Audit trail</th></tr>
-<table>
-<tr><th><code>plank_config</code></th><th>PLANK key/value settings</th></tr>
+<tr><td><code>plank_node_identity</code></td><td>Local node ID and keys (singleton)</td></tr>
+<tr><td><code>plank_peers</code></td><td>Known peer nodes</td></tr>
+<tr><td><code>plank_links</code></td><td>Configured network links</td></tr>
+<tr><td><code>plank_link_sessions</code></td><td>Active link sessions</td></tr>
+<tr><td><code>plank_link_cursors</code></td><td>Sync cursors per link</td></tr>
+<tr><td><code>plank_areas</code></td><td>Network message areas</td></tr>
+<tr><td><code>plank_area_policies</code></td><td>Moderation policies</td></tr>
+<tr><td><code>plank_subscriptions</code></td><td>Per-link area subscriptions</td></tr>
+<tr><td><code>plank_objects</code></td><td>Content-addressed CBOR objects</td></tr>
+<tr><td><code>plank_messages</code></td><td>Denormalized message objects</td></tr>
+<tr><td><code>plank_attachments</code></td><td>Attachment metadata</td></tr>
+<tr><td><code>plank_message_attachments</code></td><td>Message ↔ attachment map</td></tr>
+<tr><td><code>plank_journal</code></td><td>Append-only object journal</td></tr>
+<tr><td><code>plank_moderation</code></td><td>Moderation events</td></tr>
+<tr><td><code>plank_receipts</code></td><td>Delivery acknowledgements</td></tr>
+<tr><td><code>plank_import_history</code></td><td>Bundle import dedup</td></tr>
+<tr><td><code>plank_dedupe</code></td><td>Object deduplication window</td></tr>
+<tr><td><code>plank_deadletters</code></td><td>Failed delivery queue</td></tr>
+<tr><td><code>plank_quarantine</code></td><td>Policy-violating objects</td></tr>
+<tr><td><code>plank_user_exports</code></td><td>User offline packet exports</td></tr>
+<tr><td><code>plank_user_replies</code></td><td>Imported user reply bundles</td></tr>
+<tr><td><code>plank_routes</code></td><td>Direct message routing</td></tr>
+<tr><td><code>plank_outbound_queue</code></td><td>Pending outbound objects</td></tr>
+<tr><td><code>plank_audit</code></td><td>Audit trail</td></tr>
+<tr><td><code>plank_config</code></td><td>PLANK key/value settings</td></tr>
 </table>
 <h2>COVE Tables</h2>
 <table>
 <tr><th>Table</th><th>Purpose</th></tr>
-<table>
-<tr><th><code>cove_downstream</code></th><th>Downstream link tracking</th></tr>
-<table>
-<tr><th><code>cove_upstream</code></th><th>Upstream link tracking</th></tr>
-<table>
-<tr><th><code>cove_fanout_queue</code></th><th>Fan-out delivery queue</th></tr>
+<tr><td><code>cove_downstream</code></td><td>Downstream link tracking</td></tr>
+<tr><td><code>cove_upstream</code></td><td>Upstream link tracking</td></tr>
+<tr><td><code>cove_fanout_queue</code></td><td>Fan-out delivery queue</td></tr>
 </table>
 <h2>Key Indexes</h2>
 <table>
 <tr><th>Index</th><th>Table</th><th>Column(s)</th></tr>
-<table>
-<tr><th><code>idx_users_handle</code></th><th>users</th><th>handle</th></tr>
-<table>
-<tr><th><code>idx_messages_area</code></th><th>messages</th><th>area_id</th></tr>
-<table>
-<tr><th><code>idx_messages_user</code></th><th>messages</th><th>user_id</th></tr>
-<table>
-<tr><th><code>idx_files_area</code></th><th>files</th><th>area_id</th></tr>
-<table>
-<tr><th><code>idx_nodes_status</code></th><th>nodes</th><th>status</th></tr>
-<table>
-<tr><th><code>idx_oneliners_posted</code></th><th>oneliners</th><th>posted_at DESC</th></tr>
-<table>
-<tr><th><code>idx_fido_netmail_status</code></th><th>fido_netmail</th><th>status</th></tr>
-<table>
-<tr><th><code>idx_qwk_packet_queue_status</code></th><th>qwk_packet_queue</th><th>status</th></tr>
-<table>
-<tr><th><code>idx_plank_objects_class</code></th><th>plank_objects</th><th>object_class</th></tr>
-<table>
-<tr><th><code>idx_plank_journal_state</code></th><th>plank_journal</th><th>processing_state</th></tr>
+<tr><td><code>idx_users_handle</code></td><td>users</td><td>handle</td></tr>
+<tr><td><code>idx_messages_area</code></td><td>messages</td><td>area_id</td></tr>
+<tr><td><code>idx_messages_user</code></td><td>messages</td><td>user_id</td></tr>
+<tr><td><code>idx_files_area</code></td><td>files</td><td>area_id</td></tr>
+<tr><td><code>idx_nodes_status</code></td><td>nodes</td><td>status</td></tr>
+<tr><td><code>idx_oneliners_posted</code></td><td>oneliners</td><td>posted_at DESC</td></tr>
+<tr><td><code>idx_fido_netmail_status</code></td><td>fido_netmail</td><td>status</td></tr>
+<tr><td><code>idx_qwk_packet_queue_status</code></td><td>qwk_packet_queue</td><td>status</td></tr>
+<tr><td><code>idx_plank_objects_class</code></td><td>plank_objects</td><td>object_class</td></tr>
+<tr><td><code>idx_plank_journal_state</code></td><td>plank_journal</td><td>processing_state</td></tr>
 </table>
 <h2>Schema Application</h2>
 <p><code>mutineer-initbbs</code> applies schema automatically. Manual application:</p>
@@ -302,16 +204,11 @@ mutineer-maint integrity -v
 <h2>Maintenance</h2>
 <table>
 <tr><th>Command</th><th>Effect</th></tr>
-<table>
-<tr><th><code>mutineer-maint vacuum</code></th><th>Reclaim space</th></tr>
-<table>
-<tr><th><code>mutineer-maint reindex</code></th><th>Rebuild indexes</th></tr>
-<table>
-<tr><th><code>mutineer-msgpack</code></th><th>Prune old messages</th></tr>
-<table>
-<tr><th><code>mutineer-filepack</code></th><th>Prune file records</th></tr>
-<table>
-<tr><th><code>mutineer-userpack</code></th><th>Prune inactive users</th></tr>
+<tr><td><code>mutineer-maint vacuum</code></td><td>Reclaim space</td></tr>
+<tr><td><code>mutineer-maint reindex</code></td><td>Rebuild indexes</td></tr>
+<tr><td><code>mutineer-msgpack</code></td><td>Prune old messages</td></tr>
+<tr><td><code>mutineer-filepack</code></td><td>Prune file records</td></tr>
+<tr><td><code>mutineer-userpack</code></td><td>Prune inactive users</td></tr>
 </table>
 <h2>Related Documentation</h2>
 <ul>

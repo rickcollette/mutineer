@@ -4,6 +4,10 @@
 import html
 import os
 import re
+import argparse
+import shutil
+import sys
+import tempfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DOCS = os.path.join(ROOT, "docs")
@@ -58,6 +62,8 @@ def md_to_html(text: str) -> str:
     out = []
     i = 0
     in_code = False
+    in_table = False
+    table_header_done = False
 
     while i < len(lines):
         line = lines[i]
@@ -79,19 +85,23 @@ def md_to_html(text: str) -> str:
             continue
 
         if "|" in line and line.strip().startswith("|"):
-            if not out or out[-1] != "<table>":
+            if not in_table:
                 out.append("<table>")
+                in_table = True
+                table_header_done = False
             cells = [c.strip() for c in line.strip().strip("|").split("|")]
             if all(re.match(r"^[-:]+$", c) for c in cells):
                 i += 1
                 continue
-            if out[-1] == "<table>":
+            if not table_header_done:
                 out.append("<tr>" + "".join(f"<th>{inline(c)}</th>" for c in cells) + "</tr>")
+                table_header_done = True
             else:
                 out.append("<tr>" + "".join(f"<td>{inline(c)}</td>" for c in cells) + "</tr>")
             i += 1
-            if i >= len(lines) or "|" not in lines[i]:
+            if i >= len(lines) or "|" not in lines[i] or not lines[i].strip().startswith("|"):
                 out.append("</table>")
+                in_table = False
             continue
 
         m = re.match(r"^(#{1,6})\s+(.*)$", line)
@@ -172,7 +182,7 @@ def wrap(title: str, body: str, current: str, depth: int) -> str:
 </html>"""
 
 
-def convert(src_rel: str, dst_rel: str, depth: int):
+def convert(src_rel: str, dst_rel: str, depth: int, out_docs: str):
     src = os.path.join(DOCS, src_rel)
     if not os.path.exists(src):
         print(f"  SKIP: {src_rel}")
@@ -182,16 +192,14 @@ def convert(src_rel: str, dst_rel: str, depth: int):
     title_m = re.search(r"^#\s+(.+)$", md, re.MULTILINE)
     title = title_m.group(1) if title_m else src_rel
     body = md_to_html(md)
-    dst = os.path.join(OUT_DOCS, dst_rel)
+    dst = os.path.join(out_docs, dst_rel)
     os.makedirs(os.path.dirname(dst), exist_ok=True)
     with open(dst, "w", encoding="utf-8") as f:
         f.write(wrap(title, body, dst_rel, depth))
-    print(f"  {src_rel} → website/docs/{dst_rel}")
+    print(f"  {src_rel} → {os.path.relpath(dst, ROOT)}")
 
 
-def main():
-    os.makedirs(OUT_DOCS, exist_ok=True)
-    pages = [
+PAGES = [
         ("index.md", "index.html", 0),
         ("quick-start.md", "quick-start.html", 0),
         ("windows.md", "windows.html", 0),
@@ -222,12 +230,78 @@ def main():
         ("reference/file-commands.md", "reference/file-commands.html", 1),
         ("reference/acs-mci.md", "reference/acs-mci.html", 1),
         ("reference/database.md", "reference/database.html", 1),
-    ]
+]
+
+STALE_PHRASES = [
+    "Buccaneer VM",
+    "Buccaneer scripting VM",
+    "embedded scripting VM",
+    "VM audit",
+    "DOOR.CHAIN sets VM_HALT",
+    "DOOR.EXIT discards exit code",
+    "SHARED.CAS uses shallow equality",
+]
+
+
+def build(out_dir: str):
+    out_docs = os.path.join(out_dir, "docs")
+    os.makedirs(out_docs, exist_ok=True)
     print("Building documentation HTML...")
-    for src, dst, depth in pages:
-        convert(src, dst, depth)
+    for src, dst, depth in PAGES:
+        convert(src, dst, depth, out_docs)
     print("Done.")
 
 
+def check_output(out_dir: str) -> int:
+    failures = []
+    for dirpath, _, filenames in os.walk(out_dir):
+        for name in filenames:
+            if not name.endswith(".html"):
+                continue
+            path = os.path.join(dirpath, name)
+            with open(path, encoding="utf-8") as f:
+                data = f.read()
+            if data.count("<table>") != data.count("</table>"):
+                failures.append(f"{path}: unbalanced table tags")
+            depth = 0
+            for tag in re.findall(r"</?table>", data):
+                if tag == "<table>":
+                    depth += 1
+                    if depth > 1:
+                        failures.append(f"{path}: nested table output")
+                        break
+                else:
+                    depth = max(0, depth - 1)
+            for phrase in STALE_PHRASES:
+                if phrase in data:
+                    failures.append(f"{path}: stale phrase: {phrase}")
+    if failures:
+        print("Website generation check failed:")
+        for failure in failures:
+            print(f"  {failure}")
+        return 1
+    print("Website generation check passed.")
+    return 0
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--output", default=OUT, help="output website directory")
+    parser.add_argument("--check-or-temp-output", action="store_true",
+                        help="build into a temporary directory and validate generated HTML")
+    args = parser.parse_args()
+
+    if args.check_or_temp_output:
+        tmp = tempfile.mkdtemp(prefix="mutineer_website_")
+        try:
+            build(tmp)
+            return check_output(tmp)
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    build(os.path.abspath(args.output))
+    return 0
+
+
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

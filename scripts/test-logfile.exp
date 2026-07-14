@@ -1,10 +1,12 @@
 #!/usr/bin/expect -f
 set timeout 30
 log_user 1
-log_file -noappend /tmp/teltest.ansi
+set tmpdir [expr {[info exists env(TMPDIR)] && $env(TMPDIR) ne "" ? $env(TMPDIR) : "/tmp"}]
+set logfile [file join $tmpdir teltest.[pid].ansi]
+log_file -noappend $logfile
 spawn telnet 127.0.0.1 2929
 expect -re {ANSI graphics}
 send "Y\r"
 expect -re {Handle:}
 log_file
-puts "size=[file size /tmp/teltest.ansi]"
+puts "size=[file size $logfile]"

@@ -548,7 +548,7 @@ Recursive-descent parser with precedence: `!` > `&` > `|`
 
 ### 9.2 Door Execution
 - All drop files written to `data/dropfiles/<doorname>/`
-- External command execution via `system()`
+- External command execution uses supervised argv templates with shell metacharacter rejection, process-group timeout handling, and disconnect-aware cancellation.
 - Return code logging
 
 ### 9.3 Protocol Execution (`doors.c`)
@@ -910,7 +910,7 @@ Files generated:
 | `L` | Logs |
 | `Z` | History |
 | `N` | Nodes list |
-| `D` | Drop to shell |
+| `D` | Config-gated supervised shell command |
 | `E` | Events |
 | `W` | Write mail |
 | `R` | Read |

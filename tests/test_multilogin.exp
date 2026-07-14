@@ -5,34 +5,62 @@ source [file dirname [info script]]/expect_helpers.exp
 
 set timeout 10
 
-# First, login with sysop
-spawn nc $default_host $default_port
-expect "ANSI graphics"
-send "y\r"
-expect "Handle:"
-send "sysop\r"
-expect "Password:"
-send "mutineer\r"
-expect "Menu"
+proc login_sysop_local {} {
+    global default_host default_port timeout
+    spawn telnet $default_host $default_port
+    expect {
+        -re "Connected to" { }
+        timeout { return "" }
+    }
+    set sid $spawn_id
+    expect {
+        -re "ANSI.*\\?|graphics.*\\?" { send "Y\r" }
+        timeout { catch { close -i $sid }; return "" }
+    }
+    expect {
+        "Handle:" { send "sysop\r" }
+        timeout { catch { close -i $sid }; return "" }
+    }
+    expect {
+        "Password:" { send "mutineer\r" }
+        timeout { catch { close -i $sid }; return "" }
+    }
+    expect {
+        "Selection:" { return $sid }
+        timeout { catch { close -i $sid }; return "" }
+    }
+}
 
-# Keep first session alive
-set session1 $spawn_id
+set session1 [login_sysop_local]
+if {$session1 eq ""} {
+    puts "\n\[FAIL\] Could not establish first login"
+    exit 1
+}
 
-# Now try to login again with same user
-spawn nc $default_host $default_port
-expect "ANSI graphics"
-send "y\r"
-expect "Handle:"
-send "sysop\r"
-expect "Password:"
-send "mutineer\r"
+spawn telnet $default_host $default_port
+set session2 $spawn_id
+expect {
+    -re "Connected to" { }
+    timeout { puts "\n\[FAIL\] Could not connect second session"; exit 1 }
+}
+expect {
+    -re "ANSI.*\\?|graphics.*\\?" { send "Y\r" }
+    timeout { puts "\n\[FAIL\] No ANSI prompt for second session"; exit 1 }
+}
+expect {
+    "Handle:" { send "sysop\r" }
+    timeout { puts "\n\[FAIL\] No handle prompt for second session"; exit 1 }
+}
+expect {
+    "Password:" { send "mutineer\r" }
+    timeout { puts "\n\[FAIL\] No password prompt for second session"; exit 1 }
+}
 
-# Should get multi-login rejection
 expect {
     "already logged in" {
         puts "\n\[PASS\] Multi-login correctly blocked"
     }
-    "Menu" {
+    "Selection:" {
         puts "\n\[FAIL\] Multi-login was allowed"
         exit 1
     }
@@ -42,12 +70,21 @@ expect {
     }
 }
 
-expect "Goodbye"
+expect {
+    "Goodbye" { }
+    eof { }
+    timeout { }
+}
+catch { close -i $session2 }
+catch { wait -i $session2 }
 
-# Close first session
 set spawn_id $session1
 send "Q\r"
-expect eof
+expect {
+    eof { }
+    timeout { catch { close -i $session1 } }
+}
+catch { wait -i $session1 }
 
 puts "\n\[PASS\] Multi-login prevention test passed"
 exit 0

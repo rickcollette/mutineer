@@ -32,18 +32,12 @@ games/scoreboard/
 <p>Typical fields:</p>
 <table>
 <tr><th>Field</th><th>Purpose</th></tr>
-<table>
-<tr><th><code>id</code></th><th>Unique application id</th></tr>
-<table>
-<tr><th><code>name</code></th><th>Display name</th></tr>
-<table>
-<tr><th><code>version</code></th><th>Package version</th></tr>
-<table>
-<tr><th><code>entry</code></th><th>Default program name</th></tr>
-<table>
-<tr><th><code>programs</code></th><th>List of compiled modules / source names</th></tr>
-<table>
-<tr><th><code>capabilities</code></th><th>Host powers granted at runtime</th></tr>
+<tr><td><code>id</code></td><td>Unique application id</td></tr>
+<tr><td><code>name</code></td><td>Display name</td></tr>
+<tr><td><code>version</code></td><td>Package version</td></tr>
+<tr><td><code>entry</code></td><td>Default program name</td></tr>
+<tr><td><code>programs</code></td><td>List of compiled modules / source names</td></tr>
+<tr><td><code>capabilities</code></td><td>Host powers granted at runtime</td></tr>
 </table>
 <p>Example:</p>
 <pre><code class="json">
@@ -72,13 +66,8 @@ games/scoreboard/
 <li>Install files under the BBS doors directory and register in the <code>doors</code> table.</li>
 </ol>
 <h2>Registering on Mutineer</h2>
-<p>Until <code>runner=bucc</code> is wired in <code>src/doors.c</code> (see GitHub issue WIRE-3), sysops should:</p>
-<ul>
-<li>Track BUCC integration issues on the repo</li>
-<li>Use the simulator for author acceptance testing</li>
-<li>Plan door records with <code>runner=bucc</code> for when launch path lands</li>
-</ul>
-<p>Native and DOSBox doors remain the production runners today — see <a href="../doors-and-scripting.html">Doors and Scripting</a>.</p>
+<p>Register the package as a door record with <code>runner=bucc</code> and set the record&#x27;s <code>manifest</code> field to the Buccaneer <code>door.json</code> path. At launch, Mutineer loads that manifest, grants only the declared capabilities, binds the caller session context, and runs the package through the Buccaneer runtime.</p>
+<p>Use the simulator for author acceptance testing before installing the package on a live BBS. See <a href="../doors-and-scripting.html">Doors and Scripting</a>.</p>
 <h2>Multi-program applications</h2>
 <p>Declare multiple programs in <code>door.json</code> and chain between them:</p>
 <pre><code class="basic">

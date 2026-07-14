@@ -17,6 +17,7 @@
 #include "bbs_file_cmds.h"
 #include "bbs_msg_cmds.h"
 #include "bbs_chat.h"
+#include "bbs_telnet.h"
 #include <openssl/evp.h>
 #include <signal.h>
 #include <ctype.h>
@@ -416,7 +417,7 @@ Session *online_get_node(int node_num)
 }
 
 /* Read raw bytes, strip telnet, return clean bytes length.
-   Returns 0 on disconnect, -1 on error. */
+   Returns 0 on disconnect, -1 on error, -3 when input was only telnet negotiation. */
 static int recv_clean(Session *s, uint8_t *out, size_t out_cap)
 {
   uint8_t inbuf[512];
@@ -430,6 +431,8 @@ static int recv_clean(Session *s, uint8_t *out, size_t out_cap)
     return -1;
   }
   size_t n = telnet_feed(&s->tn, s->fd, inbuf, (size_t)r, out, out_cap);
+  if (n == 0)
+    return -3;
   return (int)n;
 }
 
@@ -953,8 +956,10 @@ static int prompt_password(Session *s, const char *prompt, char *out, size_t cap
     return -1;
   if (prompt)
     send_str(s, prompt);
+  telnet_password_begin(s->fd);
   uint8_t line[256];
   int n = readline_echo(s, line, sizeof(line), s->cfg.idle_timeout_sec, ECHO_DOTS);
+  telnet_password_end(s->fd);
   if (n < 0)
     return n;
   send_str(s, "\r\n"); /* newline after user input */
@@ -1413,257 +1418,15 @@ static void handle_action(Session *s, const char *action)
       send_str(s, "\r\n\x1b[1;31mYou are restricted from messages.\x1b[0m\r\n");
       return;
     }
-    DbMsgArea areas[32];
-    int acount = db_msg_area_list(s->db, areas, 32);
-    if (acount == 0)
-    {
-      send_str(s, "\r\nNo message areas.\r\n");
-      return;
-    }
-    send_str(s, "\r\nMessage Areas:\r\n");
-    char linebuf[512];
-    for (int i = 0; i < acount; i++)
-    {
-      if (!acs_allows(s, areas[i].acs))
-        continue;
-      snprintf(linebuf, sizeof(linebuf), "  [%d] %s\r\n", areas[i].id, areas[i].name);
-      send_str(s, linebuf);
-    }
-    if (acs_allows(s, "+A"))
-      send_str(s, "  [N] New area (sysop)\r\n");
-    send_str(s, "Choose area number: ");
-    uint8_t line[64];
-    int n = session_readline(s, line, sizeof(line), s->cfg.idle_timeout_sec);
-    if (n <= 0)
-      return;
-    if ((line[0] == 'N' || line[0] == 'n') && acs_allows(s, "+A"))
-    {
-      char name[64];
-      prompt_line(s, "Area name: ", name, sizeof(name));
-      int new_id = 0;
-      db_message_area_manage(s->db, name, "", &new_id, false);
-    }
-    int area_id = atoi((char *)line);
-    if (area_id <= 0)
-    {
-      send_str(s, "\r\nInvalid area.\r\n");
-      return;
-    }
-    s->current_msg_area = area_id;
-
-    DbMessage msgs[32];
-    int mcount = db_messages_list(s->db, area_id, msgs, 32);
-    send_str(s, "\r\nThreaded messages:\r\n");
-    for (int i = 0; i < mcount; i++)
-    {
-      int depth = 0;
-      int pid = msgs[i].reply_to;
-      while (pid > 0 && depth < 5)
-      {
-        DbMessage tmp;
-        if (!db_message_get(s->db, pid, &tmp))
-          break;
-        depth++;
-        pid = tmp.reply_to;
-      }
-      int indent = depth * 2;
-      snprintf(linebuf, sizeof(linebuf), "%*s#%d %s (%s) %s\r\n", indent, "", msgs[i].id, msgs[i].subject, msgs[i].user_handle, msgs[i].created_at);
-      send_str(s, linebuf);
-    }
-    send_str(s, "\r\nSelect msg # to read (blank skip): ");
-    n = session_readline(s, line, sizeof(line), s->cfg.idle_timeout_sec);
-    int msg_id = 0;
-    if (n > 0)
-      msg_id = atoi((char *)line);
-    DbMessage view;
-    if (msg_id > 0 && db_message_get(s->db, msg_id, &view))
-    {
-      send_str(s, "\r\n");
-      send_str(s, view.subject);
-      send_str(s, " by ");
-      send_str(s, view.user_handle);
-      send_str(s, "\r\n");
-      send_str(s, view.body);
-      send_str(s, "\r\n");
-    }
-    send_str(s, "(N)ew post, (R)eply, (M)ail user, (Q)uit, (D)elete: ");
-    n = session_readline(s, line, sizeof(line), s->cfg.idle_timeout_sec);
-    char subj[80] = {0}, body[512] = {0};
-    if (n > 0 && (line[0] == 'N' || line[0] == 'n'))
-    {
-      if (HAS_AC_FLAG(&s->user, AC_RPOST))
-      {
-        send_str(s, "\r\n\x1b[1;31mYou are restricted from posting.\x1b[0m\r\n");
-      }
-      else
-      {
-        prompt_line(s, "Subject: ", subj, sizeof(subj));
-        prompt_line(s, "Body: ", body, sizeof(body));
-        if (db_message_post(s->db, area_id, s->user.id, subj, body, 0))
-        {
-          send_str(s, "\r\nPosted.\r\n");
-          db_stats_inc(s->db, "posts");
-          s->user.msg_post++;
-        }
-      }
-    }
-    else if (n > 0 && (line[0] == 'R' || line[0] == 'r') && msg_id > 0)
-    {
-      snprintf(subj, sizeof(subj), "Re: %s", view.subject);
-      /* quote */
-      char quoted[512] = {0};
-      const char *p = view.body;
-      while (*p && strlen(quoted) + 2 < sizeof(quoted))
-      {
-        const char *nl = strchr(p, '\n');
-        size_t len = nl ? (size_t)(nl - p) : strlen(p);
-        strncat(quoted, "> ", sizeof(quoted) - strlen(quoted) - 1);
-        strncat(quoted, p, len < sizeof(quoted) - strlen(quoted) - 1 ? len : sizeof(quoted) - strlen(quoted) - 1);
-        strncat(quoted, "\r\n", sizeof(quoted) - strlen(quoted) - 1);
-        if (!nl)
-          break;
-        p = nl + 1;
-      }
-      send_str(s, "Quoted:\r\n");
-      send_str(s, quoted);
-      prompt_line(s, "Body: ", body, sizeof(body));
-      strncat(body, "\r\n", sizeof(body) - strlen(body) - 1);
-      strncat(body, quoted, sizeof(body) - strlen(body) - 1);
-      if (db_message_post(s->db, area_id, s->user.id, subj, body, msg_id))
-      {
-        send_str(s, "\r\nReplied.\r\n");
-        db_stats_inc(s->db, "posts");
-      }
-    }
-    else if (n > 0 && (line[0] == 'M' || line[0] == 'm'))
-    {
-      char to[64] = {0};
-      prompt_line(s, "Send private mail to: ", to, sizeof(to));
-      DbUser u;
-      if (!db_user_fetch(s->db, to, &u))
-      {
-        send_str(s, "\r\nNo such user.\r\n");
-      }
-      else
-      {
-        prompt_line(s, "Subject: ", subj, sizeof(subj));
-        prompt_line(s, "Body: ", body, sizeof(body));
-        if (db_message_post(s->db, area_id, s->user.id, subj, body, 0))
-        {
-          /* mark to_user */
-          int last_id = db_last_insert_id(s->db);
-          db_message_set_to_user(s->db, last_id, u.id);
-          send_str(s, "\r\nMail sent.\r\n");
-          db_stats_inc(s->db, "emails");
-        }
-      }
-    }
-    else if (n > 0 && (line[0] == 'D' || line[0] == 'd') && acs_allows(s, "+A"))
-    {
-      char confirm[8] = {0};
-      prompt_line(s, "Delete message #:", confirm, sizeof(confirm));
-      int del = atoi(confirm);
-#ifdef HAVE_SQLITE
-      char sql[64];
-      snprintf(sql, sizeof(sql), "DELETE FROM messages WHERE id=%d", del);
-      db_exec(s->db, sql);
-      send_str(s, "\r\nDeleted.\r\n");
-#else
-      send_str(s, "\r\nDB not available.\r\n");
-#endif
-    }
+    handle_msg_command(s, "MG", NULL);
+    handle_msg_command(s, "MA", NULL);
+    handle_msg_command(s, "MR", NULL);
   }
   else if (!strcmp(action, "files"))
   {
-    DbFileArea areas[16];
-    int acount = db_file_area_list(s->db, areas, 16);
-    if (acount == 0)
-    {
-      send_str(s, "\r\nNo file areas.\r\n");
-      return;
-    }
-    send_str(s, "\r\nFile Areas:\r\n");
-    char buf[256];
-    for (int i = 0; i < acount; i++)
-    {
-      snprintf(buf, sizeof(buf), "  [%d] %s (%s)\r\n", areas[i].id, areas[i].name, areas[i].path);
-      send_str(s, buf);
-    }
-    send_str(s, "Choose area number: ");
-    uint8_t line[64];
-    int n = session_readline(s, line, sizeof(line), s->cfg.idle_timeout_sec);
-    if (n <= 0)
-      return;
-    int area_id = atoi((char *)line);
-    if (area_id <= 0)
-    {
-      send_str(s, "\r\nInvalid area.\r\n");
-      return;
-    }
-
-    DbFileArea area = {0};
-    for (int i = 0; i < acount; i++)
-      if (areas[i].id == area_id)
-        area = areas[i];
-    if (area.id == 0)
-    {
-      send_str(s, "\r\nArea not found.\r\n");
-      return;
-    }
-    if (!acs_allows(s, area.acs_list))
-    {
-      send_str(s, "\r\nAccess denied.\r\n");
-      return;
-    }
-    s->current_file_area = area.id;
-
-    DbFileRec files[10];
-    int fcount = db_file_list(&area, s->db, files, 10);
-    send_str(s, "\r\nFiles:\r\n");
-    for (int i = 0; i < fcount; i++)
-    {
-      if ((files[i].flags & FILE_FLAG_NOTVAL) && !acs_allows(s, "+A"))
-        continue;
-      snprintf(buf, sizeof(buf), "#%d %-20s %8d bytes by %s\r\n  %s\r\n",
-               files[i].id, files[i].filename, files[i].size_bytes, files[i].uploader, files[i].desc);
-      send_str(s, buf);
-    }
-    send_str(s, "Add to batch queue # (blank skip): ");
-    n = session_readline(s, line, sizeof(line), s->cfg.idle_timeout_sec);
-    if (n > 0 && line[0])
-    {
-      int id = atoi((char *)line);
-      DbFileRec rec = {0};
-      if (!db_file_get(s->db, id, &rec) ||
-          ((rec.flags & FILE_FLAG_NOTVAL) && !acs_allows(s, "+A")))
-      {
-        send_str(s, "\r\nFile unavailable.\r\n");
-      }
-      else
-      if (s->batch_count < (int)(sizeof(s->batch_queue) / sizeof(s->batch_queue[0])))
-      {
-        s->batch_queue[s->batch_count++] = id;
-        s->batch_area[s->batch_count - 1] = area.id;
-        send_str(s, "\r\nQueued.\r\n");
-      }
-      else
-        send_str(s, "\r\nQueue full.\r\n");
-    }
-    send_str(s, "\r\nDownload file # (blank to skip): ");
-    n = session_readline(s, line, sizeof(line), s->cfg.idle_timeout_sec);
-    if (n > 0 && line[0])
-    {
-      int id = atoi((char *)line);
-      char idbuf[32];
-      snprintf(idbuf, sizeof(idbuf), "%d", id);
-      cmd_file_download(s, idbuf);
-    }
-    send_str(s, "\r\nUpload a file using configured transfer protocol? (Y/N): ");
-    n = session_readline(s, line, sizeof(line), s->cfg.idle_timeout_sec);
-    if (n > 0 && (line[0] == 'Y' || line[0] == 'y'))
-    {
-      cmd_file_upload(s, NULL);
-    }
+    handle_file_command(s, "FG", NULL);
+    handle_file_command(s, "FA", NULL);
+    handle_file_command(s, "FL", NULL);
   }
   else if (!strcmp(action, "chat"))
   {
@@ -3856,19 +3619,68 @@ static void handle_action(Session *s, const char *action)
         prompt_line(s, prompt, confirm, sizeof(confirm));
         if (!strcmp(confirm, "DELETE"))
         {
-          char sql[160];
-          snprintf(sql, sizeof(sql),
-                   "DELETE FROM files WHERE uploaded_at < datetime('now','-%d days')",
-                   days);
-          if (db_exec(s->db, "BEGIN IMMEDIATE") && db_exec(s->db, sql) && db_exec(s->db, "COMMIT"))
+          char buf[256];
+          DbFileRec old_files[512];
+          int old_count = db_file_list_older(s->db, days, old_files, 512);
+          bool safe = true;
+          char paths[512][512];
+          memset(paths, 0, sizeof(paths));
+          for (int i = 0; i < old_count; i++)
           {
-            send_str(s, "\r\nFile record purge complete. Run file-area cleanup to remove orphaned files.\r\n");
-            log_audit(s->user.handle, "maintenance_purge_files", prompt);
+            DbFileArea area;
+            if (!db_file_area_get(s->db, old_files[i].area_id, &area) ||
+                !file_area_resolve(area.path, old_files[i].filename, paths[i], sizeof(paths[i])))
+            {
+              safe = false;
+              break;
+            }
+          }
+          snprintf(buf, sizeof(buf), "\r\nPreview matched %d file record(s).\r\n", old_count);
+          send_str(s, buf);
+          if (!safe)
+          {
+            send_str(s, "\r\nFile purge aborted: unsafe file path detected.\r\n");
+            log_audit(s->user.handle, "maintenance_purge_files_abort", "unsafe path");
+          }
+          else if (db_exec(s->db, "BEGIN IMMEDIATE"))
+          {
+            int files_deleted = 0;
+            int records_deleted = 0;
+            bool ok = true;
+            for (int i = 0; i < old_count; i++)
+            {
+              if (paths[i][0] && unlink(paths[i]) != 0 && errno != ENOENT)
+              {
+                ok = false;
+                break;
+              }
+              if (paths[i][0])
+                files_deleted++;
+              if (!db_file_delete(s->db, old_files[i].id))
+              {
+                ok = false;
+                break;
+              }
+              records_deleted++;
+            }
+            if (ok && db_exec(s->db, "COMMIT"))
+            {
+              snprintf(buf, sizeof(buf), "\r\nFile purge complete: %d record(s), %d file(s).\r\n",
+                       records_deleted, files_deleted);
+              send_str(s, buf);
+              snprintf(buf, sizeof(buf), "records=%d files=%d days=%d", records_deleted, files_deleted, days);
+              log_audit(s->user.handle, "maintenance_purge_files", buf);
+            }
+            else
+            {
+              db_exec(s->db, "ROLLBACK");
+              send_str(s, "\r\nFile purge failed and was rolled back.\r\n");
+              log_audit(s->user.handle, "maintenance_purge_files_abort", "delete failure");
+            }
           }
           else
           {
-            db_exec(s->db, "ROLLBACK");
-            send_str(s, "\r\nFile purge failed and was rolled back.\r\n");
+            send_str(s, "\r\nFile purge failed: could not start transaction.\r\n");
           }
         }
       }
@@ -3947,7 +3759,9 @@ static void handle_action(Session *s, const char *action)
                        akas[i].domain[0] ? akas[i].domain : "");
               if (akas[i].is_primary)
               {
-                snprintf(buf + strlen(buf) - 2, sizeof(buf) - strlen(buf) + 2, " [PRIMARY]\r\n");
+                char *cr = strstr(buf, "\r\n");
+                if (cr) *cr = '\0';
+                bbs_str_append(buf, sizeof(buf), " [PRIMARY]\r\n");
               }
               send_str(s, buf);
             }
