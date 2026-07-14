@@ -4,7 +4,8 @@ How to run Mutineer in production-like environments: Docker, release tarballs, a
 
 ## Docker Compose (recommended for small installs)
 
-The repo includes `Dockerfile` and `docker-compose.yml`.
+The repo includes Docker assets under `docker/`: `docker/Dockerfile` and
+`docker/compose.yml`.
 
 ```bash
 docker compose up -d --build

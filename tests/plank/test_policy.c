@@ -85,10 +85,10 @@ static void teardown(void) {
 /* Helper: create a properly signed message object */
 static plank_object_t *create_signed_message(uint8_t *pubkey_out, uint8_t *privkey_out,
                                               uint32_t hop_count) {
-    uint8_t pubkey[32], privkey[32];
+    uint8_t pubkey[PLANK_PUBKEY_SIZE], privkey[PLANK_PRIVKEY_SIZE];
     plank_crypto_keygen_ed25519(pubkey, privkey);
-    if (pubkey_out) memcpy(pubkey_out, pubkey, 32);
-    if (privkey_out) memcpy(privkey_out, privkey, 32);
+    if (pubkey_out) memcpy(pubkey_out, pubkey, PLANK_PUBKEY_SIZE);
+    if (privkey_out) memcpy(privkey_out, privkey, PLANK_PRIVKEY_SIZE);
 
     plank_message_body_t *body = plank_message_body_new();
     ASSERT(body != NULL);
@@ -112,7 +112,7 @@ TEST(policy_create) {
 }
 
 TEST(validate_valid_object) {
-    uint8_t pubkey[32];
+    uint8_t pubkey[PLANK_PUBKEY_SIZE];
     plank_object_t *obj = create_signed_message(pubkey, NULL, 0);
     ASSERT(obj != NULL);
 
@@ -128,7 +128,7 @@ TEST(validate_valid_object) {
 }
 
 TEST(validate_bad_signature) {
-    uint8_t pubkey[32];
+    uint8_t pubkey[PLANK_PUBKEY_SIZE];
     plank_object_t *obj = create_signed_message(pubkey, NULL, 0);
     ASSERT(obj != NULL);
 
@@ -148,7 +148,7 @@ TEST(validate_bad_signature) {
 }
 
 TEST(validate_tampered_object) {
-    uint8_t pubkey[32];
+    uint8_t pubkey[PLANK_PUBKEY_SIZE];
     plank_object_t *obj = create_signed_message(pubkey, NULL, 0);
     ASSERT(obj != NULL);
 

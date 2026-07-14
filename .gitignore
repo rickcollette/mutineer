@@ -1,63 +1,143 @@
-# Build output
-build/
-build_debug/
-dist/
+# Generated build directories
+/build*/
+/build-*/
+/build_*/
+/cmake-build-*/
+/out/
+/target/
+/tmp/
+/temp/
 
-# CMake artifacts (generated inside build dirs, not the root Makefile)
+# Distribution and packaging output
+/dist/
+/release/
+/releases/
+/packages/
+*.tar
+*.tar.gz
+*.tgz
+*.zip
+*.7z
+*.deb
+*.rpm
+*.apk
+*.dmg
+*.iso
+*.sha256
+
+# CMake, CTest, Ninja, and package-manager build metadata
 CMakeCache.txt
 CMakeFiles/
 cmake_install.cmake
 CTestTestfile.cmake
+DartConfiguration.tcl
+Testing/
+install_manifest.txt
+compile_commands.json
+.cmake/
+_deps/
+CPackConfig.cmake
+CPackSourceConfig.cmake
+*.cmake.user
+.ninja_deps
+.ninja_log
+build.ninja
+rules.ninja
 
-# Compiled objects and archives
+# Compilers, linkers, and debug/profiling output
 *.o
+*.obj
+*.lo
+*.la
 *.a
+*.lib
 *.so
 *.so.*
-
-# Test / coverage artifacts
-Testing/
+*.dylib
+*.dll
+*.exe
+*.out
+*.bin
+*.elf
+*.pdb
+*.ilk
+*.dSYM/
+*.map
+*.lst
 *.gcov
 *.gcda
 *.gcno
+*.profraw
+*.profdata
+*.su
 
-# Runtime data — never commit live state
-data/mutineer.db
-data/mutineer.db-journal
-data/mutineer.db-wal
-data/mutineer.db-shm
-data/dropfiles/
-data/door_runtime/
-logs/*.log
+# Runtime state, databases, logs, and generated BBS data
+/data/mutineer.db
+/data/*.db
+/data/*.db-*
+/data/*.sqlite
+/data/*.sqlite3
+/data/dropfiles/
+/data/door_runtime/
+/data/qwk/
+/data/temp/
+/data/tmp/
+/data/uploads/
+/logs/
 *.log
 *.pid
+*.sock
+core
+core.*
 
-# Buccaneer toolchain build artifacts (root-owned by Docker)
-src/buccaneer/build/
-src/buccaneer/bin/
+# Toolchain-local generated output
+/src/buccaneer/build/
+/src/buccaneer/bin/
+/src/buccaneer/dist/
+/src/buccaneer/tests/test_*
+!/src/buccaneer/tests/test_*.c
 
-# Backups
-backups/
-dist/releases/
+# Test harness scratch files and local fixtures
+/tests/tmp/
+/tests/.tmp/
+/tests/output/
+/tests/artifacts/
+*.transcript
+*.expect.log
 
-# OS and editor noise
+# Language/package caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage/
+htmlcov/
+.cache/
+.ccache/
+.npm/
+node_modules/
+
+# Docker/local environment overrides
+.env
+.env.*
+!.env.example
+docker-compose.override.yml
+compose.override.yml
+
+# Backups and editor/OS noise
+/backups/
+*.bak
+*.backup
+*.orig
+*.rej
+*~
+*.swp
+*.swo
 .DS_Store
 .DS_Store?
 Thumbs.db
-*.swp
-*.swo
-*~
-*.orig
-*.bak
 .vscode/
 .idea/
 *.sublime-workspace
-
-# Sensitive config overrides — use conf/mutineer.conf.example instead
-# (conf/mutineer.conf is intentionally committed as a default example)
-
-# Pre-compiled test binaries in buccaneer tests dir
-src/buccaneer/tests/test_lexer
-src/buccaneer/tests/test_parser
-src/buccaneer/tests/test_package
-src/buccaneer/tests/test_value

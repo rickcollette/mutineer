@@ -17,27 +17,29 @@ else
   exit 0
 fi
 
-if [ ! -f docker-compose.yml ] && [ ! -f compose.yml ]; then
-  echo "no compose file present; skipping quick-start smoke"
+COMPOSE_FILE="${MUTINEER_COMPOSE_FILE:-docker/compose.yml}"
+
+if [ ! -f "$COMPOSE_FILE" ]; then
+  echo "no compose file present at $COMPOSE_FILE; skipping quick-start smoke"
   exit 0
 fi
 
 PROJECT="mutineer_smoke_$$_$(date +%s)"
 cleanup() {
-  "${COMPOSE[@]}" -p "$PROJECT" down -v --remove-orphans >/dev/null 2>&1 || true
+  "${COMPOSE[@]}" -f "$COMPOSE_FILE" -p "$PROJECT" down -v --remove-orphans >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
 
-"${COMPOSE[@]}" -p "$PROJECT" config >/dev/null
+"${COMPOSE[@]}" -f "$COMPOSE_FILE" -p "$PROJECT" config >/dev/null
 
 if [ "${MUTINEER_DOCKER_FULL_SMOKE:-0}" != "1" ]; then
   echo "compose config validated; set MUTINEER_DOCKER_FULL_SMOKE=1 for container startup"
   exit 0
 fi
 
-"${COMPOSE[@]}" -p "$PROJECT" up -d --build
+"${COMPOSE[@]}" -f "$COMPOSE_FILE" -p "$PROJECT" up -d --build
 sleep 5
-"${COMPOSE[@]}" -p "$PROJECT" ps
+"${COMPOSE[@]}" -f "$COMPOSE_FILE" -p "$PROJECT" ps
 
 if [ -x "$BUILD_DIR/mutineer" ]; then
   "$BUILD_DIR/mutineer" --help >/dev/null

@@ -80,7 +80,7 @@ int main(void) {
   char* coved = read_file("src/tools/coved.c");
   char* docs = read_file("docs/configuration.md");
   char* conf = read_file("conf/mutineer.conf");
-  char* matrix = read_file("feature-matrix.md");
+  char* matrix = read_file("docs/status/feature-matrix.md");
 
   CHECK(cmake && session && mainc && wfc && sched && maint && config &&
         filecmds && coved && docs && conf && matrix, "read source files");

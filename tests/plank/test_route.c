@@ -83,7 +83,7 @@ static void teardown(void) {
 
 /* Helper: create a signed test message using the modern API */
 static plank_object_t *create_test_message(const char *area, const char *subject) {
-    uint8_t pubkey[32], privkey[32];
+    uint8_t pubkey[PLANK_PUBKEY_SIZE], privkey[PLANK_PRIVKEY_SIZE];
     plank_crypto_keygen_ed25519(pubkey, privkey);
 
     plank_message_body_t *body = plank_message_body_new();
@@ -136,7 +136,7 @@ TEST(duplicate_detection) {
 
 TEST(hop_count_validation) {
     /* Create a message with hop_count=5 (well within default limit of 16) */
-    uint8_t pubkey[32], privkey[32];
+    uint8_t pubkey[PLANK_PUBKEY_SIZE], privkey[PLANK_PRIVKEY_SIZE];
     plank_crypto_keygen_ed25519(pubkey, privkey);
 
     plank_message_body_t *body = plank_message_body_new();

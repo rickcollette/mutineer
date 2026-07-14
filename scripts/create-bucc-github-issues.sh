@@ -3,7 +3,7 @@
 set -euo pipefail
 
 REPO="${MUTINEER_GITHUB_REPO:-rickcollette/mutineer}"
-SRC="${BUCC_TODO_FILE:-BUCC_TODO.md}"
+SRC="${BUCC_TODO_FILE:-docs/status/BUCC_TODO.md}"
 MODE="${1:-create}"
 
 if [[ "$MODE" != "create" && "$MODE" != "--dry-run" ]]; then

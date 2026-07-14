@@ -99,7 +99,7 @@ static void teardown(void) {
 
 /* Helper: create a signed test message object using the modern API. */
 static plank_object_t* make_test_message(const char* subject, const char* body_text) {
-    uint8_t pubkey[32], privkey[32];
+    uint8_t pubkey[PLANK_PUBKEY_SIZE], privkey[PLANK_PRIVKEY_SIZE];
     bool ok = plank_crypto_keygen_ed25519(pubkey, privkey);
     ASSERT(ok);
 

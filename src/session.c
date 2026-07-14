@@ -4711,7 +4711,7 @@ void *session_thread_main(void *arg)
   {
     send_str(s, "\x1b[2J\x1b[H"); /* clear screen */
     send_str(s, ANSI_BASE);
-    send_art(s, "mutineer.ans");
+    send_named_art(s, "mutineer");
     send_motd(s);
   }
   else

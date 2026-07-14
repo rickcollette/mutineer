@@ -68,12 +68,12 @@ int main(void) {
   CHECK(check_public_doc("website/docs/buccaneer/index.html") == 0, "generated Buccaneer index consistency");
   CHECK(check_public_doc("website/docs/buccaneer/host-api.html") == 0, "generated Buccaneer host API consistency");
   CHECK(check_legacy_status_doc("docs/SPEC.md") == 0, "legacy spec consistency");
-  CHECK(check_legacy_status_doc("FUNCTIONAL_MUTINEER.md") == 0, "functional status consistency");
-  CHECK(check_legacy_status_doc("DELTA_BBS.md") == 0, "delta status consistency");
-  CHECK(check_legacy_status_doc("TODO.md") == 0, "TODO consistency");
+  CHECK(check_legacy_status_doc("docs/status/FUNCTIONAL_MUTINEER.md") == 0, "functional status consistency");
+  CHECK(check_legacy_status_doc("docs/status/DELTA_BBS.md") == 0, "delta status consistency");
+  CHECK(check_legacy_status_doc("docs/status/TODO.md") == 0, "TODO consistency");
 
-  char* todo = read_file("BUCC_TODO.md");
-  char* matrix = read_file("feature-matrix.md");
+  char* todo = read_file("docs/status/BUCC_TODO.md");
+  char* matrix = read_file("docs/status/feature-matrix.md");
   CHECK(todo && matrix, "read status files");
   CHECK(!contains(todo, "BUCC_TODO — Buccaneer VM Audit"), "BUCC_TODO is no longer stale VM audit");
   CHECK(!contains(todo, "BUG-1") && !contains(todo, "BUILD-1"), "completed Buccaneer audit IDs removed");

@@ -1,0 +1,17 @@
+services:
+  mutineer:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    image: mutineer-bbs:latest
+    container_name: mutineer-bbs
+    ports:
+      - "2929:2929"
+    volumes:
+      - mutineer-data:/opt/mutineer/data
+      - mutineer-logs:/opt/mutineer/logs
+    restart: unless-stopped
+
+volumes:
+  mutineer-data:
+  mutineer-logs:
