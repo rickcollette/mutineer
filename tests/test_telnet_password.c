@@ -29,7 +29,7 @@ int main(void) {
   telnet_password_end(fds[0]);
   n = read(fds[1], buf, sizeof(buf));
   CHECK(n >= 6, "password end sends negotiation bytes");
-  CHECK(has_triplet(buf, n, 255, 252, 1), "password end restores client echo policy");
+  CHECK(has_triplet(buf, n, 255, 251, 1), "password end keeps server echo policy");
 
   close(fds[0]);
   close(fds[1]);

@@ -25,6 +25,15 @@ static const char* ansi_colors[] = {
   "\x1b[1;37m",  /* 15 - bright white */
 };
 
+static void mci_copy(char *dst, size_t cap, const char *src)
+{
+  if (!dst || cap == 0) return;
+  size_t n = src ? strlen(src) : 0;
+  if (n >= cap) n = cap - 1;
+  if (n > 0) memcpy(dst, src, n);
+  dst[n] = '\0';
+}
+
 /* Color scheme table: schemes[scheme_id][color_index (0-9)] = ansi_color index (0-15).
    ^0=primary accent, ^1=secondary, ^2=text, ^3=dim text, ^4=highlight,
    ^5=error/alert, ^6=success, ^7=label, ^8=border, ^9=title */
@@ -466,9 +475,9 @@ size_t mci_expand(const Session* s, const char* in, char* out, size_t cap) {
         const char* bar = strchr(body, '|');
         if (bar) {
           snprintf(thenp, sizeof(thenp), "%.*s", (int)(bar - body), body);
-          snprintf(elsep, sizeof(elsep), "%s", bar + 1);
+          mci_copy(elsep, sizeof(elsep), bar + 1);
         } else {
-          snprintf(thenp, sizeof(thenp), "%s", body);
+          mci_copy(thenp, sizeof(thenp), body);
         }
         bool cond = acs_allows(s, expr);
         const char* choose = cond ? thenp : elsep;

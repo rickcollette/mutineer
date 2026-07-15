@@ -19,10 +19,10 @@ typedef struct BbsConfig
   char art_path[256];
   int session_time_limit_min;
   /* sysop / runtime */
-  int wfc_enabled;       /* 1 to run WFC console locally */
-  int wfc_refresh_ms;    /* refresh interval in ms */
-  int wfc_blank_sec;     /* screen blank timeout (0=disabled) */
-  int wfc_node_num;      /* local WFC console node number */
+  int wfc_enabled;       /* deprecated; local WFC thread is replaced by mutineer-console */
+  int wfc_refresh_ms;    /* mutineer-console refresh interval in ms */
+  int wfc_blank_sec;     /* mutineer-console blank timeout (0=disabled) */
+  int wfc_node_num;      /* mutineer-console display node number */
   int wfc_fg_color;      /* foreground color (ANSI 0-15) */
   int wfc_bg_color;      /* background color (ANSI 0-7) */
   char wfc_status_idle_char;
@@ -31,6 +31,10 @@ typedef struct BbsConfig
   char wfc_status_chat_char;
   int wfc_shell_enabled;
   char wfc_shell_command[256];
+  int console_enabled;          /* 1 to run mutineer-console control service */
+  char console_bind[64];        /* console control listener bind address */
+  int console_port;             /* console control listener port */
+  int console_idle_timeout_sec; /* idle timeout for console clients */
   int scheduler_enabled; /* run events thread */
   int scheduler_tick_sec;
   /* auth */
@@ -68,6 +72,7 @@ typedef struct BbsConfig
   int  door_default_timeout_sec;  /* 0=no timeout */
   int  door_cleanup_on_exit;      /* 1=remove runtime tree on success */
   int  door_keep_failed_runs;     /* 1=keep runtime tree on failure for debugging */
+  char door_session_hmac_secret[128]; /* shared secret for signed native-door sessions */
   /* chat */
   int  max_page_sysop;            /* max sysop page attempts per session (0=unlimited) */
   int  max_calls_per_day;         /* max logins per user per calendar day (0=unlimited) */

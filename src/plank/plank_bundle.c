@@ -1743,9 +1743,10 @@ bool plank_bundle_import_reply(plank_store_t *store, const char *path,
 
     if (plank_store_dedupe_exists(store, manifest->bundle_id))
     {
+        int duplicate_count = (int)manifest->object_count;
         plank_bundle_reader_close(reader);
         result->result = PLANK_IMPORT_DUPLICATE;
-        result->messages_duplicate = (int)manifest->object_count;
+        result->messages_duplicate = duplicate_count;
         strncpy(result->error, "Duplicate reply bundle", sizeof(result->error) - 1);
         return true;
     }

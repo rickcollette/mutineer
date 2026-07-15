@@ -435,6 +435,21 @@ bool db_node_upsert(BbsDb *db, int node_num, int user_id, const char *status, co
 bool db_node_clear(BbsDb *db, int node_num);
 int db_node_list(BbsDb *db, DbNode *out, int max_nodes);
 bool db_node_user_online(BbsDb *db, int user_id, int *out_node);
+bool db_node_lock_set(BbsDb *db, int node_num, bool locked, const char *actor);
+bool db_node_lock_get(BbsDb *db, int node_num);
+int db_node_lock_list(BbsDb *db, int *out_nodes, int max_nodes);
+
+/* Buccaneer live host storage */
+bool db_bucc_kv_get(BbsDb *db, const char *scope, const char *key, char *out, size_t out_cap);
+bool db_bucc_kv_set(BbsDb *db, const char *scope, const char *key, const char *value);
+bool db_bucc_kv_delete(BbsDb *db, const char *scope, const char *key);
+bool db_bucc_kv_exists(BbsDb *db, const char *scope, const char *key);
+int64_t db_bucc_data_insert(BbsDb *db, const char *scope, const char *dataset, const char *value);
+bool db_bucc_data_update(BbsDb *db, const char *scope, const char *dataset, int64_t id, const char *value);
+bool db_bucc_data_delete(BbsDb *db, const char *scope, const char *dataset, int64_t id);
+bool db_bucc_data_get(BbsDb *db, const char *scope, const char *dataset, int64_t id, char *out, size_t out_cap);
+int db_bucc_data_find(BbsDb *db, const char *scope, const char *dataset, int64_t *ids, char values[][512], int max_rows);
+int64_t db_bucc_data_count(BbsDb *db, const char *scope, const char *dataset);
 
 /* Message areas */
 int db_msg_area_list(BbsDb *db, DbMsgArea *out, int max_areas);

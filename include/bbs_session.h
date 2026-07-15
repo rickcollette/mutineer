@@ -1,6 +1,7 @@
 #pragma once
 #include <pthread.h>
 #include <stdint.h>
+#include <stdbool.h>
 #include "bbs_config.h"
 #include "bbs_telnet.h"
 #include "bbs_db.h"
@@ -52,11 +53,16 @@ void* session_thread_main(void* arg);
 /* session I/O helpers */
 void send_str(Session* s, const char* str);
 int session_readline(Session* s, uint8_t* buf, size_t cap, int timeout);
+int session_readline_echo(Session* s, uint8_t* buf, size_t cap, int timeout, int echo);
 int prompt_line(Session* s, const char* prompt, char* out, size_t cap);
 
 /* online registry */
-void online_add(Session* s);
+bool online_add(Session* s);
 void online_remove(Session* s);
 size_t online_list(char* out, size_t cap);
 void online_broadcast(const char* msg);
 Session* online_get_node(int node_num);
+bool online_mark_node_dead(int node_num, const Session *except, const char *msg);
+void online_set_node_locked(int node_num, bool locked);
+bool online_node_is_locked(int node_num);
+void bbs_handle_action(Session *s, const char *action);

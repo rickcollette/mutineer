@@ -417,7 +417,7 @@ int main(int argc, char **argv)
     char temp_dir[512];
     const char* tmpbase = getenv("TMPDIR");
     if (!tmpbase || !tmpbase[0]) tmpbase = cfg.data_path[0] ? cfg.data_path : "data";
-    snprintf(temp_dir, sizeof(temp_dir), "%s/qwkgen_XXXXXX", tmpbase);
+    path_join(tmpbase, "qwkgen_XXXXXX", temp_dir, sizeof(temp_dir));
     if (!mkdtemp(temp_dir))
     {
         fprintf(stderr, "Failed to create temp directory\n");
@@ -426,9 +426,9 @@ int main(int argc, char **argv)
     }
 
     char control_path[512], messages_path[512], door_path[512];
-    snprintf(control_path, sizeof(control_path), "%s/CONTROL.DAT", temp_dir);
-    snprintf(messages_path, sizeof(messages_path), "%s/MESSAGES.DAT", temp_dir);
-    snprintf(door_path, sizeof(door_path), "%s/DOOR.ID", temp_dir);
+    path_join(temp_dir, "CONTROL.DAT", control_path, sizeof(control_path));
+    path_join(temp_dir, "MESSAGES.DAT", messages_path, sizeof(messages_path));
+    path_join(temp_dir, "DOOR.ID", door_path, sizeof(door_path));
 
     FILE *f = fopen(control_path, "w");
     if (f)

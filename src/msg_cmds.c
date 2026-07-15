@@ -127,8 +127,8 @@ static bool attachment_path(Session *s, const char *name, char *out, size_t outc
   if (!safe_basename(name)) return false;
   const char *data = (s && s->cfg.data_path[0]) ? s->cfg.data_path : "data";
   char root[512], joined[512], realroot[512], realjoined[512];
-  snprintf(root, sizeof(root), "%s/attachments", data);
-  snprintf(joined, sizeof(joined), "%s/%s", root, name);
+  path_join(data, "attachments", root, sizeof(root));
+  path_join(root, name, joined, sizeof(joined));
   if (!realpath(root, realroot) || !realpath(joined, realjoined)) return false;
   size_t n = strlen(realroot);
   if (strncmp(realroot, realjoined, n) != 0 ||
@@ -602,7 +602,7 @@ void cmd_msg_reply(Session* s, const char* data) {
   send_str(s, quoted);
   
   char subject[80];
-  snprintf(subject, sizeof(subject), "Re: %s", orig.subject);
+  snprintf(subject, sizeof(subject), "Re: %.75s", orig.subject);
   
   char body[2048] = {0};
   /* Pre-populate with quoted text */

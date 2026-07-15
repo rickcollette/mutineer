@@ -20,10 +20,21 @@ extern int prompt_line(Session* s, const char* prompt, char* out, size_t cap);
 
 #define QWK_BLOCK_SIZE 128
 
+static void qwk_copy(char* dst, size_t cap, const char* src) {
+  if (!dst || cap == 0) return;
+  if (!src) src = "";
+  size_t n = strlen(src);
+  if (n >= cap) n = cap - 1;
+  memcpy(dst, src, n);
+  dst[n] = '\0';
+}
+
 static bool qwk_make_temp_dir(Session* s, const char* prefix, char* out, size_t cap) {
   const char* base = getenv("TMPDIR");
   if (!base || !base[0]) base = (s && s->cfg.data_path[0]) ? s->cfg.data_path : "data";
-  snprintf(out, cap, "%s/%sXXXXXX", base, prefix ? prefix : "qwk_");
+  char leaf[80];
+  snprintf(leaf, sizeof(leaf), "%.64sXXXXXX", prefix ? prefix : "qwk_");
+  path_join(base, leaf, out, cap);
   return mkdtemp(out) != NULL;
 }
 
@@ -50,7 +61,7 @@ static bool find_rep_file(const char* dir, char* out, size_t cap) {
   while ((ent = readdir(d)) != NULL) {
     const char* dot = strrchr(ent->d_name, '.');
     if (!dot || strcasecmp(dot, ".REP") != 0) continue;
-    snprintf(out, cap, "%s/%s", dir, ent->d_name);
+    path_join(dir, ent->d_name, out, cap);
     closedir(d);
     return true;
   }
@@ -151,8 +162,9 @@ static void write_ndx_files(const char* temp_dir,
     }
     if (conf_count == 0) continue;
 
-    char ndx_path[512];
-    snprintf(ndx_path, sizeof(ndx_path), "%s/%03d.NDX", temp_dir, conf);
+    char ndx_path[512], ndx_leaf[32];
+    snprintf(ndx_leaf, sizeof(ndx_leaf), "%03d.NDX", conf);
+    path_join(temp_dir, ndx_leaf, ndx_path, sizeof(ndx_path));
     FILE* f = fopen(ndx_path, "wb");
     if (!f) continue;
 
@@ -166,7 +178,7 @@ static void write_ndx_files(const char* temp_dir,
   }
 
   char personal_path[512];
-  snprintf(personal_path, sizeof(personal_path), "%s/PERSONAL.NDX", temp_dir);
+  path_join(temp_dir, "PERSONAL.NDX", personal_path, sizeof(personal_path));
   FILE* f = fopen(personal_path, "wb");
   if (f) {
     for (int i = 0; i < personal_count; i++) {
@@ -356,10 +368,10 @@ bool qwk_generate_packet(Session* s, const char* output_path, const char* last_q
   if (!qwk_make_temp_dir(s, "qwk_", temp_dir, sizeof(temp_dir))) return false;
 
   char control_path[512], messages_path[512], door_path[512], newfiles_path[512];
-  snprintf(control_path,  sizeof(control_path),  "%s/CONTROL.DAT",    temp_dir);
-  snprintf(messages_path, sizeof(messages_path), "%s/MESSAGES.DAT",   temp_dir);
-  snprintf(door_path,     sizeof(door_path),     "%s/DOOR.ID",        temp_dir);
-  snprintf(newfiles_path, sizeof(newfiles_path), "%s/NEWFILES.DAT",   temp_dir);
+  path_join(temp_dir, "CONTROL.DAT", control_path, sizeof(control_path));
+  path_join(temp_dir, "MESSAGES.DAT", messages_path, sizeof(messages_path));
+  path_join(temp_dir, "DOOR.ID", door_path, sizeof(door_path));
+  path_join(temp_dir, "NEWFILES.DAT", newfiles_path, sizeof(newfiles_path));
 
   DbMsgArea areas[QWK_MAX_AREAS];
   int num_areas = db_msg_area_list(s->db, areas, QWK_MAX_AREAS);
@@ -455,7 +467,7 @@ void cmd_qwk_download(Session* s, const char* data) {
   if (qwk_generate_packet(s, qwk_path, last_qwk)) {
     struct stat st;
     if (stat(qwk_path, &st) == 0) {
-      snprintf(buf, sizeof(buf), "\r\nPacket generated: %s (%ld bytes)\r\n", qwk_path, (long)st.st_size);
+      snprintf(buf, sizeof(buf), "\r\nPacket generated: %.190s (%ld bytes)\r\n", qwk_path, (long)st.st_size);
       send_str(s, buf);
 
       send_str(s, "\r\nSelect download protocol: (Z)modem, (Y)modem, (X)modem: ");
@@ -486,7 +498,7 @@ void cmd_qwk_download(Session* s, const char* data) {
         char ts[32];
         strftime(ts, sizeof(ts), "%Y-%m-%d %H:%M:%S", tm);
         db_user_set_last_qwk(s->db, s->user.id, ts);
-        strncpy(s->user.last_qwk, ts, sizeof(s->user.last_qwk) - 1);
+        qwk_copy(s->user.last_qwk, sizeof(s->user.last_qwk), ts);
       } else {
         send_str(s, "\r\nTransfer failed or cancelled.\r\n");
       }
@@ -514,12 +526,12 @@ bool qwk_import_rep(Session* s, const char* rep_path) {
   
   /* Look for *.MSG file (BBSID.MSG) */
   char msg_path[512];
-  snprintf(msg_path, sizeof(msg_path), "%s/MUTINEER.MSG", temp_dir);
+  path_join(temp_dir, "MUTINEER.MSG", msg_path, sizeof(msg_path));
   
   FILE* f = fopen(msg_path, "rb");
   if (!f) {
     /* Try uppercase */
-    snprintf(msg_path, sizeof(msg_path), "%s/mutineer.msg", temp_dir);
+    path_join(temp_dir, "mutineer.msg", msg_path, sizeof(msg_path));
     f = fopen(msg_path, "rb");
   }
   
@@ -588,11 +600,11 @@ bool qwk_import_rep(Session* s, const char* rep_path) {
       memset(&msg, 0, sizeof(msg));
       msg.area_id = conf_num;
       msg.user_id = s->user.id;
-      strncpy(msg.user_handle, s->user.handle, sizeof(msg.user_handle) - 1);
-      strncpy(msg.to_name, to_name, sizeof(msg.to_name) - 1);
-      strncpy(msg.from_name, s->user.handle, sizeof(msg.from_name) - 1);
-      strncpy(msg.subject, subject, sizeof(msg.subject) - 1);
-      strncpy(msg.body, body, sizeof(msg.body) - 1);
+      qwk_copy(msg.user_handle, sizeof(msg.user_handle), s->user.handle);
+      qwk_copy(msg.to_name, sizeof(msg.to_name), to_name);
+      qwk_copy(msg.from_name, sizeof(msg.from_name), s->user.handle);
+      qwk_copy(msg.subject, sizeof(msg.subject), subject);
+      qwk_copy(msg.body, sizeof(msg.body), body);
       
       if (db_message_post_ex(s->db, &msg)) {
         imported++;

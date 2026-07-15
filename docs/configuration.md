@@ -72,22 +72,26 @@ Keys match `BbsConfig` fields in `include/bbs_config.h`. Defaults shown are from
 | `max_calls_per_day` | int | `0` | No | Max logins per user per calendar day; `0` = unlimited |
 | `max_page_sysop` | int | `3` | No | Max sysop page attempts per session; `0` = unlimited |
 
-### WFC Console
+### Console / WFC Dashboard
 
 | Key | Type | Default | Required | Description |
 |-----|------|---------|----------|-------------|
-| `wfc_enabled` | int | `1` | No | Run local WFC console thread |
-| `wfc_refresh_ms` | int | `1000` | No | WFC screen refresh interval (ms) |
-| `wfc_blank_sec` | int | `300` | No | Blank screen timeout; `0` = disabled |
-| `wfc_node_num` | int | `1` | No | Local WFC console node number |
+| `console_enabled` | int/bool | `1` | No | Run the TCP console-control service for `mutineer-console` |
+| `console_bind` | string | `127.0.0.1` | No | Console-control bind address |
+| `console_port` | int | `2931` | No | Console-control TCP port |
+| `console_idle_timeout_sec` | int | `600` | No | Idle timeout for console-control clients |
+| `wfc_enabled` | int | `0` | No | Deprecated local WFC thread flag; use `mutineer-console` |
+| `wfc_refresh_ms` | int | `1000` | No | `mutineer-console` refresh interval (ms) |
+| `wfc_blank_sec` | int | `300` | No | `mutineer-console` blank screen timeout; `0` = disabled |
+| `wfc_node_num` | int | `1` | No | `mutineer-console` display node number |
 | `wfc_fg_color` | int | `11` | No | WFC foreground ANSI color (0–15) |
 | `wfc_bg_color` | int | `0` | No | WFC background ANSI color (0–7) |
 | `wfc_status_idle_char` | char | `I` | No | Node status char when idle |
 | `wfc_status_logging_char` | char | `L` | No | Node status char during login |
 | `wfc_status_online_char` | char | `A` | No | Node status char when online |
 | `wfc_status_chat_char` | char | `S` | No | Node status char during chat |
-| `wfc_shell_enabled` | int/bool | `0` | No | Enable the local WFC `D` command |
-| `wfc_shell_command` | string | *(empty)* | No | Argv-template command for WFC `D`; disabled unless explicitly set |
+| `wfc_shell_enabled` | int/bool | `0` | No | Enable the console `D` command on the server |
+| `wfc_shell_command` | string | *(empty)* | No | Server-side argv-template command for console `D`; disabled unless explicitly set |
 
 ### Scheduler
 
@@ -139,6 +143,7 @@ Keys match `BbsConfig` fields in `include/bbs_config.h`. Defaults shown are from
 | `door_default_timeout_sec` | int | `300` | No | Door timeout; `0` = no timeout |
 | `door_cleanup_on_exit` | int | `1` | No | Remove runtime tree on successful exit |
 | `door_keep_failed_runs` | int | `0` | No | Keep runtime tree on failure for debugging |
+| `door_session_hmac_secret` | string | `mutineer-dev-door-secret` | Yes for production | Shared secret for signing native-door session assertions |
 
 ### Plugins
 
@@ -187,7 +192,10 @@ login_max_attempts=5
 allow_multi_login=0
 password_upgrade=1
 
-wfc_enabled=1
+console_enabled=1
+console_bind=127.0.0.1
+console_port=2931
+wfc_enabled=0
 scheduler_enabled=1
 scheduler_tick_sec=60
 
@@ -197,6 +205,7 @@ dosbox_path=/usr/bin/dosbox
 door_runtime_path=/var/lib/mutineer/door_runtime
 door_default_timeout_sec=600
 door_cleanup_on_exit=1
+door_session_hmac_secret=replace-with-a-long-random-production-secret
 
 plugins_enabled=true
 plugins_dir=/opt/mutineer/plugins
@@ -217,5 +226,6 @@ CLI tools accept `-c` / `--config` with the same keys.
 
 - [Getting Started](getting-started.md) — first-time setup
 - [Sysop Guide](sysop-guide.md) — WFC and scheduler tuning
+- [Console Protocol](console-protocol.md) — console-control TCP framing and commands
 - [Doors and Scripting](doors-and-scripting.md) — DOS door settings
 - [Plugins](plugins.md) — plugin configuration

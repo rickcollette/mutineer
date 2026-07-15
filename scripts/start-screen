@@ -1,10 +1,15 @@
 #!/bin/bash
-# Start Mutineer BBS in a screen session with WFC console
+# Start Mutineer BBS in a screen session.
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-BBS_DIR="$(dirname "$SCRIPT_DIR")/dist"
-SCREEN_NAME="mutineer-console"
+BBS_ROOT="$(dirname "$SCRIPT_DIR")"
+if [ -x "$BBS_ROOT/mutineer" ]; then
+    BBS_DIR="$BBS_ROOT"
+else
+    BBS_DIR="$BBS_ROOT/dist"
+fi
+SCREEN_NAME="mutineer-daemon"
 
 if screen -list | grep -q "$SCREEN_NAME"; then
     echo "Screen session '$SCREEN_NAME' already exists"

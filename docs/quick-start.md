@@ -57,7 +57,7 @@ telnet localhost 2929
 ```bash
 git clone https://github.com/rickcollette/mutineer.git
 cd mutineer
-sudo apt-get install -y cmake build-essential libsqlite3-dev libssl-dev
+sudo apt-get install -y cmake build-essential libsqlite3-dev sqlite3 libssl-dev libarchive-dev
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build
 build/mutineer-initbbs -c conf/mutineer.conf -y
@@ -72,7 +72,7 @@ build/mutineer -c conf/mutineer.conf
 
 ## WFC console (sysop)
 
-The detached Docker service runs without a local TTY, so the **Waiting For Caller** screen is off by default. To open WFC interactively:
+The BBS runs the console-control service on `127.0.0.1:2931`. To open the **Waiting For Caller** dashboard interactively:
 
 ```bash
 ./scripts/open-wfc.sh

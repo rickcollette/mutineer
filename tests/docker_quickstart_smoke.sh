@@ -45,4 +45,17 @@ if [ -x "$BUILD_DIR/mutineer" ]; then
   "$BUILD_DIR/mutineer" --help >/dev/null
 fi
 
+"${COMPOSE[@]}" -f "$COMPOSE_FILE" -p "$PROJECT" exec -T mutineer \
+  bash -lc 'timeout 3 bash -c "cat < /dev/null > /dev/tcp/127.0.0.1/2929"'
+
+console_reply="$("${COMPOSE[@]}" -f "$COMPOSE_FILE" -p "$PROJECT" exec -T mutineer \
+  bash -lc 'exec 7<>/dev/tcp/127.0.0.1/2931; printf "{\"id\":\"hello\",\"cmd\":\"hello\"}\n" >&7; IFS= read -r -t 3 line <&7; printf "%s" "$line"')"
+case "$console_reply" in
+  *'"id":"hello","ok":true'*) ;;
+  *)
+    echo "console service did not answer hello: $console_reply" >&2
+    exit 1
+    ;;
+esac
+
 echo "docker quick-start smoke completed"

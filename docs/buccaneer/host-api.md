@@ -1,6 +1,6 @@
 # Buccaneer Host API Reference
 
-Host functions are called from bytecode as `NAMESPACE.NAME(args)`. The Mutineer implementation registers handlers in `src/buccaneer/host.c`. This document reflects **what is registered today**; the [Buccaneer spec](../../SPECS/BUCCANEER/Buccaneer_SPEC.md) may define additional calls not yet wired.
+Host functions are called from bytecode as `NAMESPACE.NAME(args)`. The Mutineer implementation registers handlers in `src/buccaneer/host.c`. This document reflects the live host surface built into the top-level CMake `mutineer` target; the [Buccaneer spec](../../SPECS/BUCCANEER/Buccaneer_SPEC.md) may define additional future calls.
 
 **Legend:** ✅ dispatched · ⚠️ registered but not dispatched · ❌ spec only
 
@@ -31,10 +31,9 @@ Host functions are called from bytecode as `NAMESPACE.NAME(args)`. The Mutineer 
 | `USER.SECURITY()` | user.read | INTEGER |
 | `USER.TIME_LEFT()` | user.read | INTEGER |
 | `USER.TIME_REMAINING()` | user.read | INTEGER |
+| `USER.FLAGS()` | user.read | INTEGER |
 
 `USER.TIMELEFT()` remains accepted as a compatibility alias.
-
-`USER.FLAGS()` — spec struct field exists; not yet in dispatch table.
 
 ## USERS — directory lookups
 

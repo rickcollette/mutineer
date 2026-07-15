@@ -42,6 +42,15 @@ static struct {
   .initialized = 0
 };
 
+static void chat_copy(char* dst, size_t cap, const char* src) {
+  if (!dst || cap == 0) return;
+  if (!src) src = "";
+  size_t n = strlen(src);
+  if (n >= cap) n = cap - 1;
+  memcpy(dst, src, n);
+  dst[n] = '\0';
+}
+
 /* Per-instance state */
 typedef struct chat_inst {
   char username[64];
@@ -60,8 +69,7 @@ static void chat_user_join(const char* username) {
   }
   for (int i = 0; i < CHAT_MAX_USERS; i++) {
     if (!g_chat.user_active[i]) {
-      strncpy(g_chat.users[i], username, sizeof(g_chat.users[i]) - 1);
-      g_chat.users[i][sizeof(g_chat.users[i]) - 1] = '\0';
+      chat_copy(g_chat.users[i], sizeof(g_chat.users[i]), username);
       g_chat.user_active[i] = 1;
       break;
     }
@@ -86,8 +94,7 @@ static int chat_list_users(char users[][64], int max_users) {
   int count = 0;
   for (int i = 0; i < CHAT_MAX_USERS && count < max_users; i++) {
     if (g_chat.user_active[i]) {
-      strncpy(users[count], g_chat.users[i], 63);
-      users[count][63] = '\0';
+      chat_copy(users[count], 64, g_chat.users[i]);
       count++;
     }
   }
@@ -101,10 +108,8 @@ static void chat_post(const char* sender, const char* text) {
   
   chat_message_t* msg = &g_chat.messages[g_chat.head];
   msg->timestamp = time(NULL);
-  strncpy(msg->sender, sender ? sender : "???", sizeof(msg->sender) - 1);
-  msg->sender[sizeof(msg->sender) - 1] = '\0';
-  strncpy(msg->text, text ? text : "", sizeof(msg->text) - 1);
-  msg->text[sizeof(msg->text) - 1] = '\0';
+  chat_copy(msg->sender, sizeof(msg->sender), sender ? sender : "???");
+  chat_copy(msg->text, sizeof(msg->text), text ? text : "");
   msg->valid = 1;
   
   g_chat.head = (g_chat.head + 1) % CHAT_MAX_MESSAGES;
@@ -156,8 +161,7 @@ static bbs_rc_t chat_enter(void* inst, bbs_session_t* s) {
   
   /* Store username */
   const char* user = H->session_username(s);
-  strncpy(ci->username, user ? user : "Anonymous", sizeof(ci->username) - 1);
-  ci->username[sizeof(ci->username) - 1] = '\0';
+  chat_copy(ci->username, sizeof(ci->username), user ? user : "Anonymous");
   
   /* Set last_seen to current count so we don't show old messages */
   pthread_mutex_lock(&g_chat.mu);
@@ -186,7 +190,7 @@ static bbs_rc_t chat_enter(void* inst, bbs_session_t* s) {
   
   /* Announce join */
   char join_msg[128];
-  snprintf(join_msg, sizeof(join_msg), "*** %s has joined the chat ***", ci->username);
+  snprintf(join_msg, sizeof(join_msg), "*** %.90s has joined the chat ***", ci->username);
   chat_post("SYSTEM", join_msg);
   
   H->log(BBS_LOG_INFO, "chat", "user joined chat room");
@@ -279,7 +283,7 @@ static void chat_exit(void* inst, bbs_session_t* s) {
   
   /* Announce leave */
   char leave_msg[128];
-  snprintf(leave_msg, sizeof(leave_msg), "*** %s has left the chat ***", ci->username);
+  snprintf(leave_msg, sizeof(leave_msg), "*** %.90s has left the chat ***", ci->username);
   chat_post("SYSTEM", leave_msg);
   if (ci->active) {
     chat_user_leave(ci->username);

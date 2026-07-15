@@ -167,10 +167,16 @@ static bbs_rc_t host_io_write(bbs_session_t* s, const void* buf, size_t n) {
   Session* sess = TO_SESSION(s);
   if (!sess || sess->fd < 0) return BBS_EIO;
   if (!buf || n == 0) return BBS_OK;
-  
-  if (!fd_write_all(sess->fd, buf, n)) {
-    return BBS_EIO;
+
+  const char* text = (const char*)buf;
+  size_t start = 0;
+  for (size_t i = 0; i < n; i++) {
+    if (text[i] != '\n' || (i > 0 && text[i - 1] == '\r')) continue;
+    if (i > start && !fd_write_all(sess->fd, text + start, i - start)) return BBS_EIO;
+    if (!fd_write_all(sess->fd, "\r\n", 2)) return BBS_EIO;
+    start = i + 1;
   }
+  if (start < n && !fd_write_all(sess->fd, text + start, n - start)) return BBS_EIO;
   return BBS_OK;
 }
 
@@ -191,10 +197,7 @@ static bbs_rc_t host_io_printf(bbs_session_t* s, const char* fmt, ...) {
   size_t to_write = (size_t)len;
   if (to_write > sizeof(buf) - 1) to_write = sizeof(buf) - 1;
   
-  if (!fd_write_all(sess->fd, buf, to_write)) {
-    return BBS_EIO;
-  }
-  return BBS_OK;
+  return host_io_write(s, buf, to_write);
 }
 
 static bbs_rc_t host_io_readline(bbs_session_t* s, char* out, size_t out_sz, int echo) {
@@ -204,26 +207,13 @@ static bbs_rc_t host_io_readline(bbs_session_t* s, char* out, size_t out_sz, int
   
   out[0] = '\0';
   
-  /* Use fd_readline for basic line reading */
   int timeout = sess->cfg.idle_timeout_sec > 0 ? sess->cfg.idle_timeout_sec : 60;
-  int rc = fd_readline(sess->fd, timeout, (uint8_t*)out, out_sz);
+  int rc = session_readline_echo(sess, (uint8_t*)out, out_sz, timeout, echo ? 1 : 0);
   
   if (rc < 0) return BBS_ETIMEOUT;
   if (rc == 0) return BBS_EIO;  /* disconnect */
-  
-  /* Echo the input if requested */
-  if (echo) {
-    fd_write_all(sess->fd, out, strlen(out));
-  } else {
-    /* Echo asterisks for password input */
-    for (size_t i = 0; i < strlen(out); i++) {
-      fd_write_all(sess->fd, "*", 1);
-    }
-  }
-  
-  /* Echo newline */
-  fd_write_all(sess->fd, "\r\n", 2);
-  
+  (void)echo;
+  send_str(sess, "\r\n");
   return BBS_OK;
 }
 

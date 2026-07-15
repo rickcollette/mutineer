@@ -570,11 +570,16 @@ int main(int argc, char* argv[]) {
             return 0;
         }
         
-        setsid();
+        if (setsid() < 0) {
+            fprintf(stderr, "setsid failed\n");
+            return 1;
+        }
         
-        freopen("/dev/null", "r", stdin);
-        freopen("/var/log/plankd.log", "a", stdout);
-        freopen("/var/log/plankd.log", "a", stderr);
+        if (!freopen("/dev/null", "r", stdin) ||
+            !freopen("/var/log/plankd.log", "a", stdout) ||
+            !freopen("/var/log/plankd.log", "a", stderr)) {
+            return 1;
+        }
     }
     
     setup_signals();

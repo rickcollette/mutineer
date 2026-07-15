@@ -120,6 +120,7 @@ bbs_name=Mutineer Test BBS
 sysop_name=Sysop
 motd=$PROJECT_DIR/art/motd.ans
 wfc_enabled=0
+console_enabled=0
 scheduler_enabled=0
 allow_multi_login=0
 login_max_attempts=20

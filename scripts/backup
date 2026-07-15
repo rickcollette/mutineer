@@ -3,8 +3,13 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-BBS_DIR="$(dirname "$SCRIPT_DIR")/dist"
-BACKUP_DIR="$(dirname "$SCRIPT_DIR")/backups"
+BBS_ROOT="$(dirname "$SCRIPT_DIR")"
+if [ -x "$BBS_ROOT/mutineer" ]; then
+    BBS_DIR="$BBS_ROOT"
+else
+    BBS_DIR="$BBS_ROOT/dist"
+fi
+BACKUP_DIR="$BBS_ROOT/backups"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 BACKUP_NAME="mutineer_backup_$TIMESTAMP"
 

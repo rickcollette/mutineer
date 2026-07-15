@@ -122,6 +122,32 @@ CREATE TABLE IF NOT EXISTS nodes (
   FOREIGN KEY(user_id) REFERENCES users(id)
 );
 
+CREATE TABLE IF NOT EXISTS node_locks (
+  node_num INTEGER PRIMARY KEY,
+  locked INTEGER NOT NULL DEFAULT 1,
+  actor TEXT,
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS bucc_kv (
+  scope TEXT NOT NULL,
+  key TEXT NOT NULL,
+  value TEXT NOT NULL,
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY(scope, key)
+);
+
+CREATE TABLE IF NOT EXISTS bucc_data_records (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  scope TEXT NOT NULL,
+  dataset TEXT NOT NULL,
+  value TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_bucc_data_scope_dataset ON bucc_data_records(scope, dataset, id);
+
 CREATE TABLE IF NOT EXISTS conferences (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   key TEXT NOT NULL UNIQUE,

@@ -7,7 +7,7 @@ Edit `conf/mutineer.conf`. Key sections:
 ```
 # Core
 bind=0.0.0.0
-port=2323
+port=2929
 db_path=data/mutineer.db
 art_path=art
 menu_main=main.mnu
@@ -164,7 +164,7 @@ Run any tool with `--help` for full options.
 
 ## WFC Console Hotkeys
 
-Local hotkeys at the WFC (Waiting for Caller) screen:
+Hotkeys in the standalone `mutineer-console` WFC screen:
 
 | Key | Action |
 |-----|--------|
@@ -173,8 +173,8 @@ Local hotkeys at the WFC (Waiting for Caller) screen:
 | `b<msg>` | Broadcast message to all nodes |
 | `q` | Shutdown BBS |
 | `@<pos>` | Inspect node (e.g. `@A0`) |
-| F1 | Quit WFC |
-| F4 | Refresh screen |
+| `Q` | Quit console |
+| `S` | Show system status |
 
 ## Security Notes
 

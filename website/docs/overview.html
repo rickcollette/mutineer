@@ -4,16 +4,15 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mutineer BBS Overview — Mutineer BBS</title>
-  <link rel="stylesheet" href="assets/css/site.css">
+  <link rel="stylesheet" href="../assets/css/site.css">
 </head>
 <body>
   <header class="site-header">
-    <a href="index.html" class="logo">MUTINEER BBS</a>
-    <span class="tagline">Documentation</span>
+    <a href="index.html" class="logo"><span class="mark">☠</span> MUTINEER BBS</a>
+    <span class="tagline">CAPTAIN'S MANUAL // STATIC ARCHIVE</span>
   </header>
-  <nav class="doc-nav"><a href="index.html" class="home">← Home</a><a href="quick-start.html">Quick Start</a><a href="windows.html">Windows</a><a href="getting-started.html">Getting Started</a><a href="deployment.html">Deployment</a><a href="overview.html" class="active">Overview</a><a href="configuration.html">Configuration</a><a href="architecture.html">Architecture</a><a href="menus-and-ui.html">Menus & UI</a><a href="messages-and-mail.html">Messages & Mail</a><a href="files-and-protocols.html">Files & Protocols</a><a href="chat-and-social.html">Chat & Social</a><a href="doors-and-scripting.html">Doors & Scripting</a><a href="sysop-guide.html">Sysop Guide</a><a href="networking-plank.html">PLANK</a><a href="buccaneer/programmers-guide.html">BUCC Guide</a><a href="buccaneer/host-api.html">BUCC API</a><a href="plugins.html">Plugins</a><a href="developer-guide.html">Developer</a><a href="cli-tools.html">CLI Tools</a><a href="reference/menu-actions.html">Menu Actions</a><a href="reference/message-commands.html">Messages Ref</a><a href="reference/file-commands.html">Files Ref</a><a href="reference/acs-mci.html">ACS & MCI</a><a href="reference/database.html">Database</a></nav>
-  <main class="doc-content"><p>&lt;!-- generated-by: gsd-doc-writer --&gt;</p>
-<h1>Mutineer BBS Overview</h1>
+  <nav class="doc-nav"><a href="index.html" class="home">← Home</a><a href="quick-start.html">Quick Start</a><a href="windows.html">Windows</a><a href="getting-started.html">Getting Started</a><a href="deployment.html">Deployment</a><a href="overview.html" class="active">Overview</a><a href="configuration.html">Configuration</a><a href="architecture.html">Architecture</a><a href="menus-and-ui.html">Menus & UI</a><a href="messages-and-mail.html">Messages & Mail</a><a href="files-and-protocols.html">Files & Protocols</a><a href="chat-and-social.html">Chat & Social</a><a href="doors-and-scripting.html">Doors & Scripting</a><a href="sysop-guide.html">Sysop Guide</a><a href="console-protocol.html">Console Protocol</a><a href="networking-plank.html">PLANK</a><a href="buccaneer/programmers-guide.html">BUCC Guide</a><a href="buccaneer/host-api.html">BUCC API</a><a href="plugins.html">Plugins</a><a href="developer-guide.html">Developer</a><a href="website-source.html">Website Source</a><a href="cli-tools.html">CLI Tools</a><a href="reference/menu-actions.html">Menu Actions</a><a href="reference/message-commands.html">Messages Ref</a><a href="reference/file-commands.html">Files Ref</a><a href="reference/acs-mci.html">ACS & MCI</a><a href="reference/database.html">Database</a></nav>
+  <main class="doc-content"><h1>Mutineer BBS Overview</h1>
 <p>Mutineer BBS is a classic telnet bulletin board system for Linux, written in C11. It targets operators who want Renegade-style menus, message and file areas, doors, and sysop tools — with modern persistence (SQLite), password hashing (PBKDF2 with optional Argon2 upgrade), and extensibility via loadable plugins and the Buccaneer interpreted language.</p>
 <h2>Design Goals</h2>
 <ul>
@@ -145,7 +144,7 @@ mutineer-bbs/
 <h2>Dependencies</h2>
 <table>
 <tr><th>Library / Tool</th><th>Required</th><th>Notes</th></tr>
-<tr><td>SQLite3</td><td>Yes</td><td><code>libsqlite3-dev</code> — persistent storage</td></tr>
+<tr><td>SQLite3</td><td>Yes</td><td><code>libsqlite3-dev</code>, <code>sqlite3</code> — storage and maintenance scripts</td></tr>
 <tr><td>OpenSSL</td><td>Yes</td><td><code>libssl-dev</code> — PBKDF2 password hashing, PLANK crypto</td></tr>
 <tr><td>pthreads</td><td>Yes</td><td>Thread-per-connection model</td></tr>
 <tr><td>libarchive</td><td>Yes</td><td><code>libarchive-dev</code> — archive and QWK package handling</td></tr>
@@ -155,7 +154,7 @@ mutineer-bbs/
 </table>
 <p>Debian/Ubuntu install:</p>
 <pre><code class="bash">
-apt-get install libsqlite3-dev libssl-dev libargon2-dev dosbox
+apt-get install libsqlite3-dev sqlite3 libssl-dev libarchive-dev libargon2-dev dosbox
 </code></pre>
 <h2>Configuration Entry Point</h2>
 <p>Primary config file: <code>conf/mutineer.conf</code> (key=value format). See <a href="configuration.html">Configuration</a> for all keys.</p>

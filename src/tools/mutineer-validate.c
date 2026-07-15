@@ -167,18 +167,18 @@ static int check_template_coverage(const char* dir) {
   int missing = 0;
   for (int i = 0; i < menu_count; i++) {
     char ans_path[512], asc_path[512];
-    snprintf(ans_path, sizeof(ans_path), "%s/%s.ans", dir, menus[i]);
-    snprintf(asc_path, sizeof(asc_path), "%s/%s.asc", dir, menus[i]);
+    snprintf(ans_path, sizeof(ans_path), "%.470s/%.31s.ans", dir, menus[i]);
+    snprintf(asc_path, sizeof(asc_path), "%.470s/%.31s.asc", dir, menus[i]);
     
     if (!file_exists(ans_path)) {
       char msg[128];
-      snprintf(msg, sizeof(msg), "missing ANSI template for menu '%s'", menus[i]);
+      snprintf(msg, sizeof(msg), "missing ANSI template for menu '%.31s'", menus[i]);
       log_warn(dir, msg);
       missing++;
     }
     if (!file_exists(asc_path)) {
       char msg[128];
-      snprintf(msg, sizeof(msg), "missing ASCII template for menu '%s'", menus[i]);
+      snprintf(msg, sizeof(msg), "missing ASCII template for menu '%.31s'", menus[i]);
       log_warn(dir, msg);
       missing++;
     }

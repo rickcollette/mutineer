@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Website Source Ownership — Mutineer BBS</title>
+  <link rel="stylesheet" href="../assets/css/site.css">
+</head>
+<body>
+  <header class="site-header">
+    <a href="index.html" class="logo"><span class="mark">☠</span> MUTINEER BBS</a>
+    <span class="tagline">CAPTAIN'S MANUAL // STATIC ARCHIVE</span>
+  </header>
+  <nav class="doc-nav"><a href="index.html" class="home">← Home</a><a href="quick-start.html">Quick Start</a><a href="windows.html">Windows</a><a href="getting-started.html">Getting Started</a><a href="deployment.html">Deployment</a><a href="overview.html">Overview</a><a href="configuration.html">Configuration</a><a href="architecture.html">Architecture</a><a href="menus-and-ui.html">Menus & UI</a><a href="messages-and-mail.html">Messages & Mail</a><a href="files-and-protocols.html">Files & Protocols</a><a href="chat-and-social.html">Chat & Social</a><a href="doors-and-scripting.html">Doors & Scripting</a><a href="sysop-guide.html">Sysop Guide</a><a href="console-protocol.html">Console Protocol</a><a href="networking-plank.html">PLANK</a><a href="buccaneer/programmers-guide.html">BUCC Guide</a><a href="buccaneer/host-api.html">BUCC API</a><a href="plugins.html">Plugins</a><a href="developer-guide.html">Developer</a><a href="website-source.html" class="active">Website Source</a><a href="cli-tools.html">CLI Tools</a><a href="reference/menu-actions.html">Menu Actions</a><a href="reference/message-commands.html">Messages Ref</a><a href="reference/file-commands.html">Files Ref</a><a href="reference/acs-mci.html">ACS & MCI</a><a href="reference/database.html">Database</a></nav>
+  <main class="doc-content"><h1>Website Source Ownership</h1>
+<p>The canonical public website source is the Markdown documentation under</p>
+<p><code>docs/</code> plus <code>scripts/build-website.py</code>.</p>
+<p>Generated static HTML under <code>website/</code> is checked in so releases and GitHub</p>
+<p>Pages can publish without a Node build. CI verifies that the generated output is</p>
+<p>fresh by running the website generator in check mode.</p>
+<p>The Vite/React files under <code>website/</code> are experimental development material and</p>
+<p>are not the release or publication source of truth. They must not replace the</p>
+<p>Markdown-generated website unless this document, CI, release packaging, and the</p>
+<p>deployment scripts are changed together.</p>
+<p>Release package trees under <code>dist/</code> and Vite output under <code>website/dist/</code> are</p>
+<p>generated artifacts. Rebuild them with the release or website scripts instead of</p>
+<p>editing them by hand.</p></main>
+  <footer class="site-footer">
+    <p>Mutineer BBS — <a href="https://github.com/rickcollette/mutineer">GitHub</a> — MIT License</p>
+  </footer>
+</body>
+</html>

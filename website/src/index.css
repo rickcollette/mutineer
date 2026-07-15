@@ -1,0 +1,378 @@
+@import url('https://fonts.googleapis.com/css2?family=VT323&family=IBM+Plex+Mono:wght@400;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+  DOS ANSI 16-color palette:
+  --cyan:    #55ffff  (bright cyan)   -- primary body text
+  --yellow:  #ffff55  (bright yellow) -- headers, section titles
+  --magenta: #ff55ff  (bright magenta)-- accents, tags
+  --white:   #ffffff  (white)         -- emphasis
+  --green:   #55ff55  (bright green)  -- positive status, values
+  --red:     #ff5555  (bright red)    -- warnings, errors, skull
+  --blue:    #5555ff  (bright blue)   -- borders, secondary
+  --gray:    #aaaaaa  (light gray)    -- dim text
+  --dkgray:  #555555  (dark gray)     -- muted text
+  --bg:      #000022  (near-black blue)-- background
+*/
+
+:root {
+  --cyan:    #55ffff;
+  --cyan-dim:#00aaaa;
+  --yellow:  #ffff55;
+  --yellow-dim: #aaaa00;
+  --magenta: #ff55ff;
+  --magenta-dim: #aa00aa;
+  --white:   #ffffff;
+  --green:   #55ff55;
+  --green-dim: #00aa00;
+  --red:     #ff5555;
+  --blue:    #5555ff;
+  --blue-dim:#0000aa;
+  --gray:    #aaaaaa;
+  --dkgray:  #555555;
+  --bg:      #000011;
+  --scanline: rgba(0, 0, 0, 0.2);
+}
+
+* {
+  box-sizing: border-box;
+  -webkit-font-smoothing: none;
+  -moz-osx-font-smoothing: unset;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--cyan);
+  font-family: 'IBM Plex Mono', 'Courier New', monospace;
+  overflow-x: hidden;
+  text-rendering: optimizeSpeed;
+}
+
+body {
+  position: relative;
+}
+
+/* CRT scanline overlay */
+body::before {
+  content: '';
+  display: block;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    var(--scanline) 0px,
+    var(--scanline) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+  pointer-events: none;
+  z-index: 9999;
+  opacity: 0.35;
+}
+
+/* CRT flicker */
+@keyframes flicker {
+  0%, 100% { opacity: 1; }
+  92%       { opacity: 1; }
+  93%       { opacity: 0.96; }
+  94%       { opacity: 1; }
+  97%       { opacity: 0.98; }
+}
+
+.crt {
+  animation: flicker 8s infinite;
+}
+
+/* Glow variants */
+.glow-cyan    { text-shadow: 0 0 8px var(--cyan),    0 0 18px var(--cyan-dim); }
+.glow-yellow  { text-shadow: 0 0 8px var(--yellow),  0 0 18px var(--yellow-dim); }
+.glow-magenta { text-shadow: 0 0 8px var(--magenta), 0 0 18px var(--magenta-dim); }
+.glow-green   { text-shadow: 0 0 8px var(--green),   0 0 18px var(--green-dim); }
+.glow-red     { text-shadow: 0 0 8px var(--red),     0 0 14px #aa0000; }
+.glow-white   { text-shadow: 0 0 6px #fff, 0 0 14px #aaaaaa; }
+
+/* Legacy aliases used in JSX */
+.glow       { text-shadow: 0 0 8px var(--cyan),   0 0 18px var(--cyan-dim); }
+.glow-amber { text-shadow: 0 0 8px var(--yellow), 0 0 18px var(--yellow-dim); }
+
+/* Cursor blink */
+@keyframes blink {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+
+.cursor::after {
+  content: '_';
+  animation: blink 1s step-end infinite;
+  color: var(--cyan);
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar-track {
+  background: #000022;
+  border: 1px solid var(--blue-dim);
+}
+::-webkit-scrollbar-thumb { background: var(--blue); }
+
+/* Border boxes */
+.ascii-box {
+  border: 1px solid var(--blue);
+  box-shadow: 0 0 10px rgba(85, 85, 255, 0.25), inset 0 0 6px rgba(85, 85, 255, 0.06);
+}
+
+.ascii-box-yellow {
+  border: 1px solid var(--yellow-dim);
+  box-shadow: 0 0 10px rgba(255, 255, 85, 0.2), inset 0 0 6px rgba(255, 255, 85, 0.04);
+}
+
+.ascii-box-magenta {
+  border: 1px solid var(--magenta-dim);
+  box-shadow: 0 0 10px rgba(255, 85, 255, 0.2), inset 0 0 6px rgba(255, 85, 255, 0.04);
+}
+
+/* Legacy alias */
+.ascii-box-amber { @apply ascii-box-yellow; }
+
+/* VT323 only for display/hero text */
+.font-vt323 {
+  font-family: 'VT323', monospace;
+  -webkit-font-smoothing: none;
+}
+
+/* Crisp monospace for ASCII art blocks */
+pre, code {
+  font-family: 'IBM Plex Mono', 'Courier New', monospace;
+  -webkit-font-smoothing: none;
+  letter-spacing: 0;
+}
+
+/* Progress bar */
+@keyframes progress-fill {
+  from { width: 0%; }
+  to   { width: var(--target-width); }
+}
+
+.progress-bar { animation: progress-fill 2s ease-out forwards; }
+
+/* Menu items */
+.menu-item {
+  transition: background-color 0.05s, color 0.05s;
+  color: var(--cyan);
+  border-left: 1px solid transparent;
+  border-right: 1px solid transparent;
+  text-shadow: 0 0 6px var(--cyan-dim);
+}
+
+.menu-item:hover,
+.menu-item.active {
+  background-color: var(--cyan);
+  color: var(--bg);
+  border-left-color: var(--cyan);
+  border-right-color: var(--cyan);
+  text-shadow: none;
+}
+
+.menu-item .nav-key {
+  color: var(--yellow);
+}
+
+.menu-item:hover .nav-key,
+.menu-item.active .nav-key {
+  color: var(--bg);
+}
+
+.doc-filter {
+  border-color: var(--blue-dim);
+  background: transparent;
+  transition: background-color 0.05s, border-color 0.05s, color 0.05s;
+}
+
+.doc-filter:hover,
+.doc-filter.is-active {
+  background: var(--cyan);
+  border-color: var(--cyan);
+  color: var(--bg);
+  text-shadow: none;
+}
+
+.doc-article-link {
+  display: block;
+  width: 100%;
+  padding: 0.55rem 0.75rem;
+  text-align: left;
+  color: var(--cyan);
+  border-bottom: 1px solid #000033;
+  transition: background-color 0.05s, color 0.05s;
+}
+
+.doc-article-link:hover,
+.doc-article-link.is-active {
+  background: var(--cyan);
+  color: var(--bg);
+  text-shadow: none;
+}
+
+.doc-markdown {
+  color: var(--gray);
+  font-size: 1rem;
+  line-height: 1.7;
+}
+
+.doc-markdown > *:first-child {
+  margin-top: 0;
+}
+
+.doc-markdown h1,
+.doc-markdown h2,
+.doc-markdown h3,
+.doc-markdown h4 {
+  font-weight: 400;
+  letter-spacing: 0;
+}
+
+.doc-markdown h1 {
+  color: var(--yellow);
+  font-size: 1.8rem;
+  line-height: 1.15;
+  margin: 0 0 1rem;
+  padding-bottom: 0.6rem;
+  border-bottom: 1px solid var(--blue-dim);
+  text-shadow: 0 0 8px var(--yellow), 0 0 18px var(--yellow-dim);
+}
+
+.doc-markdown h1::before {
+  content: "## ";
+  color: var(--cyan);
+}
+
+.doc-markdown h2 {
+  color: var(--cyan);
+  font-size: 1.25rem;
+  margin: 1.8rem 0 0.7rem;
+  padding-bottom: 0.35rem;
+  border-bottom: 1px solid var(--blue-dim);
+  text-shadow: 0 0 8px var(--cyan), 0 0 18px var(--cyan-dim);
+}
+
+.doc-markdown h2::before {
+  content: "> ";
+  color: var(--yellow);
+}
+
+.doc-markdown h3 {
+  color: var(--magenta);
+  font-size: 1.05rem;
+  margin: 1.35rem 0 0.5rem;
+  text-shadow: 0 0 8px var(--magenta), 0 0 18px var(--magenta-dim);
+}
+
+.doc-markdown h4 {
+  color: var(--green);
+  margin: 1rem 0 0.4rem;
+}
+
+.doc-markdown p {
+  margin: 0.75rem 0;
+  color: var(--gray);
+}
+
+.doc-markdown strong {
+  color: var(--white);
+}
+
+.doc-markdown a {
+  color: var(--cyan);
+  text-decoration: none;
+  border-bottom: 1px solid var(--blue-dim);
+}
+
+.doc-markdown a:hover {
+  color: var(--yellow);
+  border-bottom-color: var(--yellow);
+}
+
+.doc-markdown ul,
+.doc-markdown ol {
+  margin: 0.65rem 0 1rem 1.35rem;
+  padding: 0;
+}
+
+.doc-markdown li {
+  margin: 0.35rem 0;
+}
+
+.doc-markdown li::marker {
+  color: var(--yellow);
+}
+
+.doc-markdown pre {
+  margin: 1rem 0;
+  padding: 0.85rem 1rem;
+  background: #000022;
+  border: 1px solid var(--blue-dim);
+  color: var(--green);
+  overflow-x: auto;
+  box-shadow: inset 0 0 12px rgba(85, 255, 255, 0.08);
+}
+
+.doc-markdown pre::before {
+  content: "C:\\MUTINEER> ";
+  display: block;
+  color: var(--yellow);
+  margin-bottom: 0.25rem;
+}
+
+.doc-markdown code {
+  color: var(--green);
+}
+
+.doc-markdown p code,
+.doc-markdown li code,
+.doc-markdown td code {
+  padding: 0.08rem 0.3rem;
+  background: #000022;
+  border: 1px solid var(--blue-dim);
+}
+
+.doc-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  margin: 1rem 0;
+}
+
+.doc-markdown table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.doc-markdown th,
+.doc-markdown td {
+  padding: 0.5rem 0.65rem;
+  border: 1px solid var(--blue-dim);
+  text-align: left;
+  vertical-align: top;
+}
+
+.doc-markdown th {
+  color: var(--yellow);
+  background: #000022;
+  font-weight: 400;
+}
+
+.doc-markdown td {
+  color: var(--gray);
+}
+
+.doc-markdown tr:nth-child(even) td {
+  background: rgba(0, 0, 34, 0.7);
+}

@@ -104,7 +104,7 @@ Run:
 
 Connect:
 ```
-telnet 127.0.0.1 2323
+telnet 127.0.0.1 2929
 ```
 
 ## 10. Roadmap (high level)

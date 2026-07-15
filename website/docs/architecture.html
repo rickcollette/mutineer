@@ -4,17 +4,16 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Architecture — Mutineer BBS</title>
-  <link rel="stylesheet" href="assets/css/site.css">
+  <link rel="stylesheet" href="../assets/css/site.css">
 </head>
 <body>
   <header class="site-header">
-    <a href="index.html" class="logo">MUTINEER BBS</a>
-    <span class="tagline">Documentation</span>
+    <a href="index.html" class="logo"><span class="mark">☠</span> MUTINEER BBS</a>
+    <span class="tagline">CAPTAIN'S MANUAL // STATIC ARCHIVE</span>
   </header>
-  <nav class="doc-nav"><a href="index.html" class="home">← Home</a><a href="quick-start.html">Quick Start</a><a href="windows.html">Windows</a><a href="getting-started.html">Getting Started</a><a href="deployment.html">Deployment</a><a href="overview.html">Overview</a><a href="configuration.html">Configuration</a><a href="architecture.html" class="active">Architecture</a><a href="menus-and-ui.html">Menus & UI</a><a href="messages-and-mail.html">Messages & Mail</a><a href="files-and-protocols.html">Files & Protocols</a><a href="chat-and-social.html">Chat & Social</a><a href="doors-and-scripting.html">Doors & Scripting</a><a href="sysop-guide.html">Sysop Guide</a><a href="networking-plank.html">PLANK</a><a href="buccaneer/programmers-guide.html">BUCC Guide</a><a href="buccaneer/host-api.html">BUCC API</a><a href="plugins.html">Plugins</a><a href="developer-guide.html">Developer</a><a href="cli-tools.html">CLI Tools</a><a href="reference/menu-actions.html">Menu Actions</a><a href="reference/message-commands.html">Messages Ref</a><a href="reference/file-commands.html">Files Ref</a><a href="reference/acs-mci.html">ACS & MCI</a><a href="reference/database.html">Database</a></nav>
-  <main class="doc-content"><p>&lt;!-- generated-by: gsd-doc-writer --&gt;</p>
-<h1>Architecture</h1>
-<p>Mutineer BBS is a single-process, multi-threaded telnet server. One main thread accepts connections; each caller gets a dedicated session thread. Background threads run the WFC console and event scheduler. SQLite provides shared persistence with per-thread connections where needed.</p>
+  <nav class="doc-nav"><a href="index.html" class="home">← Home</a><a href="quick-start.html">Quick Start</a><a href="windows.html">Windows</a><a href="getting-started.html">Getting Started</a><a href="deployment.html">Deployment</a><a href="overview.html">Overview</a><a href="configuration.html">Configuration</a><a href="architecture.html" class="active">Architecture</a><a href="menus-and-ui.html">Menus & UI</a><a href="messages-and-mail.html">Messages & Mail</a><a href="files-and-protocols.html">Files & Protocols</a><a href="chat-and-social.html">Chat & Social</a><a href="doors-and-scripting.html">Doors & Scripting</a><a href="sysop-guide.html">Sysop Guide</a><a href="console-protocol.html">Console Protocol</a><a href="networking-plank.html">PLANK</a><a href="buccaneer/programmers-guide.html">BUCC Guide</a><a href="buccaneer/host-api.html">BUCC API</a><a href="plugins.html">Plugins</a><a href="developer-guide.html">Developer</a><a href="website-source.html">Website Source</a><a href="cli-tools.html">CLI Tools</a><a href="reference/menu-actions.html">Menu Actions</a><a href="reference/message-commands.html">Messages Ref</a><a href="reference/file-commands.html">Files Ref</a><a href="reference/acs-mci.html">ACS & MCI</a><a href="reference/database.html">Database</a></nav>
+  <main class="doc-content"><h1>Architecture</h1>
+<p>Mutineer BBS is a single-process, multi-threaded telnet server. One main thread accepts caller connections; each caller gets a dedicated session thread. Background threads run the remote console-control service and event scheduler. SQLite provides shared persistence with per-thread connections where needed.</p>
 <h2>System Overview</h2>
 <pre><code class="">
                     ┌─────────────────────────────────────┐
@@ -25,8 +24,8 @@
          ┌──────────────────────────┼──────────────────────────┐
          │                          │                          │
          ▼                          ▼                          ▼
-  net_listener.c              wfc.c                    scheduler.c
-  (accept loop)            (sysop console)            (cron events)
+  net_listener.c        console_service.c              scheduler.c
+  (accept loop)         (mutineer-console API)         (cron events)
          │
          │  spawn per connection
          ▼
@@ -52,9 +51,9 @@
 <li>Run <code>startup_init_database()</code> — verify schema and seed data</li>
 <li>Initialize teleconference (<code>teleconf_init</code>)</li>
 <li>Initialize plugin loader (<code>plugin_loader_init</code>)</li>
-<li>Start WFC thread (<code>wfc_start</code>) and scheduler (<code>scheduler_start</code>)</li>
+<li>Start console service (<code>console_service_start</code>) and scheduler (<code>scheduler_start</code>)</li>
 <li>Enter listener loop (<code>net_run_listener</code>) until stop flag set</li>
-<li>Shutdown: scheduler, WFC, plugins, DB, logs</li>
+<li>Shutdown: scheduler, console service, plugins, DB, logs</li>
 </ol>
 <h3>Connection Threads</h3>
 <p><code>net_listener.c</code> accepts TCP connections and spawns a pthread per client (up to 256 nodes tracked in the <code>nodes</code> table). Each thread runs <code>session_run()</code> which:</p>
@@ -68,7 +67,7 @@
 <h3>Background Threads</h3>
 <table>
 <tr><th>Thread</th><th>Source</th><th>Purpose</th></tr>
-<tr><td>WFC</td><td><code>wfc.c</code></td><td>Local sysop console showing node grid</td></tr>
+<tr><td>Console</td><td><code>console_service.c</code> + <code>mutineer-console</code></td><td>Remote sysop console showing node grid</td></tr>
 <tr><td>Scheduler</td><td><code>scheduler.c</code></td><td>Poll <code>events</code> table, run scheduled/logon/permission events</td></tr>
 </table>
 <p>PLANK daemons (<code>plankd</code>, <code>coved</code>) run as <strong>separate processes</strong>, not inside <code>mutineer</code>.</p>
@@ -97,9 +96,10 @@ Connect → Telnet negotiate → Logon menu → Auth/NewUser
 <pre><code class="mermaid">
 graph TD
     Main[main.c] --&gt; Net[net_listener.c]
-    Main --&gt; WFC[wfc.c]
+    Main --&gt; Console[console_service.c]
     Main --&gt; Sched[scheduler.c]
     Main --&gt; DB[(SQLite db.c)]
+    Console --&gt; ConsoleClient[mutineer-console]
     Net --&gt; Session[session.c]
     Session --&gt; Telnet[telnet.c]
     Session --&gt; Menu[menu.c]
@@ -152,7 +152,8 @@ graph TD
 <tr><td><code>chat.c</code></td><td>Split chat, teleconference, paging</td></tr>
 <tr><td><code>qwk.c</code></td><td>QWK packet generation/import</td></tr>
 <tr><td><code>fido_netmail.c</code></td><td>FidoNet netmail export</td></tr>
-<tr><td><code>wfc.c</code></td><td>Who&#x27;s On Full Color console</td></tr>
+<tr><td><code>console_service.c</code></td><td>TCP control service for the standalone sysop console</td></tr>
+<tr><td><code>tools/mutineer-console.c</code></td><td>Who&#x27;s On Full Color dashboard client</td></tr>
 <tr><td><code>scheduler.c</code></td><td>Event scheduler thread</td></tr>
 <tr><td><code>maint.c</code></td><td>In-BBS maintenance menu actions</td></tr>
 <tr><td><code>hash.c</code></td><td>Password hashing (PBKDF2/Argon2)</td></tr>
@@ -221,7 +222,7 @@ graph TD
 <li>Global online user list protected by mutex (<code>online_*</code> functions in session.c)</li>
 <li>SQLite connections: main DB handle shared; WAL mode recommended for concurrent readers</li>
 <li>Node table updated on login/logout with status transitions</li>
-<li>WFC reads node state read-only on refresh interval</li>
+<li><code>mutineer-console</code> reads node state through the TCP console-control service on its refresh interval</li>
 <li>Plugin loader initializes once; per-session plugin instances created on demand</li>
 </ul>
 <h2>Extension Points</h2>

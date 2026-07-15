@@ -1,118 +1,16 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Mutineer BBS — Classic Telnet BBS in C</title>
-  <link rel="stylesheet" href="assets/css/site.css">
-</head>
-<body>
-
-<header class="landing-header">
-  <div class="logo-ascii">███╗   ███╗██╗   ██╗████████╗██╗███╗   ██╗███████╗███████╗██████╗
-████╗ ████║██║   ██║╚══██╔══╝██║████╗  ██║██╔════╝██╔════╝██╔══██╗
-██╔████╔██║██║   ██║   ██║   ██║██╔██╗ ██║█████╗  █████╗  ██████╔╝
-██║╚██╔╝██║██║   ██║   ██║   ██║██║╚██╗██║██╔══╝  ██╔══╝  ██╔══██╗
-██║ ╚═╝ ██║╚██████╔╝   ██║   ██║██║ ╚████║███████╗███████╗██║  ██║
-╚═╝     ╚═╝ ╚═════╝    ╚═╝   ╚═╝╚═╝  ╚═══╝╚══════╝╚══════╝╚═╝  ╚═╝</div>
-  <h1>MUTINEER BBS</h1>
-  <p class="tagline" style="color:var(--text-dim);margin-top:0.4rem;">A classic telnet BBS — written in C&nbsp;&nbsp;<span class="blink">▮</span></p>
-</header>
-
-<nav class="landing-nav">
-  <a href="#features">Features</a>
-  <a href="#docs">Documentation</a>
-  <a href="#install">Install</a>
-  <a href="https://github.com/rickcollette/mutineer" target="_blank">GitHub</a>
-</nav>
-
-<main class="landing-main">
-
-  <div class="hero">
-    <div>
-      <h2>Sail the digital seas.</h2>
-      <p>Mutineer is a full-featured telnet BBS server built from scratch in C11, styled after the classic Renegade BBS with a green pirate theme. SQLite persistence, DOS doors, PLANK networking, and Buccaneer, an interpreted language for addons, games, doors, and extensions.</p>
-      <div class="badge-row">
-        <span class="badge">C11</span>
-        <span class="badge">SQLite</span>
-        <span class="badge">OpenSSL</span>
-        <span class="badge">DOSBox</span>
-        <span class="badge">MIT License</span>
-      </div>
-      <p style="margin-top:1rem;">
-        <a class="btn btn-primary" href="docs/index.html">Read the Docs</a>
-        <a class="btn btn-secondary" href="https://github.com/rickcollette/mutineer" target="_blank">GitHub</a>
-      </p>
-    </div>
-    <div class="term">
-      <div class="comment">$ telnet localhost 2929</div>
-      <br>
-      <div class="output">  ╔══════════════════════════════════╗</div>
-      <div class="output">  ║    W e l c o m e   A b o a r d  ║</div>
-      <div class="output">  ║      M U T I N E E R   B B S     ║</div>
-      <div class="output">  ╚══════════════════════════════════╝</div>
-      <br>
-      <div>Ahoy, sailor. Enter your handle:</div>
-      <div class="prompt">Handle: <span class="blink">▮</span></div>
-    </div>
-  </div>
-
-  <section id="features">
-    <h2>Features</h2>
-    <div class="feature-grid">
-      <div class="feature-card"><h3>Multi-Node Telnet</h3><p>Thread-per-connection, up to 256 nodes. WFC console, whisper, wall broadcasts.</p></div>
-      <div class="feature-card"><h3>Message System</h3><p>Threaded boards, private email, QWK offline mail, FidoNet netmail, FSEditor.</p></div>
-      <div class="feature-card"><h3>File Areas</h3><p>Upload/download, credits/ratio enforcement, batch ops, archive test/extract.</p></div>
-      <div class="feature-card"><h3>DOS Door Runner</h3><p>DOSBox with serial nullmodem socket passthrough. Aladdin Adventure included.</p></div>
-      <div class="feature-card"><h3>ACS System</h3><p>Full expression parser: levels, flags, ratios, time, credits, conferences.</p></div>
-      <div class="feature-card"><h3>PLANK Networking</h3><p>Store-and-forward federation with Ed25519 signatures and CBOR objects.</p></div>
-      <div class="feature-card"><h3>Buccaneer</h3><p>Interpreted language for interactive doors, addons, and games. Pascal-like syntax.</p></div>
-      <div class="feature-card"><h3>Plugins</h3><p>Loadable .so modules via dlopen with capability-controlled host API.</p></div>
-    </div>
-  </section>
-
-  <section id="docs">
-    <h2>Documentation</h2>
-    <div class="doc-grid">
-      <div class="doc-card"><h3><a href="docs/quick-start.html">Quick Start</a></h3><p>Docker or binary — running in minutes.</p></div>
-      <div class="doc-card"><h3><a href="docs/windows.html">Windows</a></h3><p>Docker Desktop and WSL2 guides.</p></div>
-      <div class="doc-card"><h3><a href="docs/getting-started.html">Getting Started</a></h3><p>Install, build, initialize, run, connect.</p></div>
-      <div class="doc-card"><h3><a href="docs/configuration.html">Configuration</a></h3><p>All mutineer.conf settings.</p></div>
-      <div class="doc-card"><h3><a href="docs/architecture.html">Architecture</a></h3><p>System design, components, workflows.</p></div>
-      <div class="doc-card"><h3><a href="docs/menus-and-ui.html">Menus &amp; UI</a></h3><p>Menu files, templates, MCI, ACS.</p></div>
-      <div class="doc-card"><h3><a href="docs/messages-and-mail.html">Messages &amp; Mail</a></h3><p>Boards, email, QWK, FidoNet.</p></div>
-      <div class="doc-card"><h3><a href="docs/files-and-protocols.html">Files &amp; Protocols</a></h3><p>File areas, upload/download, batch ops.</p></div>
-      <div class="doc-card"><h3><a href="docs/chat-and-social.html">Chat &amp; Social</a></h3><p>Chat, paging, wall, whisper.</p></div>
-      <div class="doc-card"><h3><a href="docs/doors-and-scripting.html">Doors &amp; Scripting</a></h3><p>Native, DOSBox, Buccaneer, plugins.</p></div>
-      <div class="doc-card"><h3><a href="docs/sysop-guide.html">Sysop Guide</a></h3><p>WFC, user admin, maintenance.</p></div>
-      <div class="doc-card"><h3><a href="docs/networking-plank.html">PLANK Networking</a></h3><p>Federation protocol and tools.</p></div>
-      <div class="doc-card"><h3><a href="docs/buccaneer/programmers-guide.html">Buccaneer Guide</a></h3><p>Full door language for authors.</p></div>
-      <div class="doc-card"><h3><a href="docs/developer-guide.html">Developer Guide</a></h3><p>Build, test, contribute.</p></div>
-      <div class="doc-card"><h3><a href="docs/cli-tools.html">CLI Tools</a></h3><p>All command-line utilities.</p></div>
-      <div class="doc-card"><h3><a href="docs/index.html">Full Index →</a></h3><p>Complete documentation index with reference pages.</p></div>
-    </div>
-  </section>
-
-  <section id="install">
-    <h2>Quick Start</h2>
-    <div class="install-box">
-      <code class="comment"># Docker (Linux, macOS, Windows)</code>
-      <code>git clone https://github.com/rickcollette/mutineer.git</code>
-      <code>cd mutineer &amp;&amp; docker compose up -d</code>
-      <code>telnet localhost 2929</code>
-      <code class="comment"># Or build from source (Linux / WSL)</code>
-      <code>cmake -S . -B build -DCMAKE_BUILD_TYPE=Release</code>
-      <code>cmake --build build</code>
-      <code>build/mutineer-initbbs -c conf/mutineer.conf -y</code>
-      <code>build/mutineer -c conf/mutineer.conf</code>
-    </div>
-  </section>
-
-</main>
-
-<footer class="site-footer">
-  <p>Mutineer BBS — <a href="https://github.com/rickcollette/mutineer">github.com/rickcollette/mutineer</a> — MIT License — &copy; 2026 Rick Collette</p>
-</footer>
-
-</body>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Mutineer BBS website and documentation console for setup, sysop operations, doors, plugins, Buccaneer, and PLANK."
+    />
+    <title>Mutineer BBS</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
 </html>

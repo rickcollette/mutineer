@@ -31,6 +31,19 @@ extern const bbs_host_api_t* plugin_host_api_get(void);
 extern void plugin_host_api_shutdown(void);
 extern void plugin_host_api_configure(const BbsConfig* cfg);
 
+static bbs_plugin_query_fn plugin_query_symbol(void* handle) {
+  void* sym = dlsym(handle, "bbs_plugin_query");
+#if defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wpedantic"
+#endif
+  bbs_plugin_query_fn fn = (bbs_plugin_query_fn)sym;
+#if defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
+  return fn;
+}
+
 /* Check if plugin ID is in a comma-separated list */
 static bool id_in_list(const char* id, const char* list) {
   if (!id || !list || !list[0]) return false;
@@ -87,7 +100,7 @@ static bool load_plugin(const char* path) {
   dlerror();
   
   /* Find the query function */
-  bbs_plugin_query_fn query_fn = (bbs_plugin_query_fn)dlsym(handle, "bbs_plugin_query");
+  bbs_plugin_query_fn query_fn = plugin_query_symbol(handle);
   const char* err = dlerror();
   if (err || !query_fn) {
     log_error("dlsym failed for bbs_plugin_query in %s: %s", path, err ? err : "symbol not found");

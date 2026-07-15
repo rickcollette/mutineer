@@ -28,7 +28,11 @@ static void set_err(BbsDb *db, const char *msg)
 {
   if (!db)
     return;
-  snprintf(db->last_err, sizeof(db->last_err), "%s", msg ? msg : "unknown");
+  const char *src = msg ? msg : "unknown";
+  size_t n = strlen(src);
+  if (n >= sizeof(db->last_err)) n = sizeof(db->last_err) - 1;
+  if (n > 0) memcpy(db->last_err, src, n);
+  db->last_err[n] = '\0';
 }
 
 const char *db_last_error(BbsDb *db)
@@ -561,7 +565,7 @@ bool db_init_schema(BbsDb *db, const char *schema_path)
       if (!plank_sql)
       {
         char err[512];
-        snprintf(err, sizeof(err), "failed to read PLANK schema file '%s': %s",
+        snprintf(err, sizeof(err), "failed to read PLANK schema file '%.400s': %s",
                  plank_path, strerror(errno));
         set_err(db, err);
         ok = false;
@@ -1727,6 +1731,281 @@ int db_node_list(BbsDb *db, DbNode *out, int max_nodes)
 #endif
 }
 
+bool db_node_lock_set(BbsDb *db, int node_num, bool locked, const char *actor)
+{
+  if (!db || node_num <= 0)
+    return false;
+#ifdef HAVE_SQLITE
+  const char *schema =
+      "CREATE TABLE IF NOT EXISTS node_locks ("
+      "node_num INTEGER PRIMARY KEY,"
+      "locked INTEGER NOT NULL DEFAULT 1,"
+      "actor TEXT,"
+      "updated_at TEXT NOT NULL DEFAULT (datetime('now')))";
+  if (!db_exec(db, schema))
+    return false;
+  if (!locked)
+  {
+    const DbBind binds[] = {DB_BIND_INT_VAL(node_num)};
+    return db_exec_prepared(db, "DELETE FROM node_locks WHERE node_num = ?", binds, 1);
+  }
+  const DbBind binds[] = {
+      DB_BIND_INT_VAL(node_num),
+      DB_BIND_TEXT_VAL(actor ? actor : "console")};
+  return db_exec_prepared(db,
+                          "INSERT INTO node_locks (node_num, locked, actor, updated_at) "
+                          "VALUES (?, 1, ?, datetime('now')) "
+                          "ON CONFLICT(node_num) DO UPDATE SET "
+                          "locked=1, actor=excluded.actor, updated_at=datetime('now')",
+                          binds, 2);
+#else
+  (void)locked;
+  (void)actor;
+  set_err(db, "sqlite disabled");
+  return false;
+#endif
+}
+
+bool db_node_lock_get(BbsDb *db, int node_num)
+{
+  if (!db || node_num <= 0)
+    return false;
+#ifdef HAVE_SQLITE
+  if (!db_exec(db,
+               "CREATE TABLE IF NOT EXISTS node_locks ("
+               "node_num INTEGER PRIMARY KEY,"
+               "locked INTEGER NOT NULL DEFAULT 1,"
+               "actor TEXT,"
+               "updated_at TEXT NOT NULL DEFAULT (datetime('now')))"))
+    return false;
+  const DbBind binds[] = {DB_BIND_INT_VAL(node_num)};
+  return db_query_int_prepared(db,
+                               "SELECT locked FROM node_locks WHERE node_num = ? AND locked != 0",
+                               binds, 1, 0) != 0;
+#else
+  set_err(db, "sqlite disabled");
+  return false;
+#endif
+}
+
+int db_node_lock_list(BbsDb *db, int *out_nodes, int max_nodes)
+{
+  if (!db || !out_nodes || max_nodes <= 0)
+    return 0;
+#ifdef HAVE_SQLITE
+  if (!db_exec(db,
+               "CREATE TABLE IF NOT EXISTS node_locks ("
+               "node_num INTEGER PRIMARY KEY,"
+               "locked INTEGER NOT NULL DEFAULT 1,"
+               "actor TEXT,"
+               "updated_at TEXT NOT NULL DEFAULT (datetime('now')))"))
+    return 0;
+  sqlite3_stmt *st = NULL;
+  if (sqlite3_prepare_v2(db->db,
+                         "SELECT node_num FROM node_locks WHERE locked != 0 ORDER BY node_num",
+                         -1, &st, NULL) != SQLITE_OK)
+  {
+    set_err(db, sqlite3_errmsg(db->db));
+    return 0;
+  }
+  int n = 0;
+  while (sqlite3_step(st) == SQLITE_ROW && n < max_nodes)
+    out_nodes[n++] = sqlite3_column_int(st, 0);
+  sqlite3_finalize(st);
+  return n;
+#else
+  set_err(db, "sqlite disabled");
+  return 0;
+#endif
+}
+
+static bool db_bucc_storage_schema(BbsDb *db)
+{
+  return db_exec(db,
+                 "CREATE TABLE IF NOT EXISTS bucc_kv ("
+                 "scope TEXT NOT NULL, key TEXT NOT NULL, value TEXT NOT NULL, "
+                 "updated_at TEXT NOT NULL DEFAULT (datetime('now')), PRIMARY KEY(scope, key));"
+                 "CREATE TABLE IF NOT EXISTS bucc_data_records ("
+                 "id INTEGER PRIMARY KEY AUTOINCREMENT, scope TEXT NOT NULL, dataset TEXT NOT NULL, "
+                 "value TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now')), "
+                 "updated_at TEXT NOT NULL DEFAULT (datetime('now')));"
+                 "CREATE INDEX IF NOT EXISTS idx_bucc_data_scope_dataset "
+                 "ON bucc_data_records(scope, dataset, id);");
+}
+
+bool db_bucc_kv_get(BbsDb *db, const char *scope, const char *key, char *out, size_t out_cap)
+{
+  if (!db || !scope || !key || !out || out_cap == 0)
+    return false;
+  out[0] = '\0';
+  if (!db_bucc_storage_schema(db))
+    return false;
+  sqlite3_stmt *st = NULL;
+  const char *sql = "SELECT value FROM bucc_kv WHERE scope = ?1 AND key = ?2";
+  if (sqlite3_prepare_v2(db->db, sql, -1, &st, NULL) != SQLITE_OK)
+  {
+    set_err(db, sqlite3_errmsg(db->db));
+    return false;
+  }
+  sqlite3_bind_text(st, 1, scope, -1, SQLITE_TRANSIENT);
+  sqlite3_bind_text(st, 2, key, -1, SQLITE_TRANSIENT);
+  int rc = sqlite3_step(st);
+  if (rc == SQLITE_ROW)
+  {
+    safe_copy(out, out_cap, (const char *)sqlite3_column_text(st, 0));
+    sqlite3_finalize(st);
+    return true;
+  }
+  sqlite3_finalize(st);
+  return false;
+}
+
+bool db_bucc_kv_set(BbsDb *db, const char *scope, const char *key, const char *value)
+{
+  if (!db || !scope || !key)
+    return false;
+  if (!db_bucc_storage_schema(db))
+    return false;
+  DbBind binds[] = {
+      DB_BIND_TEXT_VAL(scope),
+      DB_BIND_TEXT_VAL(key),
+      DB_BIND_TEXT_VAL(value ? value : ""),
+  };
+  return db_exec_prepared(db,
+                          "INSERT INTO bucc_kv (scope, key, value, updated_at) VALUES (?1, ?2, ?3, datetime('now')) "
+                          "ON CONFLICT(scope, key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')",
+                          binds, 3);
+}
+
+bool db_bucc_kv_delete(BbsDb *db, const char *scope, const char *key)
+{
+  if (!db || !scope || !key)
+    return false;
+  if (!db_bucc_storage_schema(db))
+    return false;
+  DbBind binds[] = {DB_BIND_TEXT_VAL(scope), DB_BIND_TEXT_VAL(key)};
+  return db_exec_prepared(db, "DELETE FROM bucc_kv WHERE scope = ?1 AND key = ?2", binds, 2);
+}
+
+bool db_bucc_kv_exists(BbsDb *db, const char *scope, const char *key)
+{
+  if (!db || !scope || !key)
+    return false;
+  if (!db_bucc_storage_schema(db))
+    return false;
+  DbBind binds[] = {DB_BIND_TEXT_VAL(scope), DB_BIND_TEXT_VAL(key)};
+  return db_query_int_prepared(db, "SELECT COUNT(*) FROM bucc_kv WHERE scope = ?1 AND key = ?2", binds, 2, 0) > 0;
+}
+
+int64_t db_bucc_data_insert(BbsDb *db, const char *scope, const char *dataset, const char *value)
+{
+  if (!db || !scope || !dataset)
+    return 0;
+  if (!db_bucc_storage_schema(db))
+    return 0;
+  DbBind binds[] = {
+      DB_BIND_TEXT_VAL(scope),
+      DB_BIND_TEXT_VAL(dataset),
+      DB_BIND_TEXT_VAL(value ? value : ""),
+  };
+  if (!db_exec_prepared(db, "INSERT INTO bucc_data_records (scope, dataset, value) VALUES (?1, ?2, ?3)", binds, 3))
+    return 0;
+  return db_last_insert_id(db);
+}
+
+bool db_bucc_data_update(BbsDb *db, const char *scope, const char *dataset, int64_t id, const char *value)
+{
+  if (!db || !scope || !dataset || id <= 0)
+    return false;
+  if (!db_bucc_storage_schema(db))
+    return false;
+  DbBind binds[] = {
+      DB_BIND_TEXT_VAL(value ? value : ""),
+      DB_BIND_TEXT_VAL(scope),
+      DB_BIND_TEXT_VAL(dataset),
+      DB_BIND_INT64_VAL(id),
+  };
+  return db_exec_prepared(db,
+                          "UPDATE bucc_data_records SET value = ?1, updated_at = datetime('now') "
+                          "WHERE scope = ?2 AND dataset = ?3 AND id = ?4",
+                          binds, 4);
+}
+
+bool db_bucc_data_delete(BbsDb *db, const char *scope, const char *dataset, int64_t id)
+{
+  if (!db || !scope || !dataset || id <= 0)
+    return false;
+  if (!db_bucc_storage_schema(db))
+    return false;
+  DbBind binds[] = {DB_BIND_TEXT_VAL(scope), DB_BIND_TEXT_VAL(dataset), DB_BIND_INT64_VAL(id)};
+  return db_exec_prepared(db, "DELETE FROM bucc_data_records WHERE scope = ?1 AND dataset = ?2 AND id = ?3", binds, 3);
+}
+
+bool db_bucc_data_get(BbsDb *db, const char *scope, const char *dataset, int64_t id, char *out, size_t out_cap)
+{
+  if (!db || !scope || !dataset || !out || out_cap == 0 || id <= 0)
+    return false;
+  out[0] = '\0';
+  if (!db_bucc_storage_schema(db))
+    return false;
+  sqlite3_stmt *st = NULL;
+  const char *sql = "SELECT value FROM bucc_data_records WHERE scope = ?1 AND dataset = ?2 AND id = ?3";
+  if (sqlite3_prepare_v2(db->db, sql, -1, &st, NULL) != SQLITE_OK)
+  {
+    set_err(db, sqlite3_errmsg(db->db));
+    return false;
+  }
+  sqlite3_bind_text(st, 1, scope, -1, SQLITE_TRANSIENT);
+  sqlite3_bind_text(st, 2, dataset, -1, SQLITE_TRANSIENT);
+  sqlite3_bind_int64(st, 3, (sqlite3_int64)id);
+  int rc = sqlite3_step(st);
+  if (rc == SQLITE_ROW)
+  {
+    safe_copy(out, out_cap, (const char *)sqlite3_column_text(st, 0));
+    sqlite3_finalize(st);
+    return true;
+  }
+  sqlite3_finalize(st);
+  return false;
+}
+
+int db_bucc_data_find(BbsDb *db, const char *scope, const char *dataset, int64_t *ids, char values[][512], int max_rows)
+{
+  if (!db || !scope || !dataset || !ids || !values || max_rows <= 0)
+    return 0;
+  if (!db_bucc_storage_schema(db))
+    return 0;
+  sqlite3_stmt *st = NULL;
+  const char *sql = "SELECT id, value FROM bucc_data_records WHERE scope = ?1 AND dataset = ?2 ORDER BY id DESC LIMIT ?3";
+  if (sqlite3_prepare_v2(db->db, sql, -1, &st, NULL) != SQLITE_OK)
+  {
+    set_err(db, sqlite3_errmsg(db->db));
+    return 0;
+  }
+  sqlite3_bind_text(st, 1, scope, -1, SQLITE_TRANSIENT);
+  sqlite3_bind_text(st, 2, dataset, -1, SQLITE_TRANSIENT);
+  sqlite3_bind_int(st, 3, max_rows);
+  int count = 0;
+  while (sqlite3_step(st) == SQLITE_ROW && count < max_rows)
+  {
+    ids[count] = sqlite3_column_int64(st, 0);
+    safe_copy(values[count], 512, (const char *)sqlite3_column_text(st, 1));
+    count++;
+  }
+  sqlite3_finalize(st);
+  return count;
+}
+
+int64_t db_bucc_data_count(BbsDb *db, const char *scope, const char *dataset)
+{
+  if (!db || !scope || !dataset)
+    return 0;
+  if (!db_bucc_storage_schema(db))
+    return 0;
+  DbBind binds[] = {DB_BIND_TEXT_VAL(scope), DB_BIND_TEXT_VAL(dataset)};
+  return db_query_int_prepared(db, "SELECT COUNT(*) FROM bucc_data_records WHERE scope = ?1 AND dataset = ?2", binds, 2, 0);
+}
+
 bool db_node_user_online(BbsDb *db, int user_id, int *out_node)
 {
   if (!db || user_id <= 0)
@@ -2068,8 +2347,8 @@ bool db_message_forward(BbsDb *db, int msg_id, int to_user_id)
   fwd.area_id = 0; /* Email area */
   fwd.user_id = orig.user_id;
   fwd.to_user = to_user_id;
-  snprintf(fwd.subject, sizeof(fwd.subject), "Fwd: %s", orig.subject);
-  snprintf(fwd.body, sizeof(fwd.body), "--- Forwarded message ---\r\n%s", orig.body);
+  snprintf(fwd.subject, sizeof(fwd.subject), "Fwd: %.74s", orig.subject);
+  snprintf(fwd.body, sizeof(fwd.body), "--- Forwarded message ---\r\n%.2020s", orig.body);
   fwd.attr = MSG_ATTR_FORWARDED;
 
   return db_message_post_ex(db, &fwd);

@@ -26,9 +26,13 @@ First start runs `mutineer-initbbs -y` if `data/mutineer.db` is missing.
 |----------|---------|
 | `MUTINEER_CONFIG` | Config file path inside container (default `conf/mutineer.docker.conf`) |
 
-### WFC in Docker
+### WFC / Console
 
-The default Docker config sets `wfc_enabled=0` because detached containers have no TTY. Use `scripts/open-wfc.sh` for an interactive WFC session on port 2930, or run the daemon on the host with a real terminal.
+The daemon exposes the sysop console-control service on `console_bind` /
+`console_port` when `console_enabled=1`. The default bind is `127.0.0.1`, so
+use `scripts/open-wfc.sh` from the host or tunnel the port deliberately. The
+old in-process WFC thread is deprecated; detached containers no longer need a
+TTY for the BBS daemon itself.
 
 ### Health check
 
@@ -101,3 +105,4 @@ Schedule `scripts/backup` or snapshot the data directory while the BBS is stoppe
 - [Windows](windows.md)
 - [Configuration](configuration.md)
 - [Sysop Guide](sysop-guide.md)
+- [Console Protocol](console-protocol.md)

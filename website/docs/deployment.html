@@ -4,19 +4,19 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Deployment — Mutineer BBS</title>
-  <link rel="stylesheet" href="assets/css/site.css">
+  <link rel="stylesheet" href="../assets/css/site.css">
 </head>
 <body>
   <header class="site-header">
-    <a href="index.html" class="logo">MUTINEER BBS</a>
-    <span class="tagline">Documentation</span>
+    <a href="index.html" class="logo"><span class="mark">☠</span> MUTINEER BBS</a>
+    <span class="tagline">CAPTAIN'S MANUAL // STATIC ARCHIVE</span>
   </header>
-  <nav class="doc-nav"><a href="index.html" class="home">← Home</a><a href="quick-start.html">Quick Start</a><a href="windows.html">Windows</a><a href="getting-started.html">Getting Started</a><a href="deployment.html" class="active">Deployment</a><a href="overview.html">Overview</a><a href="configuration.html">Configuration</a><a href="architecture.html">Architecture</a><a href="menus-and-ui.html">Menus & UI</a><a href="messages-and-mail.html">Messages & Mail</a><a href="files-and-protocols.html">Files & Protocols</a><a href="chat-and-social.html">Chat & Social</a><a href="doors-and-scripting.html">Doors & Scripting</a><a href="sysop-guide.html">Sysop Guide</a><a href="networking-plank.html">PLANK</a><a href="buccaneer/programmers-guide.html">BUCC Guide</a><a href="buccaneer/host-api.html">BUCC API</a><a href="plugins.html">Plugins</a><a href="developer-guide.html">Developer</a><a href="cli-tools.html">CLI Tools</a><a href="reference/menu-actions.html">Menu Actions</a><a href="reference/message-commands.html">Messages Ref</a><a href="reference/file-commands.html">Files Ref</a><a href="reference/acs-mci.html">ACS & MCI</a><a href="reference/database.html">Database</a></nav>
+  <nav class="doc-nav"><a href="index.html" class="home">← Home</a><a href="quick-start.html">Quick Start</a><a href="windows.html">Windows</a><a href="getting-started.html">Getting Started</a><a href="deployment.html" class="active">Deployment</a><a href="overview.html">Overview</a><a href="configuration.html">Configuration</a><a href="architecture.html">Architecture</a><a href="menus-and-ui.html">Menus & UI</a><a href="messages-and-mail.html">Messages & Mail</a><a href="files-and-protocols.html">Files & Protocols</a><a href="chat-and-social.html">Chat & Social</a><a href="doors-and-scripting.html">Doors & Scripting</a><a href="sysop-guide.html">Sysop Guide</a><a href="console-protocol.html">Console Protocol</a><a href="networking-plank.html">PLANK</a><a href="buccaneer/programmers-guide.html">BUCC Guide</a><a href="buccaneer/host-api.html">BUCC API</a><a href="plugins.html">Plugins</a><a href="developer-guide.html">Developer</a><a href="website-source.html">Website Source</a><a href="cli-tools.html">CLI Tools</a><a href="reference/menu-actions.html">Menu Actions</a><a href="reference/message-commands.html">Messages Ref</a><a href="reference/file-commands.html">Files Ref</a><a href="reference/acs-mci.html">ACS & MCI</a><a href="reference/database.html">Database</a></nav>
   <main class="doc-content"><h1>Deployment</h1>
 <p>How to run Mutineer in production-like environments: Docker, release tarballs, and host services.</p>
 <h2>Docker Compose (recommended for small installs)</h2>
-<p>The repo includes Docker assets under <code>docker/</code>: <code>docker/Dockerfile</code> and
-<code>docker/compose.yml</code>.</p>
+<p>The repo includes Docker assets under <code>docker/</code>: <code>docker/Dockerfile</code> and</p>
+<p><code>docker/compose.yml</code>.</p>
 <pre><code class="bash">
 docker compose up -d --build
 </code></pre>
@@ -33,8 +33,12 @@ docker compose up -d --build
 <tr><th>Variable</th><th>Purpose</th></tr>
 <tr><td><code>MUTINEER_CONFIG</code></td><td>Config file path inside container (default <code>conf/mutineer.docker.conf</code>)</td></tr>
 </table>
-<h3>WFC in Docker</h3>
-<p>The default Docker config sets <code>wfc_enabled=0</code> because detached containers have no TTY. Use <code>scripts/open-wfc.sh</code> for an interactive WFC session on port 2930, or run the daemon on the host with a real terminal.</p>
+<h3>WFC / Console</h3>
+<p>The daemon exposes the sysop console-control service on <code>console_bind</code> /</p>
+<p><code>console_port</code> when <code>console_enabled=1</code>. The default bind is <code>127.0.0.1</code>, so</p>
+<p>use <code>scripts/open-wfc.sh</code> from the host or tunnel the port deliberately. The</p>
+<p>old in-process WFC thread is deprecated; detached containers no longer need a</p>
+<p>TTY for the BBS daemon itself.</p>
 <h3>Health check</h3>
 <p>The image healthcheck probes TCP <code>127.0.0.1:2929</code> inside the container.</p>
 <h2>GitHub release tarballs</h2>
@@ -95,6 +99,7 @@ WantedBy=multi-user.target
 <li><a href="windows.html">Windows</a></li>
 <li><a href="configuration.html">Configuration</a></li>
 <li><a href="sysop-guide.html">Sysop Guide</a></li>
+<li><a href="console-protocol.html">Console Protocol</a></li>
 </ul></main>
   <footer class="site-footer">
     <p>Mutineer BBS — <a href="https://github.com/rickcollette/mutineer">GitHub</a> — MIT License</p>

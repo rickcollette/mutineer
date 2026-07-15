@@ -17,7 +17,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             build-essential cmake libsqlite3-dev libssl-dev \
-            libargon2-dev libzstd-dev
+            libargon2-dev libzstd-dev libarchive-dev sqlite3
 
       - name: Build and test
         run: ./scripts/ci-build.sh
@@ -26,3 +26,6 @@ jobs:
         run: |
           VERSION=ci-${GITHUB_SHA::7} PLATFORM=debian ./scripts/build-release.sh
           tar tzf dist/releases/mutineer-ci-*.tar.gz | head -20
+          tar tzf dist/releases/mutineer-ci-*.tar.gz | grep -q '/bin/mutineer-console$'
+          tar tzf dist/releases/mutineer-ci-*.tar.gz | grep -q '/plank/bin/coved$'
+          tar tzf dist/releases/mutineer-ci-*.tar.gz | grep -q '/scripts/open-wfc.sh$'

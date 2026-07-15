@@ -4,16 +4,15 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Configuration Reference — Mutineer BBS</title>
-  <link rel="stylesheet" href="assets/css/site.css">
+  <link rel="stylesheet" href="../assets/css/site.css">
 </head>
 <body>
   <header class="site-header">
-    <a href="index.html" class="logo">MUTINEER BBS</a>
-    <span class="tagline">Documentation</span>
+    <a href="index.html" class="logo"><span class="mark">☠</span> MUTINEER BBS</a>
+    <span class="tagline">CAPTAIN'S MANUAL // STATIC ARCHIVE</span>
   </header>
-  <nav class="doc-nav"><a href="index.html" class="home">← Home</a><a href="quick-start.html">Quick Start</a><a href="windows.html">Windows</a><a href="getting-started.html">Getting Started</a><a href="deployment.html">Deployment</a><a href="overview.html">Overview</a><a href="configuration.html" class="active">Configuration</a><a href="architecture.html">Architecture</a><a href="menus-and-ui.html">Menus & UI</a><a href="messages-and-mail.html">Messages & Mail</a><a href="files-and-protocols.html">Files & Protocols</a><a href="chat-and-social.html">Chat & Social</a><a href="doors-and-scripting.html">Doors & Scripting</a><a href="sysop-guide.html">Sysop Guide</a><a href="networking-plank.html">PLANK</a><a href="buccaneer/programmers-guide.html">BUCC Guide</a><a href="buccaneer/host-api.html">BUCC API</a><a href="plugins.html">Plugins</a><a href="developer-guide.html">Developer</a><a href="cli-tools.html">CLI Tools</a><a href="reference/menu-actions.html">Menu Actions</a><a href="reference/message-commands.html">Messages Ref</a><a href="reference/file-commands.html">Files Ref</a><a href="reference/acs-mci.html">ACS & MCI</a><a href="reference/database.html">Database</a></nav>
-  <main class="doc-content"><p>&lt;!-- generated-by: gsd-doc-writer --&gt;</p>
-<h1>Configuration Reference</h1>
+  <nav class="doc-nav"><a href="index.html" class="home">← Home</a><a href="quick-start.html">Quick Start</a><a href="windows.html">Windows</a><a href="getting-started.html">Getting Started</a><a href="deployment.html">Deployment</a><a href="overview.html">Overview</a><a href="configuration.html" class="active">Configuration</a><a href="architecture.html">Architecture</a><a href="menus-and-ui.html">Menus & UI</a><a href="messages-and-mail.html">Messages & Mail</a><a href="files-and-protocols.html">Files & Protocols</a><a href="chat-and-social.html">Chat & Social</a><a href="doors-and-scripting.html">Doors & Scripting</a><a href="sysop-guide.html">Sysop Guide</a><a href="console-protocol.html">Console Protocol</a><a href="networking-plank.html">PLANK</a><a href="buccaneer/programmers-guide.html">BUCC Guide</a><a href="buccaneer/host-api.html">BUCC API</a><a href="plugins.html">Plugins</a><a href="developer-guide.html">Developer</a><a href="website-source.html">Website Source</a><a href="cli-tools.html">CLI Tools</a><a href="reference/menu-actions.html">Menu Actions</a><a href="reference/message-commands.html">Messages Ref</a><a href="reference/file-commands.html">Files Ref</a><a href="reference/acs-mci.html">ACS & MCI</a><a href="reference/database.html">Database</a></nav>
+  <main class="doc-content"><h1>Configuration Reference</h1>
 <p>Mutineer BBS reads a flat key=value configuration file. The canonical struct is <code>BbsConfig</code> in <code>include/bbs_config.h</code>. Loading is handled by <code>cfg_load()</code> in <code>src/config.c</code>, which applies defaults then overrides from the file.</p>
 <p>Default config path: <code>conf/mutineer.conf</code>.</p>
 <h2>File Format</h2>
@@ -71,21 +70,25 @@ build/mutineer --config /etc/mutineer/mutineer.conf
 <tr><td><code>max_calls_per_day</code></td><td>int</td><td><code>0</code></td><td>No</td><td>Max logins per user per calendar day; <code>0</code> = unlimited</td></tr>
 <tr><td><code>max_page_sysop</code></td><td>int</td><td><code>3</code></td><td>No</td><td>Max sysop page attempts per session; <code>0</code> = unlimited</td></tr>
 </table>
-<h3>WFC Console</h3>
+<h3>Console / WFC Dashboard</h3>
 <table>
 <tr><th>Key</th><th>Type</th><th>Default</th><th>Required</th><th>Description</th></tr>
-<tr><td><code>wfc_enabled</code></td><td>int</td><td><code>1</code></td><td>No</td><td>Run local WFC console thread</td></tr>
-<tr><td><code>wfc_refresh_ms</code></td><td>int</td><td><code>1000</code></td><td>No</td><td>WFC screen refresh interval (ms)</td></tr>
-<tr><td><code>wfc_blank_sec</code></td><td>int</td><td><code>300</code></td><td>No</td><td>Blank screen timeout; <code>0</code> = disabled</td></tr>
-<tr><td><code>wfc_node_num</code></td><td>int</td><td><code>1</code></td><td>No</td><td>Local WFC console node number</td></tr>
+<tr><td><code>console_enabled</code></td><td>int/bool</td><td><code>1</code></td><td>No</td><td>Run the TCP console-control service for <code>mutineer-console</code></td></tr>
+<tr><td><code>console_bind</code></td><td>string</td><td><code>127.0.0.1</code></td><td>No</td><td>Console-control bind address</td></tr>
+<tr><td><code>console_port</code></td><td>int</td><td><code>2931</code></td><td>No</td><td>Console-control TCP port</td></tr>
+<tr><td><code>console_idle_timeout_sec</code></td><td>int</td><td><code>600</code></td><td>No</td><td>Idle timeout for console-control clients</td></tr>
+<tr><td><code>wfc_enabled</code></td><td>int</td><td><code>0</code></td><td>No</td><td>Deprecated local WFC thread flag; use <code>mutineer-console</code></td></tr>
+<tr><td><code>wfc_refresh_ms</code></td><td>int</td><td><code>1000</code></td><td>No</td><td><code>mutineer-console</code> refresh interval (ms)</td></tr>
+<tr><td><code>wfc_blank_sec</code></td><td>int</td><td><code>300</code></td><td>No</td><td><code>mutineer-console</code> blank screen timeout; <code>0</code> = disabled</td></tr>
+<tr><td><code>wfc_node_num</code></td><td>int</td><td><code>1</code></td><td>No</td><td><code>mutineer-console</code> display node number</td></tr>
 <tr><td><code>wfc_fg_color</code></td><td>int</td><td><code>11</code></td><td>No</td><td>WFC foreground ANSI color (0–15)</td></tr>
 <tr><td><code>wfc_bg_color</code></td><td>int</td><td><code>0</code></td><td>No</td><td>WFC background ANSI color (0–7)</td></tr>
 <tr><td><code>wfc_status_idle_char</code></td><td>char</td><td><code>I</code></td><td>No</td><td>Node status char when idle</td></tr>
 <tr><td><code>wfc_status_logging_char</code></td><td>char</td><td><code>L</code></td><td>No</td><td>Node status char during login</td></tr>
 <tr><td><code>wfc_status_online_char</code></td><td>char</td><td><code>A</code></td><td>No</td><td>Node status char when online</td></tr>
 <tr><td><code>wfc_status_chat_char</code></td><td>char</td><td><code>S</code></td><td>No</td><td>Node status char during chat</td></tr>
-<tr><td><code>wfc_shell_enabled</code></td><td>int/bool</td><td><code>0</code></td><td>No</td><td>Enable the local WFC <code>D</code> command</td></tr>
-<tr><td><code>wfc_shell_command</code></td><td>string</td><td>*(empty)*</td><td>No</td><td>Argv-template command for WFC <code>D</code>; disabled unless explicitly set</td></tr>
+<tr><td><code>wfc_shell_enabled</code></td><td>int/bool</td><td><code>0</code></td><td>No</td><td>Enable the console <code>D</code> command on the server</td></tr>
+<tr><td><code>wfc_shell_command</code></td><td>string</td><td>*(empty)*</td><td>No</td><td>Server-side argv-template command for console <code>D</code>; disabled unless explicitly set</td></tr>
 </table>
 <h3>Scheduler</h3>
 <table>
@@ -131,6 +134,7 @@ build/mutineer --config /etc/mutineer/mutineer.conf
 <tr><td><code>door_default_timeout_sec</code></td><td>int</td><td><code>300</code></td><td>No</td><td>Door timeout; <code>0</code> = no timeout</td></tr>
 <tr><td><code>door_cleanup_on_exit</code></td><td>int</td><td><code>1</code></td><td>No</td><td>Remove runtime tree on successful exit</td></tr>
 <tr><td><code>door_keep_failed_runs</code></td><td>int</td><td><code>0</code></td><td>No</td><td>Keep runtime tree on failure for debugging</td></tr>
+<tr><td><code>door_session_hmac_secret</code></td><td>string</td><td><code>mutineer-dev-door-secret</code></td><td>Yes for production</td><td>Shared secret for signing native-door session assertions</td></tr>
 </table>
 <h3>Plugins</h3>
 <table>
@@ -176,7 +180,10 @@ login_max_attempts=5
 allow_multi_login=0
 password_upgrade=1
 
-wfc_enabled=1
+console_enabled=1
+console_bind=127.0.0.1
+console_port=2931
+wfc_enabled=0
 scheduler_enabled=1
 scheduler_tick_sec=60
 
@@ -186,6 +193,7 @@ dosbox_path=/usr/bin/dosbox
 door_runtime_path=/var/lib/mutineer/door_runtime
 door_default_timeout_sec=600
 door_cleanup_on_exit=1
+door_session_hmac_secret=replace-with-a-long-random-production-secret
 
 plugins_enabled=true
 plugins_dir=/opt/mutineer/plugins
@@ -201,6 +209,7 @@ build/mutineer --config conf/mutineer-prod.conf
 <ul>
 <li><a href="getting-started.html">Getting Started</a> — first-time setup</li>
 <li><a href="sysop-guide.html">Sysop Guide</a> — WFC and scheduler tuning</li>
+<li><a href="console-protocol.html">Console Protocol</a> — console-control TCP framing and commands</li>
 <li><a href="doors-and-scripting.html">Doors and Scripting</a> — DOS door settings</li>
 <li><a href="plugins.html">Plugins</a> — plugin configuration</li>
 </ul></main>

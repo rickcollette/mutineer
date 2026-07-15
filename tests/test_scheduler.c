@@ -11,6 +11,7 @@
 #include "bbs_process.h"
 #include "bbs_scheduler.h"
 #include "bbs_session.h"
+#include "bbs_util.h"
 
 #define CHECK(cond, msg) do { \
   if (!(cond)) { fprintf(stderr, "FAIL: %s\n", msg); return 1; } \
@@ -72,16 +73,16 @@ static int test_permission_and_logon_events(void) {
   CHECK(dir != NULL, "temporary scheduler directory creates");
 
   char allowed[256], denied[256], logon[256], rejected[256];
-  snprintf(allowed, sizeof(allowed), "%s/allowed", dir);
-  snprintf(denied, sizeof(denied), "%s/denied", dir);
-  snprintf(logon, sizeof(logon), "%s/logon", dir);
-  snprintf(rejected, sizeof(rejected), "%s/rejected", dir);
+  path_join(dir, "allowed", allowed, sizeof(allowed));
+  path_join(dir, "denied", denied, sizeof(denied));
+  path_join(dir, "logon", logon, sizeof(logon));
+  path_join(dir, "rejected", rejected, sizeof(rejected));
 
   char cmd_allowed[512], cmd_denied[512], cmd_logon[512], cmd_rejected[512];
-  snprintf(cmd_allowed, sizeof(cmd_allowed), "%s %s", touch_bin(), allowed);
-  snprintf(cmd_denied, sizeof(cmd_denied), "%s %s", touch_bin(), denied);
-  snprintf(cmd_logon, sizeof(cmd_logon), "%s %s", touch_bin(), logon);
-  snprintf(cmd_rejected, sizeof(cmd_rejected), "%s %s; %s %s",
+  snprintf(cmd_allowed, sizeof(cmd_allowed), "%s %.220s", touch_bin(), allowed);
+  snprintf(cmd_denied, sizeof(cmd_denied), "%s %.220s", touch_bin(), denied);
+  snprintf(cmd_logon, sizeof(cmd_logon), "%s %.220s", touch_bin(), logon);
+  snprintf(cmd_rejected, sizeof(cmd_rejected), "%s %.220s; %s %.220s",
            touch_bin(), rejected, touch_bin(), denied);
 
   BbsDb* db = db_open(":memory:");

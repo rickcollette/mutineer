@@ -60,6 +60,11 @@ static int user_time_left(void* ctx) {
   return 42;
 }
 
+static int user_flags(void* ctx) {
+  (void)ctx;
+  return 0x41;
+}
+
 static int bbs_node(void* ctx) {
   (void)ctx;
   return 7;
@@ -86,7 +91,8 @@ int main(void) {
     .supports_ansi = term_supports_ansi
   };
   bucc_user_api_t user = {
-    .get_time_left = user_time_left
+    .get_time_left = user_time_left,
+    .get_flags = user_flags
   };
   bucc_bbs_api_t bbs = {
     .get_node = bbs_node
@@ -144,6 +150,9 @@ int main(void) {
   bucc_value_t time_remaining = bucc_host_dispatch(&vm, "USER", "TIME_REMAINING", NULL, 0, ctx);
   CHECK(time_remaining.kind == BUCC_VAL_I64 && time_remaining.as.i64 == 42,
         "USER.TIME_REMAINING compatibility alias returns time left");
+
+  bucc_value_t flags = bucc_host_dispatch(&vm, "USER", "FLAGS", NULL, 0, ctx);
+  CHECK(flags.kind == BUCC_VAL_I64 && flags.as.i64 == 0x41, "USER.FLAGS returns user flags");
 
   bucc_string_t* cas_key = bucc_string_from_cstr("cas-key");
   bucc_value_t set_scalar[] = { BUCC_STRING_VAL(cas_key), BUCC_I64_VAL(10) };

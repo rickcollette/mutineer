@@ -3,7 +3,12 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-BBS_DIR="$(dirname "$SCRIPT_DIR")/dist"
+BBS_ROOT="$(dirname "$SCRIPT_DIR")"
+if [ -x "$BBS_ROOT/mutineer" ]; then
+    BBS_DIR="$BBS_ROOT"
+else
+    BBS_DIR="$BBS_ROOT/dist"
+fi
 PID_FILE="$BBS_DIR/mutineer.pid"
 
 if [ -f "$PID_FILE" ] && kill -0 "$(cat "$PID_FILE")" 2>/dev/null; then

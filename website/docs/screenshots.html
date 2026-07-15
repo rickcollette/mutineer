@@ -4,61 +4,65 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Screenshots — Mutineer BBS</title>
-  <link rel="stylesheet" href="assets/css/site.css">
+  <link rel="stylesheet" href="../assets/css/site.css">
 </head>
 <body>
   <header class="site-header">
-    <a href="index.html" class="logo">MUTINEER BBS</a>
-    <span class="tagline">Documentation</span>
+    <a href="index.html" class="logo"><span class="mark">☠</span> MUTINEER BBS</a>
+    <span class="tagline">CAPTAIN'S MANUAL // STATIC ARCHIVE</span>
   </header>
-  <nav class="doc-nav"><a href="index.html" class="home">← Home</a><a href="quick-start.html">Quick Start</a><a href="windows.html">Windows</a><a href="getting-started.html">Getting Started</a><a href="deployment.html">Deployment</a><a href="overview.html">Overview</a><a href="configuration.html">Configuration</a><a href="architecture.html">Architecture</a><a href="menus-and-ui.html">Menus & UI</a><a href="messages-and-mail.html">Messages & Mail</a><a href="files-and-protocols.html">Files & Protocols</a><a href="chat-and-social.html">Chat & Social</a><a href="doors-and-scripting.html">Doors & Scripting</a><a href="sysop-guide.html">Sysop Guide</a><a href="networking-plank.html">PLANK</a><a href="buccaneer/programmers-guide.html">BUCC Guide</a><a href="buccaneer/host-api.html">BUCC API</a><a href="plugins.html">Plugins</a><a href="developer-guide.html">Developer</a><a href="cli-tools.html">CLI Tools</a><a href="reference/menu-actions.html">Menu Actions</a><a href="reference/message-commands.html">Messages Ref</a><a href="reference/file-commands.html">Files Ref</a><a href="reference/acs-mci.html">ACS & MCI</a><a href="reference/database.html">Database</a></nav>
+  <nav class="doc-nav"><a href="index.html" class="home">← Home</a><a href="quick-start.html">Quick Start</a><a href="windows.html">Windows</a><a href="getting-started.html">Getting Started</a><a href="deployment.html">Deployment</a><a href="overview.html">Overview</a><a href="configuration.html">Configuration</a><a href="architecture.html">Architecture</a><a href="menus-and-ui.html">Menus & UI</a><a href="messages-and-mail.html">Messages & Mail</a><a href="files-and-protocols.html">Files & Protocols</a><a href="chat-and-social.html">Chat & Social</a><a href="doors-and-scripting.html">Doors & Scripting</a><a href="sysop-guide.html">Sysop Guide</a><a href="console-protocol.html">Console Protocol</a><a href="networking-plank.html">PLANK</a><a href="buccaneer/programmers-guide.html">BUCC Guide</a><a href="buccaneer/host-api.html">BUCC API</a><a href="plugins.html">Plugins</a><a href="developer-guide.html">Developer</a><a href="website-source.html">Website Source</a><a href="cli-tools.html">CLI Tools</a><a href="reference/menu-actions.html">Menu Actions</a><a href="reference/message-commands.html">Messages Ref</a><a href="reference/file-commands.html">Files Ref</a><a href="reference/acs-mci.html">ACS & MCI</a><a href="reference/database.html">Database</a></nav>
   <main class="doc-content"><h1>Screenshots</h1>
 <h2>Manual (recommended)</h2>
 <ol>
-<li><strong>BBS</strong> — with <code>docker compose up -d</code> running:</li>
+<li><strong>BBS</strong> — with <code>docker compose -f docker/compose.yml up -d</code> running:</li>
 </ol>
-<p>   ```bash</p>
-<p>   ./scripts/open-bbs-telnet.sh</p>
-<p>   ```</p>
+<pre><code class="bash">
+   ./scripts/open-bbs-telnet.sh
+</code></pre>
 <p>   Answer <code>Y</code> for ANSI, log in as <strong>sysop</strong> / <strong>mutineer</strong>, walk menus, and screenshot your terminal.</p>
 <ol>
-<li><strong>WFC</strong> — needs an interactive TTY (not the detached compose service):</li>
+<li><strong>WFC</strong> — the standalone console client needs an interactive TTY:</li>
 </ol>
-<p>   ```bash</p>
-<p>   ./scripts/open-wfc.sh</p>
-<p>   ```</p>
+<pre><code class="bash">
+   ./scripts/open-wfc.sh
+</code></pre>
 <p>   Screenshot the WFC node grid. Press <strong>Q</strong> to quit.</p>
 <h2>Automated PNG capture</h2>
-<p>With the BBS running (<code>docker compose up -d</code>):</p>
+<p>With the BBS running (<code>docker compose -f docker/compose.yml up -d</code>):</p>
 <pre><code class="bash">
 ./scripts/capture-screenshots.sh
 </code></pre>
-<p>Telnet screens use <strong>expect</strong> + headless Chromium; WFC uses <strong>docker run -it</strong> + the same renderer. Output in <code>screenshots/</code>:</p>
+<p>Telnet screens use <strong>expect</strong> + headless Chromium; WFC uses <code>mutineer-console</code></p>
+<p>through <code>scripts/open-wfc.sh</code> plus the same renderer. When Chromium is missing,</p>
+<p>the renderer still writes checked-in HTML captures. Output in <code>screenshots/</code>:</p>
 <table>
 <tr><th>File</th><th>Content</th></tr>
 <tr><td><code>01-motd-login.png</code></td><td>MOTD, ANSI prompt, handle</td></tr>
 <tr><td><code>02-main-menu.png</code></td><td>Main deck menu</td></tr>
 <tr><td><code>03-whos-online.png</code></td><td>Who&#x27;s online</td></tr>
 <tr><td><code>04-messages.png</code></td><td>Messages menu</td></tr>
-<tr><td><code>05-wfc-console.png</code></td><td>WFC node grid (requires image built with <code>docker/mutineer.wfc.conf</code>)</td></tr>
+<tr><td><code>05-wfc-console.png</code></td><td>WFC node grid from <code>mutineer-console</code></td></tr>
+<tr><td><code>05-wfc-console.html</code></td><td>HTML fallback/rendered WFC capture</td></tr>
 </table>
 <p>Host packages (Debian/Ubuntu): <code>xvfb xterm xdotool imagemagick</code>.</p>
 <h2>Manual capture (your terminal)</h2>
 <ol>
 <li><strong>BBS</strong> — telnet into the running container:</li>
 </ol>
-<p>   ```bash</p>
-<p>   ./scripts/open-bbs-telnet.sh</p>
-<p>   ```</p>
+<pre><code class="bash">
+   ./scripts/open-bbs-telnet.sh
+</code></pre>
 <p>   Log in: <code>sysop</code> / <code>mutineer</code>, navigate menus, screenshot the terminal.</p>
 <ol>
-<li><strong>WFC</strong> — separate interactive container (needs a real TTY):</li>
+<li><strong>WFC</strong> — standalone console client:</li>
 </ol>
-<p>   ```bash</p>
-<p>   ./scripts/open-wfc.sh</p>
-<p>   ```</p>
+<pre><code class="bash">
+   ./scripts/open-wfc.sh
+</code></pre>
 <p>   The WFC screen is the process foreground. Screenshot the terminal window.</p>
-<p>The main <code>docker compose</code> service keeps <code>wfc_enabled=0</code> (no TTY in detached mode). WFC is only started via <code>open-wfc.sh</code> or the capture script.</p></main>
+<p>The main daemon keeps the console-control TCP service enabled by config. The</p>
+<p>WFC dashboard itself is only started by <code>open-wfc.sh</code> or the capture script.</p></main>
   <footer class="site-footer">
     <p>Mutineer BBS — <a href="https://github.com/rickcollette/mutineer">GitHub</a> — MIT License</p>
   </footer>

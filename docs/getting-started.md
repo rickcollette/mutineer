@@ -13,7 +13,7 @@ This guide walks from a fresh clone to a running Mutineer BBS with passing tests
 | Linux | Any recent distro | Primary target platform |
 | CMake | >= 3.16 | Build system |
 | GCC or Clang | C11 support | `-std=c11` required |
-| SQLite3 dev | 3.x | `libsqlite3-dev` |
+| SQLite3 dev + CLI | 3.x | `libsqlite3-dev`, `sqlite3` |
 | OpenSSL dev | 1.1+ or 3.x | `libssl-dev` |
 | pthreads | — | Provided by libc on Linux |
 | make / ninja | — | CMake generator backend |
@@ -65,8 +65,8 @@ cd mutineer-bbs
 Debian/Ubuntu:
 
 ```bash
-sudo apt-get install cmake build-essential libsqlite3-dev libssl-dev \
-  libargon2-dev dosbox expect
+sudo apt-get install cmake build-essential libsqlite3-dev sqlite3 libssl-dev \
+  libarchive-dev libargon2-dev dosbox expect
 ```
 
 ### 3. Configure and build
@@ -236,7 +236,7 @@ ss -tlnp | grep 2929
 **Fix:** Install dev packages:
 
 ```bash
-sudo apt-get install libsqlite3-dev libssl-dev
+sudo apt-get install libsqlite3-dev sqlite3 libssl-dev
 ```
 
 ### Login throttled during testing

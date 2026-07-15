@@ -4,16 +4,15 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Getting Started — Mutineer BBS</title>
-  <link rel="stylesheet" href="assets/css/site.css">
+  <link rel="stylesheet" href="../assets/css/site.css">
 </head>
 <body>
   <header class="site-header">
-    <a href="index.html" class="logo">MUTINEER BBS</a>
-    <span class="tagline">Documentation</span>
+    <a href="index.html" class="logo"><span class="mark">☠</span> MUTINEER BBS</a>
+    <span class="tagline">CAPTAIN'S MANUAL // STATIC ARCHIVE</span>
   </header>
-  <nav class="doc-nav"><a href="index.html" class="home">← Home</a><a href="quick-start.html">Quick Start</a><a href="windows.html">Windows</a><a href="getting-started.html" class="active">Getting Started</a><a href="deployment.html">Deployment</a><a href="overview.html">Overview</a><a href="configuration.html">Configuration</a><a href="architecture.html">Architecture</a><a href="menus-and-ui.html">Menus & UI</a><a href="messages-and-mail.html">Messages & Mail</a><a href="files-and-protocols.html">Files & Protocols</a><a href="chat-and-social.html">Chat & Social</a><a href="doors-and-scripting.html">Doors & Scripting</a><a href="sysop-guide.html">Sysop Guide</a><a href="networking-plank.html">PLANK</a><a href="buccaneer/programmers-guide.html">BUCC Guide</a><a href="buccaneer/host-api.html">BUCC API</a><a href="plugins.html">Plugins</a><a href="developer-guide.html">Developer</a><a href="cli-tools.html">CLI Tools</a><a href="reference/menu-actions.html">Menu Actions</a><a href="reference/message-commands.html">Messages Ref</a><a href="reference/file-commands.html">Files Ref</a><a href="reference/acs-mci.html">ACS & MCI</a><a href="reference/database.html">Database</a></nav>
-  <main class="doc-content"><p>&lt;!-- generated-by: gsd-doc-writer --&gt;</p>
-<h1>Getting Started</h1>
+  <nav class="doc-nav"><a href="index.html" class="home">← Home</a><a href="quick-start.html">Quick Start</a><a href="windows.html">Windows</a><a href="getting-started.html" class="active">Getting Started</a><a href="deployment.html">Deployment</a><a href="overview.html">Overview</a><a href="configuration.html">Configuration</a><a href="architecture.html">Architecture</a><a href="menus-and-ui.html">Menus & UI</a><a href="messages-and-mail.html">Messages & Mail</a><a href="files-and-protocols.html">Files & Protocols</a><a href="chat-and-social.html">Chat & Social</a><a href="doors-and-scripting.html">Doors & Scripting</a><a href="sysop-guide.html">Sysop Guide</a><a href="console-protocol.html">Console Protocol</a><a href="networking-plank.html">PLANK</a><a href="buccaneer/programmers-guide.html">BUCC Guide</a><a href="buccaneer/host-api.html">BUCC API</a><a href="plugins.html">Plugins</a><a href="developer-guide.html">Developer</a><a href="website-source.html">Website Source</a><a href="cli-tools.html">CLI Tools</a><a href="reference/menu-actions.html">Menu Actions</a><a href="reference/message-commands.html">Messages Ref</a><a href="reference/file-commands.html">Files Ref</a><a href="reference/acs-mci.html">ACS & MCI</a><a href="reference/database.html">Database</a></nav>
+  <main class="doc-content"><h1>Getting Started</h1>
 <p>This guide walks from a fresh clone to a running Mutineer BBS with passing tests.</p>
 <p><strong>Just want it running fast?</strong> See <a href="quick-start.html">Quick Start</a>. <strong>On Windows?</strong> See <a href="windows.html">Running on Windows</a>. <strong>Production Docker/releases:</strong> <a href="deployment.html">Deployment</a>.</p>
 <h2>Prerequisites</h2>
@@ -22,7 +21,7 @@
 <tr><td>Linux</td><td>Any recent distro</td><td>Primary target platform</td></tr>
 <tr><td>CMake</td><td>&gt;= 3.16</td><td>Build system</td></tr>
 <tr><td>GCC or Clang</td><td>C11 support</td><td><code>-std=c11</code> required</td></tr>
-<tr><td>SQLite3 dev</td><td>3.x</td><td><code>libsqlite3-dev</code></td></tr>
+<tr><td>SQLite3 dev + CLI</td><td>3.x</td><td><code>libsqlite3-dev</code>, <code>sqlite3</code></td></tr>
 <tr><td>OpenSSL dev</td><td>1.1+ or 3.x</td><td><code>libssl-dev</code></td></tr>
 <tr><td>pthreads</td><td>—</td><td>Provided by libc on Linux</td></tr>
 <tr><td>make / ninja</td><td>—</td><td>CMake generator backend</td></tr>
@@ -62,8 +61,8 @@ cd mutineer-bbs
 <h3>2. Install dependencies</h3>
 <p>Debian/Ubuntu:</p>
 <pre><code class="bash">
-sudo apt-get install cmake build-essential libsqlite3-dev libssl-dev \
-  libargon2-dev dosbox expect
+sudo apt-get install cmake build-essential libsqlite3-dev sqlite3 libssl-dev \
+  libarchive-dev libargon2-dev dosbox expect
 </code></pre>
 <h3>3. Configure and build</h3>
 <p>Release build (production):</p>
@@ -180,7 +179,7 @@ ss -tlnp | grep 2929
 <p><strong>Symptom:</strong> CMake <code>find_package</code> errors.</p>
 <p><strong>Fix:</strong> Install dev packages:</p>
 <pre><code class="bash">
-sudo apt-get install libsqlite3-dev libssl-dev
+sudo apt-get install libsqlite3-dev sqlite3 libssl-dev
 </code></pre>
 <h3>Login throttled during testing</h3>
 <p><strong>Symptom:</strong> Repeated failed logins blocked.</p>

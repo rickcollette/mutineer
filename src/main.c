@@ -6,12 +6,12 @@
 #include "bbs_db.h"
 #include "bbs_log.h"
 #include "bbs_hash.h"
-#include "bbs_wfc.h"
 #include "bbs_scheduler.h"
 #include "bbs_session.h"
 #include "bbs_startup.h"
 #include "bbs_chat.h"
 #include "bbs_plugin_loader.h"
+#include "bbs_console_service.h"
 
 int net_run_listener(const struct BbsConfig* cfg, struct BbsDb* db, volatile sig_atomic_t* stop_flag);
 void broadcast_check(const char* data_path);
@@ -82,6 +82,15 @@ int main(int argc, char** argv) {
     return 2;
   }
 
+  int locked_nodes[256];
+  int locked_count = db_node_lock_list(db, locked_nodes, 256);
+  for (int i = 0; i < locked_count; i++) {
+    online_set_node_locked(locked_nodes[i], true);
+  }
+  if (locked_count > 0) {
+    log_info("restored %d persistent node locks", locked_count);
+  }
+
   fprintf(stdout, "mutineer listening on %s:%d\n", cfg.bind, cfg.port);
   log_info("listening on %s:%d", cfg.bind, cfg.port);
   fflush(stdout);
@@ -97,15 +106,15 @@ int main(int argc, char** argv) {
     log_warn("plugin loader initialization failed");
   }
 
-  /* start WFC console and scheduler threads */
-  wfc_start(&cfg, db);
+  /* start remote console and scheduler threads */
+  console_service_start(&cfg, db);
   scheduler_start(&cfg, db);
 
   int rc = net_run_listener(&cfg, db, &g_stop);
 
   online_broadcast("\r\nSystem shutting down.\r\n");
   scheduler_stop();
-  wfc_stop();
+  console_service_stop();
   plugin_loader_shutdown();
   db_close(db);
   log_info("shutdown");

@@ -73,6 +73,23 @@ static char* replace_percent_f(const char* token, const char* filepath) {
   return out;
 }
 
+static char* replace_marker(const char* token, const char* marker_text,
+                            const char* value) {
+  const char* marker = strstr(token, marker_text);
+  if (!marker) return strdup(token);
+
+  size_t mlen = strlen(marker_text);
+  size_t prefix = (size_t)(marker - token);
+  size_t suffix = strlen(marker + mlen);
+  size_t vlen = strlen(value);
+  char* out = malloc(prefix + vlen + suffix + 1);
+  if (!out) return NULL;
+  memcpy(out, token, prefix);
+  memcpy(out + prefix, value, vlen);
+  memcpy(out + prefix + vlen, marker + mlen, suffix + 1);
+  return out;
+}
+
 bool bbs_argv_parse_template(const char* command, const char* filepath,
                              char*** argv_out, char* errbuf, size_t errcap) {
   if (!argv_out) return false;
@@ -137,6 +154,72 @@ bool bbs_argv_parse_template(const char* command, const char* filepath,
 
   if (filepath && !saw_file_marker) {
     char* arg = strdup(filepath);
+    if (!arg || !argv_push(&argv, &argc, &cap, arg)) {
+      free(arg);
+      bbs_argv_free(argv);
+      if (errbuf) snprintf(errbuf, errcap, "out of memory");
+      return false;
+    }
+  }
+
+  if (argc == 0) {
+    if (errbuf) snprintf(errbuf, errcap, "empty command");
+    bbs_argv_free(argv);
+    return false;
+  }
+  *argv_out = argv;
+  return true;
+}
+
+bool bbs_argv_parse_door_template(const char* command, const char* dropdir,
+                                  char*** argv_out, char* errbuf, size_t errcap) {
+  if (!argv_out) return false;
+  *argv_out = NULL;
+  if (!command || !command[0]) {
+    if (errbuf) snprintf(errbuf, errcap, "empty command");
+    return false;
+  }
+  if (command_contains_shell_meta(command, errbuf, errcap)) return false;
+
+  char** argv = NULL;
+  size_t argc = 0, cap = 0;
+  const char* p = command;
+
+  while (*p) {
+    while (isspace((unsigned char)*p)) p++;
+    if (!*p) break;
+
+    char token[1024];
+    size_t len = 0;
+    char quote = '\0';
+    while (*p && (quote || !isspace((unsigned char)*p))) {
+      if (!quote && (*p == '\'' || *p == '"')) {
+        quote = *p++;
+        continue;
+      }
+      if (quote && *p == quote) {
+        quote = '\0';
+        p++;
+        continue;
+      }
+      if (*p == '\\' && p[1]) p++;
+      if (len + 1 >= sizeof(token)) {
+        if (errbuf) snprintf(errbuf, errcap, "argument too long");
+        bbs_argv_free(argv);
+        return false;
+      }
+      token[len++] = *p++;
+    }
+    if (quote) {
+      if (errbuf) snprintf(errbuf, errcap, "unterminated quote");
+      bbs_argv_free(argv);
+      return false;
+    }
+    token[len] = '\0';
+
+    char* arg = (dropdir && strstr(token, "%D"))
+                    ? replace_marker(token, "%D", dropdir)
+                    : strdup(token);
     if (!arg || !argv_push(&argv, &argc, &cap, arg)) {
       free(arg);
       bbs_argv_free(argv);

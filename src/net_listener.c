@@ -12,6 +12,7 @@
 
 #include "bbs_session.h"
 #include "bbs_telnet.h"
+#include "bbs_util.h"
 
 static int make_listener(const char* bind_ip, int port) {
   int fd = socket(AF_INET, SOCK_STREAM, 0);
@@ -93,7 +94,7 @@ int net_run_listener(const BbsConfig* cfg, BbsDb* db, volatile sig_atomic_t* sto
     s->db = db_open(cfg->db_path);
     if (!s->db) {
       const char* msg = "\r\nSystem is temporarily unavailable. Please try again later.\r\n";
-      (void)write(cfd, msg, strlen(msg));
+      fd_write_all(cfd, msg, strlen(msg));
       fprintf(stderr, "session db_open failed for %s\n", cfg->db_path);
       close(cfd);
       free(s);

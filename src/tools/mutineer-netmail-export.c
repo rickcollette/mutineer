@@ -5,6 +5,7 @@
 #include "bbs_config.h"
 #include "bbs_db.h"
 #include "bbs_fido_netmail.h"
+#include "bbs_util.h"
 #include <getopt.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -70,8 +71,11 @@ int main(int argc, char **argv)
   char out_dir[256];
   if (out_dir_arg)
     snprintf(out_dir, sizeof(out_dir), "%s", out_dir_arg);
-  else
-    snprintf(out_dir, sizeof(out_dir), "%s/mail/outbound", cfg.data_path);
+  else {
+    char mail_dir[256];
+    path_join(cfg.data_path, "mail", mail_dir, sizeof(mail_dir));
+    path_join(mail_dir, "outbound", out_dir, sizeof(out_dir));
+  }
 
   BbsDb *db = db_open(cfg.db_path);
   if (!db)

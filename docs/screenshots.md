@@ -2,7 +2,7 @@
 
 ## Manual (recommended)
 
-1. **BBS** — with `docker compose up -d` running:
+1. **BBS** — with `docker compose -f docker/compose.yml up -d` running:
 
    ```bash
    ./scripts/open-bbs-telnet.sh
@@ -10,7 +10,7 @@
 
    Answer `Y` for ANSI, log in as **sysop** / **mutineer**, walk menus, and screenshot your terminal.
 
-2. **WFC** — needs an interactive TTY (not the detached compose service):
+2. **WFC** — the standalone console client needs an interactive TTY:
 
    ```bash
    ./scripts/open-wfc.sh
@@ -20,13 +20,15 @@
 
 ## Automated PNG capture
 
-With the BBS running (`docker compose up -d`):
+With the BBS running (`docker compose -f docker/compose.yml up -d`):
 
 ```bash
 ./scripts/capture-screenshots.sh
 ```
 
-Telnet screens use **expect** + headless Chromium; WFC uses **docker run -it** + the same renderer. Output in `screenshots/`:
+Telnet screens use **expect** + headless Chromium; WFC uses `mutineer-console`
+through `scripts/open-wfc.sh` plus the same renderer. When Chromium is missing,
+the renderer still writes checked-in HTML captures. Output in `screenshots/`:
 
 | File | Content |
 |------|---------|
@@ -34,7 +36,8 @@ Telnet screens use **expect** + headless Chromium; WFC uses **docker run -it** +
 | `02-main-menu.png` | Main deck menu |
 | `03-whos-online.png` | Who's online |
 | `04-messages.png` | Messages menu |
-| `05-wfc-console.png` | WFC node grid (requires image built with `docker/mutineer.wfc.conf`) |
+| `05-wfc-console.png` | WFC node grid from `mutineer-console` |
+| `05-wfc-console.html` | HTML fallback/rendered WFC capture |
 
 Host packages (Debian/Ubuntu): `xvfb xterm xdotool imagemagick`.
 
@@ -48,7 +51,7 @@ Host packages (Debian/Ubuntu): `xvfb xterm xdotool imagemagick`.
 
    Log in: `sysop` / `mutineer`, navigate menus, screenshot the terminal.
 
-2. **WFC** — separate interactive container (needs a real TTY):
+2. **WFC** — standalone console client:
 
    ```bash
    ./scripts/open-wfc.sh
@@ -56,4 +59,5 @@ Host packages (Debian/Ubuntu): `xvfb xterm xdotool imagemagick`.
 
    The WFC screen is the process foreground. Screenshot the terminal window.
 
-The main `docker compose` service keeps `wfc_enabled=0` (no TTY in detached mode). WFC is only started via `open-wfc.sh` or the capture script.
+The main daemon keeps the console-control TCP service enabled by config. The
+WFC dashboard itself is only started by `open-wfc.sh` or the capture script.

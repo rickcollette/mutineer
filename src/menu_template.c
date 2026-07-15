@@ -7,6 +7,15 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
+
+static void tmpl_copy(char *dst, size_t cap, const char *src)
+{
+  if (!dst || cap == 0) return;
+  size_t n = src ? strlen(src) : 0;
+  if (n >= cap) n = cap - 1;
+  if (n > 0) memcpy(dst, src, n);
+  dst[n] = '\0';
+}
 #include <sys/stat.h>
 
 /* Placeholder tokens */
@@ -318,8 +327,8 @@ MenuKeyValidation validate_menu_keys(const Menu* m) {
       if (m->items[j].key == m->items[i].key) {
         result.valid = false;
         snprintf(result.dup_key, sizeof(result.dup_key), "%c", m->items[i].key);
-        snprintf(result.label1, sizeof(result.label1), "%s", m->items[i].label);
-        snprintf(result.label2, sizeof(result.label2), "%s", m->items[j].label);
+        tmpl_copy(result.label1, sizeof(result.label1), m->items[i].label);
+        tmpl_copy(result.label2, sizeof(result.label2), m->items[j].label);
         return result;
       }
     }
@@ -331,8 +340,8 @@ MenuKeyValidation validate_menu_keys(const Menu* m) {
           m->items[j].key_str[0] == m->items[i].key) {
         result.valid = false;
         snprintf(result.dup_key, sizeof(result.dup_key), "%c", m->items[i].key);
-        snprintf(result.label1, sizeof(result.label1), "%s", m->items[i].label);
-        snprintf(result.label2, sizeof(result.label2), "%s", m->items[j].label);
+        tmpl_copy(result.label1, sizeof(result.label1), m->items[i].label);
+        tmpl_copy(result.label2, sizeof(result.label2), m->items[j].label);
         return result;
       }
     }
@@ -347,8 +356,8 @@ MenuKeyValidation validate_menu_keys(const Menu* m) {
           strcmp(m->items[i].key_str, m->items[j].key_str) == 0) {
         result.valid = false;
         snprintf(result.dup_key, sizeof(result.dup_key), "%s", m->items[i].key_str);
-        snprintf(result.label1, sizeof(result.label1), "%s", m->items[i].label);
-        snprintf(result.label2, sizeof(result.label2), "%s", m->items[j].label);
+        tmpl_copy(result.label1, sizeof(result.label1), m->items[i].label);
+        tmpl_copy(result.label2, sizeof(result.label2), m->items[j].label);
         return result;
       }
     }
@@ -370,7 +379,7 @@ static size_t format_menu_cell(const MenuItem* item, const Session* s,
   if (item->key != '\0') {
     snprintf(key_disp, sizeof(key_disp), "%c", item->key);
   } else {
-    snprintf(key_disp, sizeof(key_disp), "%s", item->key_str);
+    tmpl_copy(key_disp, sizeof(key_disp), item->key_str);
   }
   
   /* Expand MCI in label */
@@ -378,10 +387,10 @@ static size_t format_menu_cell(const MenuItem* item, const Session* s,
   if (s) {
     mci_expand(s, item->label, label, sizeof(label));
   } else {
-    snprintf(label, sizeof(label), "%s", item->label);
+    tmpl_copy(label, sizeof(label), item->label);
   }
   
-  return (size_t)snprintf(out, cap, "[%s] %s", key_disp, label);
+  return (size_t)snprintf(out, cap, "[%.15s] %.108s", key_disp, label);
 }
 
 /* Pad or truncate a cell to exact width */

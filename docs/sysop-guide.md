@@ -6,7 +6,9 @@ This guide covers day-to-day BBS administration: WFC monitoring, user management
 
 ## WFC Console
 
-The Who's On Full Color (WFC) console runs as a background thread when `wfc_enabled=1` (default). Implemented in `src/wfc.c`.
+The Who's On Full Color (WFC) console is now the standalone `mutineer-console`
+tool. The main `mutineer` server exposes a loopback console-control TCP port,
+and the console logs in with a sysop BBS account.
 
 ### Display
 
@@ -22,7 +24,10 @@ WFC shows a grid of node slots with status characters:
 ### Tuning
 
 ```ini
-wfc_enabled=1
+console_enabled=1
+console_bind=127.0.0.1
+console_port=2931
+console_idle_timeout_sec=600
 wfc_refresh_ms=1000
 wfc_blank_sec=300
 wfc_node_num=1
@@ -31,8 +36,8 @@ wfc_bg_color=0
 ```
 
 - `wfc_blank_sec=0` disables screen blanking
-- WFC runs on the local terminal where `mutineer` was started
-- Remote sysops use telnet + F-key editors instead
+- Run `mutineer-console -c conf/mutineer.conf` from an interactive terminal
+- Large editor actions run on the server through console passthrough mode
 
 ## User Administration
 
@@ -282,6 +287,7 @@ ACS term `E#` checks active subscription type.
 ## Related Documentation
 
 - [Configuration](configuration.md)
+- [Console Protocol](console-protocol.md)
 - [CLI Tools](cli-tools.md)
 - [Architecture](architecture.md)
 - [Reference: Menu Actions](reference/menu-actions.md)

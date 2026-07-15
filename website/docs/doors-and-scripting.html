@@ -4,16 +4,15 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Doors and Scripting — Mutineer BBS</title>
-  <link rel="stylesheet" href="assets/css/site.css">
+  <link rel="stylesheet" href="../assets/css/site.css">
 </head>
 <body>
   <header class="site-header">
-    <a href="index.html" class="logo">MUTINEER BBS</a>
-    <span class="tagline">Documentation</span>
+    <a href="index.html" class="logo"><span class="mark">☠</span> MUTINEER BBS</a>
+    <span class="tagline">CAPTAIN'S MANUAL // STATIC ARCHIVE</span>
   </header>
-  <nav class="doc-nav"><a href="index.html" class="home">← Home</a><a href="quick-start.html">Quick Start</a><a href="windows.html">Windows</a><a href="getting-started.html">Getting Started</a><a href="deployment.html">Deployment</a><a href="overview.html">Overview</a><a href="configuration.html">Configuration</a><a href="architecture.html">Architecture</a><a href="menus-and-ui.html">Menus & UI</a><a href="messages-and-mail.html">Messages & Mail</a><a href="files-and-protocols.html">Files & Protocols</a><a href="chat-and-social.html">Chat & Social</a><a href="doors-and-scripting.html" class="active">Doors & Scripting</a><a href="sysop-guide.html">Sysop Guide</a><a href="networking-plank.html">PLANK</a><a href="buccaneer/programmers-guide.html">BUCC Guide</a><a href="buccaneer/host-api.html">BUCC API</a><a href="plugins.html">Plugins</a><a href="developer-guide.html">Developer</a><a href="cli-tools.html">CLI Tools</a><a href="reference/menu-actions.html">Menu Actions</a><a href="reference/message-commands.html">Messages Ref</a><a href="reference/file-commands.html">Files Ref</a><a href="reference/acs-mci.html">ACS & MCI</a><a href="reference/database.html">Database</a></nav>
-  <main class="doc-content"><p>&lt;!-- generated-by: gsd-doc-writer --&gt;</p>
-<h1>Doors and Scripting</h1>
+  <nav class="doc-nav"><a href="index.html" class="home">← Home</a><a href="quick-start.html">Quick Start</a><a href="windows.html">Windows</a><a href="getting-started.html">Getting Started</a><a href="deployment.html">Deployment</a><a href="overview.html">Overview</a><a href="configuration.html">Configuration</a><a href="architecture.html">Architecture</a><a href="menus-and-ui.html">Menus & UI</a><a href="messages-and-mail.html">Messages & Mail</a><a href="files-and-protocols.html">Files & Protocols</a><a href="chat-and-social.html">Chat & Social</a><a href="doors-and-scripting.html" class="active">Doors & Scripting</a><a href="sysop-guide.html">Sysop Guide</a><a href="console-protocol.html">Console Protocol</a><a href="networking-plank.html">PLANK</a><a href="buccaneer/programmers-guide.html">BUCC Guide</a><a href="buccaneer/host-api.html">BUCC API</a><a href="plugins.html">Plugins</a><a href="developer-guide.html">Developer</a><a href="website-source.html">Website Source</a><a href="cli-tools.html">CLI Tools</a><a href="reference/menu-actions.html">Menu Actions</a><a href="reference/message-commands.html">Messages Ref</a><a href="reference/file-commands.html">Files Ref</a><a href="reference/acs-mci.html">ACS & MCI</a><a href="reference/database.html">Database</a></nav>
+  <main class="doc-content"><h1>Doors and Scripting</h1>
 <p>Mutineer BBS supports four extension mechanisms for interactive programs: native executable doors, DOSBox-hosted DOS doors, Buccaneer scripts, and loadable <code>.so</code> plugins.</p>
 <h2>Door Types Comparison</h2>
 <table>
@@ -28,6 +27,17 @@
 <h2>Native Doors</h2>
 <p>Native doors are executables launched via <code>fork</code>/<code>exec</code> from <code>src/doors.c</code>.</p>
 <p>Native door commands are argv templates, not shell scripts. Mutineer parses quoted arguments and backslash escapes, then launches the child directly with <code>execvp()</code>. Shell metacharacters such as pipes, redirects, command substitution, <code>;</code>, <code>&amp;&amp;</code>, and <code>||</code> are rejected.</p>
+<p>Native door templates may include <code>%D</code>, which is replaced with the per-door dropfile directory before launch. This is intended for clients that need to read <code>DOOR32.SYS</code> and Mutineer-specific session metadata, for example:</p>
+<pre><code class="ini">
+/opt/anavir/src/anavir-door-client --dropdir %D --socket /run/anavir/anavir.sock
+</code></pre>
+<p>Example Anavir native door command:</p>
+<pre><code class="sql">
+INSERT INTO doors (name, runner, command, enabled, acs)
+VALUES (&#x27;Anavir&#x27;, &#x27;native&#x27;,
+        &#x27;/opt/anavir/src/anavir-door-client --dropdir %D --socket /run/anavir/anavir.sock&#x27;,
+        1, &#x27;L10&#x27;);
+</code></pre>
 <h3>Database Record (<code>doors</code> table)</h3>
 <table>
 <tr><th>Field</th><th>Purpose</th></tr>
@@ -42,10 +52,25 @@
 <ol>
 <li>User selects door from <code>doors</code> menu action</li>
 <li>ACS check on door record</li>
-<li>Dropfile written to <code>dropfile_path</code> with session/user/node info</li>
+<li>Dropfiles are written to <code>dropfile_path/&lt;door-name&gt;/</code> with session/user/node info</li>
+<li><code>MUTINEER_SESSION.JSON</code> is written beside the dropfiles for native doors</li>
 <li>Child process spawned with inherited telnet socket FD</li>
 <li>Parent waits for exit or timeout (<code>door_default_timeout_sec</code>)</li>
 <li>Session resumes at BBS menu</li>
+</ol>
+<h3>Anavir BBS Door Workflow</h3>
+<p>Anavir runs as a persistent multiplayer server. Mutineer BBS authenticates the caller and launches only a lightweight bridge client.</p>
+<ol>
+<li>Caller connects to Mutineer BBS over telnet, SSH, or a TLS terminator.</li>
+<li>Caller logs in with normal BBS credentials.</li>
+<li>Caller selects the <code>Anavir</code> native door.</li>
+<li>Mutineer performs the door ACS check.</li>
+<li>Mutineer writes standard dropfiles including <code>DOOR32.SYS</code>; line 2 contains the inherited caller socket FD.</li>
+<li>Mutineer writes <code>MUTINEER_SESSION.JSON</code> with <code>bbs_user_id</code>, <code>handle</code>, <code>real_name</code>, <code>security_level</code>, <code>node_num</code>, <code>time_left_sec</code>, <code>ansi</code>, <code>remote_ip</code>, <code>issued_at</code>, <code>expires_at</code>, <code>nonce</code>, and <code>hmac</code>.</li>
+<li>Mutineer launches <code>anavir-door-client --dropdir %D --socket /run/anavir/anavir.sock</code>.</li>
+<li>The client reads <code>DOOR32.SYS</code>, validates the session file is present and unexpired, connects to the Anavir Unix socket, sends the signed JSON auth frame, and proxies bytes both ways.</li>
+<li>Anavir validates HMAC, expiry, replay nonce, and required fields, then skips MUD password prompts for that verified BBS account.</li>
+<li>When the user quits or disconnects, the client exits and Mutineer returns the caller to the BBS menu or applies the configured door policy.</li>
 </ol>
 <h2>DOSBox Doors</h2>
 <p>Classic DOS BBS doors run under DOSBox with per-launch isolation.</p>
@@ -142,11 +167,20 @@ plugins_denylist=
 <li>Node number, COM port (socket FD mapping)</li>
 <li>BBS name, sysop name</li>
 </ul>
+<p>Native doors also receive <code>MUTINEER_SESSION.JSON</code>. Its <code>hmac</code> signs a canonical form of the JSON fields using <code>door_session_hmac_secret</code>; services such as Anavir must validate this signature and use <code>bbs_user_id</code>, not the handle alone, as the external account identity.</p>
+<p>Generate a production secret with:</p>
+<pre><code class="sh">
+openssl rand -hex 32
+</code></pre>
+<p>Configure the same value in Mutineer as <code>door_session_hmac_secret</code> and in the</p>
+<p>Anavir service as <code>--bbs-secret</code> or an equivalent secret-injection mechanism.</p>
 <h2>Door Menu</h2>
 <p><code>menus/door.mnu</code> lists available doors. The <code>doors</code> action in session.c reads from <code>doors</code> table and launches selected door.</p>
 <h2>Security Considerations</h2>
 <ul>
 <li>Native doors run as the BBS user — trust door binaries</li>
+<li>Use a production-only <code>door_session_hmac_secret</code>; the compiled default is for local development only</li>
+<li>BBS-authenticated game servers must validate HMAC, expiry, and nonce replay before trusting session fields</li>
 <li>DOSBox isolation limits filesystem exposure to runtime tree</li>
 <li>Path traversal blocked in door manifest parsing (<code>path_is_safe_relative()</code>)</li>
 <li>Timeout prevents hung doors from blocking nodes indefinitely</li>

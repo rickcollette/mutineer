@@ -28,11 +28,13 @@ NAV = [
     ("Chat & Social", "chat-and-social.html"),
     ("Doors & Scripting", "doors-and-scripting.html"),
     ("Sysop Guide", "sysop-guide.html"),
+    ("Console Protocol", "console-protocol.html"),
     ("PLANK", "networking-plank.html"),
     ("BUCC Guide", "buccaneer/programmers-guide.html"),
     ("BUCC API", "buccaneer/host-api.html"),
     ("Plugins", "plugins.html"),
     ("Developer", "developer-guide.html"),
+    ("Website Source", "website-source.html"),
     ("CLI Tools", "cli-tools.html"),
     ("Menu Actions", "reference/menu-actions.html"),
     ("Messages Ref", "reference/message-commands.html"),
@@ -68,10 +70,11 @@ def md_to_html(text: str) -> str:
     while i < len(lines):
         line = lines[i]
 
-        if line.startswith("```"):
+        stripped_line = line.lstrip()
+        if stripped_line.startswith("```"):
             if not in_code:
                 in_code = True
-                lang = html.escape(line[3:].strip())
+                lang = html.escape(stripped_line[3:].strip())
                 out.append(f'<pre><code class="{lang}">')
             else:
                 in_code = False
@@ -81,6 +84,10 @@ def md_to_html(text: str) -> str:
 
         if in_code:
             out.append(html.escape(line))
+            i += 1
+            continue
+
+        if re.match(r"^\s*<!--.*-->\s*$", line):
             i += 1
             continue
 
@@ -158,7 +165,7 @@ def build_nav(current: str, depth: int) -> str:
 
 def wrap(title: str, body: str, current: str, depth: int) -> str:
     prefix = "../" * depth
-    css = (prefix + "../assets/css/site.css") if depth else "assets/css/site.css"
+    css = prefix + "../assets/css/site.css"
     home = prefix + "index.html"
     return f"""<!DOCTYPE html>
 <html lang="en">
@@ -170,8 +177,8 @@ def wrap(title: str, body: str, current: str, depth: int) -> str:
 </head>
 <body>
   <header class="site-header">
-    <a href="{home}" class="logo">MUTINEER BBS</a>
-    <span class="tagline">Documentation</span>
+    <a href="{home}" class="logo"><span class="mark">☠</span> MUTINEER BBS</a>
+    <span class="tagline">CAPTAIN'S MANUAL // STATIC ARCHIVE</span>
   </header>
   {build_nav(current, depth)}
   <main class="doc-content">{body}</main>
@@ -214,6 +221,7 @@ PAGES = [
         ("chat-and-social.md", "chat-and-social.html", 0),
         ("doors-and-scripting.md", "doors-and-scripting.html", 0),
         ("sysop-guide.md", "sysop-guide.html", 0),
+        ("console-protocol.md", "console-protocol.html", 0),
         ("networking-plank.md", "networking-plank.html", 0),
         ("screenshots.md", "screenshots.html", 0),
         ("buccaneer.md", "buccaneer.html", 0),
@@ -224,6 +232,7 @@ PAGES = [
         ("buccaneer/door-packages.md", "buccaneer/door-packages.html", 1),
         ("plugins.md", "plugins.html", 0),
         ("developer-guide.md", "developer-guide.html", 0),
+        ("website-source.md", "website-source.html", 0),
         ("cli-tools.md", "cli-tools.html", 0),
         ("reference/menu-actions.md", "reference/menu-actions.html", 1),
         ("reference/message-commands.md", "reference/message-commands.html", 1),
@@ -284,12 +293,52 @@ def check_output(out_dir: str) -> int:
     return 0
 
 
+def self_test() -> int:
+    fixture = """# Fixture
+
+1. Build it
+   ```sh
+   echo "<safe>"
+   ```
+2. Check `inline`
+
+| Name | Value |
+| ---- | ----- |
+| Link | [Docs](quick-start.md) |
+"""
+    rendered = md_to_html(fixture)
+    checks = [
+        ("<h1>Fixture</h1>" in rendered, "heading renders"),
+        ("<ol>" in rendered and "<li>Build it</li>" in rendered, "ordered list renders"),
+        ('<pre><code class="sh">' in rendered, "indented fence starts code block"),
+        ("&lt;safe&gt;" in rendered, "code block is escaped"),
+        ("<code>inline</code>" in rendered, "inline code renders"),
+        ("<table>" in rendered and "<th>Name</th>" in rendered and "<td>Link</td>" in rendered,
+         "table renders"),
+        ('<a href="quick-start.html">Docs</a>' in rendered, "markdown links convert to html"),
+    ]
+    failures = [name for ok, name in checks if not ok]
+    if failures:
+        print("Website renderer self-test failed:")
+        print(rendered)
+        for name in failures:
+            print(f"  {name}")
+        return 1
+    print("Website renderer self-test passed.")
+    return 0
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", default=OUT, help="output website directory")
     parser.add_argument("--check-or-temp-output", action="store_true",
                         help="build into a temporary directory and validate generated HTML")
+    parser.add_argument("--self-test", action="store_true",
+                        help="run Markdown renderer fixture tests")
     args = parser.parse_args()
+
+    if args.self_test:
+        return self_test()
 
     if args.check_or_temp_output:
         tmp = tempfile.mkdtemp(prefix="mutineer_website_")

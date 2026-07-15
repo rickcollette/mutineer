@@ -247,11 +247,15 @@ Primary namespace for user interaction. Implemented functions in Mutineer today 
 | `TERM.PRINTLN(s)` | Print line |
 | `TERM.CLS()` | Clear screen |
 | `TERM.COLOR(fg, bg)` | Set colors |
+| `TERM.GOTOXY(x, y)` | Move cursor |
 | `TERM.GETKEY()` | Read one key |
 | `TERM.INPUT(prompt, default)` | Read line |
+| `TERM.INPUT_PASSWORD(prompt)` | Read masked input |
+| `TERM.PAUSE(prompt)` | Prompt and wait |
+| `TERM.SUPPORTS_ANSI()` | Detect ANSI support |
 | `TERM.WIDTH()` / `TERM.HEIGHT()` | Terminal size |
 
-Spec-defined but not yet wired in production host: `GOTOXY`, `PAUSE`, `INPUT_PASSWORD`, `SUPPORTS_ANSI`, paging helpers. The **simulator** implements more of the spec — test there first.
+Paging helpers remain simulator/spec territory until they have a live BBS implementation.
 
 See [Host API Reference](host-api.md).
 

@@ -42,7 +42,10 @@ void telnet_password_begin(int fd) {
 }
 
 void telnet_password_end(int fd) {
-  tn_send3(fd, IAC, WONT, TELOPT_ECHO);
+  /* Keep server-side echo active after password entry.
+     If we send WONT ECHO here, common telnet clients resume local echo while
+     the BBS readline path also echoes, causing doubled command characters. */
+  tn_send3(fd, IAC, WILL, TELOPT_ECHO);
   tn_send3(fd, IAC, DO, TELOPT_SGA);
 }
 

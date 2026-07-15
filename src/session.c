@@ -18,6 +18,7 @@
 #include "bbs_msg_cmds.h"
 #include "bbs_chat.h"
 #include "bbs_telnet.h"
+#include "bbs_auth.h"
 #include <openssl/evp.h>
 #include <signal.h>
 #include <ctype.h>
@@ -50,7 +51,17 @@ static bool valid_menu_basename(const char *name)
 /* Simple online registry */
 #define MAX_ONLINE 256
 static Session *g_online[MAX_ONLINE];
+static int g_node_locked[MAX_ONLINE];
 static pthread_mutex_t g_online_mu = PTHREAD_MUTEX_INITIALIZER;
+
+static void session_copy(char *dst, size_t cap, const char *src)
+{
+  if (!dst || cap == 0) return;
+  size_t n = src ? strlen(src) : 0;
+  if (n >= cap) n = cap - 1;
+  if (n > 0) memcpy(dst, src, n);
+  dst[n] = '\0';
+}
 
 typedef struct
 {
@@ -102,17 +113,7 @@ static int chat_dump(int channel, time_t since, char *out, size_t cap)
   pthread_mutex_unlock(&g_chat_mu);
   return (int)o;
 }
-typedef struct
-{
-  char ip[64];
-  char handle[64];
-  int attempts;
-  time_t window_start;
-} LoginAttempt;
-
 #define MAX_ATTEMPTS 256
-static LoginAttempt g_attempts[MAX_ATTEMPTS];
-static pthread_mutex_t g_attempts_mu = PTHREAD_MUTEX_INITIALIZER;
 
 typedef struct
 {
@@ -124,74 +125,6 @@ typedef struct
 
 static RecoveryAttempt g_recovery_attempts[MAX_ATTEMPTS];
 static pthread_mutex_t g_recovery_attempts_mu = PTHREAD_MUTEX_INITIALIZER;
-
-static bool login_throttled(const BbsConfig *cfg, const char *ip, const char *handle)
-{
-  time_t now = time(NULL);
-  pthread_mutex_lock(&g_attempts_mu);
-  for (int i = 0; i < MAX_ATTEMPTS; i++)
-  {
-    LoginAttempt *a = &g_attempts[i];
-    if (a->attempts == 0)
-      continue;
-    if (difftime(now, a->window_start) > cfg->login_window_sec)
-    {
-      a->attempts = 0;
-      continue;
-    }
-    if (!strcmp(a->ip, ip) || (handle && handle[0] && !strcmp(a->handle, handle)))
-    {
-      if (a->attempts >= cfg->login_max_attempts)
-      {
-        pthread_mutex_unlock(&g_attempts_mu);
-        return true;
-      }
-    }
-  }
-  pthread_mutex_unlock(&g_attempts_mu);
-  return false;
-}
-
-static void login_record(const BbsConfig *cfg, const char *ip, const char *handle, bool success)
-{
-  if (success)
-    return;
-  time_t now = time(NULL);
-  pthread_mutex_lock(&g_attempts_mu);
-  int slot = -1;
-  for (int i = 0; i < MAX_ATTEMPTS; i++)
-  {
-    if (g_attempts[i].attempts == 0)
-    {
-      if (slot < 0)
-        slot = i;
-      continue;
-    }
-    if (!strcmp(g_attempts[i].ip, ip) || (handle && handle[0] && !strcmp(g_attempts[i].handle, handle)))
-    {
-      if (difftime(now, g_attempts[i].window_start) > cfg->login_window_sec)
-      {
-        g_attempts[i].attempts = 0;
-        slot = i;
-      }
-      else
-      {
-        g_attempts[i].attempts++;
-        pthread_mutex_unlock(&g_attempts_mu);
-        return;
-      }
-    }
-  }
-  if (slot >= 0)
-  {
-    LoginAttempt *a = &g_attempts[slot];
-    snprintf(a->ip, sizeof(a->ip), "%s", ip);
-    snprintf(a->handle, sizeof(a->handle), "%s", handle ? handle : "");
-    a->attempts = 1;
-    a->window_start = now;
-  }
-  pthread_mutex_unlock(&g_attempts_mu);
-}
 
 static bool recovery_throttled(const BbsConfig *cfg, const char *ip, const char *handle)
 {
@@ -263,19 +196,22 @@ static void recovery_record(const BbsConfig *cfg, const char *ip, const char *ha
   pthread_mutex_unlock(&g_recovery_attempts_mu);
 }
 
-void online_add(Session *s)
+bool online_add(Session *s)
 {
+  bool added = false;
   pthread_mutex_lock(&g_online_mu);
   for (int i = 0; i < MAX_ONLINE; i++)
   {
-    if (!g_online[i])
+    if (!g_online[i] && !g_node_locked[i])
     {
       g_online[i] = s;
       s->node_num = i + 1;
+      added = true;
       break;
     }
   }
   pthread_mutex_unlock(&g_online_mu);
+  return added;
 }
 
 void online_remove(Session *s)
@@ -358,7 +294,7 @@ static bool online_send_node(int node_num, const char *msg)
   return sent;
 }
 
-static bool online_mark_node_dead(int node_num, const Session *except, const char *msg)
+bool online_mark_node_dead(int node_num, const Session *except, const char *msg)
 {
   bool marked = false;
   pthread_mutex_lock(&g_online_mu);
@@ -374,6 +310,24 @@ static bool online_mark_node_dead(int node_num, const Session *except, const cha
   }
   pthread_mutex_unlock(&g_online_mu);
   return marked;
+}
+
+void online_set_node_locked(int node_num, bool locked)
+{
+  pthread_mutex_lock(&g_online_mu);
+  if (node_num > 0 && node_num <= MAX_ONLINE)
+    g_node_locked[node_num - 1] = locked ? 1 : 0;
+  pthread_mutex_unlock(&g_online_mu);
+}
+
+bool online_node_is_locked(int node_num)
+{
+  bool locked = false;
+  pthread_mutex_lock(&g_online_mu);
+  if (node_num > 0 && node_num <= MAX_ONLINE)
+    locked = g_node_locked[node_num - 1] != 0;
+  pthread_mutex_unlock(&g_online_mu);
+  return locked;
 }
 
 void broadcast_check(const char *data_path)
@@ -520,11 +474,27 @@ int session_readline(Session *s, uint8_t *buf, size_t cap, int timeout_sec)
   return readline_echo(s, buf, cap, timeout_sec, ECHO_ON);
 }
 
+int session_readline_echo(Session *s, uint8_t *buf, size_t cap, int timeout_sec, int echo)
+{
+  return readline_echo(s, buf, cap, timeout_sec, echo ? ECHO_ON : ECHO_DOTS);
+}
+
 void send_str(Session *s, const char *str)
 {
   if (!s || !str)
     return;
-  fd_write_all(s->fd, str, strlen(str));
+  const char *start = str;
+  for (const char *p = str; *p; p++)
+  {
+    if (*p != '\n' || (p > str && p[-1] == '\r'))
+      continue;
+    if (p > start)
+      fd_write_all(s->fd, start, (size_t)(p - start));
+    fd_write_all(s->fd, "\r\n", 2);
+    start = p + 1;
+  }
+  if (*start)
+    fd_write_all(s->fd, start, strlen(start));
 }
 
 static void send_motd(Session *s)
@@ -549,12 +519,12 @@ static void send_motd(Session *s)
       if (expanded)
       {
         mci_expand(s, raw, expanded, out_cap);
-        fd_write_all(s->fd, expanded, strlen(expanded));
+        send_str(s, expanded);
         free(expanded);
       }
       else
       {
-        fd_write_all(s->fd, raw, len);
+        send_str(s, raw);
       }
       free(raw);
       return;
@@ -576,12 +546,12 @@ static void send_art(Session *s, const char *path)
   if (out)
   {
     mci_expand(s, raw, out, cap);
-    fd_write_all(s->fd, out, strlen(out));
+    send_str(s, out);
     free(out);
   }
   else
   {
-    fd_write_all(s->fd, raw, len);
+    send_str(s, raw);
   }
   free(raw);
 }
@@ -698,6 +668,23 @@ static bool cfg_edit_set_value(BbsConfig *cfg, const char *key, const char *valu
   }
   else if (!strcmp(key, "wfc_shell_command"))
     snprintf(cfg->wfc_shell_command, sizeof(cfg->wfc_shell_command), "%s", value);
+  else if (!strcmp(key, "console_enabled"))
+  {
+    if (!parse_strict_int(value, 0, 1, &n)) goto bad_bool;
+    cfg->console_enabled = n;
+  }
+  else if (!strcmp(key, "console_bind"))
+    snprintf(cfg->console_bind, sizeof(cfg->console_bind), "%s", value);
+  else if (!strcmp(key, "console_port"))
+  {
+    if (!parse_strict_int(value, 1, 65535, &n)) goto bad_int;
+    cfg->console_port = n;
+  }
+  else if (!strcmp(key, "console_idle_timeout_sec"))
+  {
+    if (!parse_strict_int(value, 1, 86400, &n)) goto bad_int;
+    cfg->console_idle_timeout_sec = n;
+  }
   else if (!strcmp(key, "max_calls_per_day"))
   {
     if (!parse_strict_int(value, 0, 10000, &n)) goto bad_int;
@@ -733,7 +720,8 @@ static void cmd_config_editor(Session *s)
   send_str(s, "\r\n\x1b[1;36mConfig Editor\x1b[0m\r\n");
   send_str(s, "Editable keys: bbs_name sysop_name bind port menu_main data_path logs_path\r\n");
   send_str(s, "idle_timeout_sec session_time_limit_min scheduler_enabled scheduler_tick_sec\r\n");
-  send_str(s, "guest_enabled guest_handle wfc_enabled wfc_shell_enabled wfc_shell_command max_calls_per_day\r\n");
+  send_str(s, "guest_enabled guest_handle console_enabled console_bind console_port console_idle_timeout_sec\r\n");
+  send_str(s, "wfc_enabled wfc_shell_enabled wfc_shell_command max_calls_per_day\r\n");
   char key[64] = {0};
   char value[256] = {0};
   if (prompt_line(s, "Key (blank to cancel): ", key, sizeof(key)) <= 0 || !key[0])
@@ -944,8 +932,10 @@ int prompt_line(Session *s, const char *prompt, char *out, size_t cap)
   if (n < 0)
     return n;
   send_str(s, "\r\n"); /* newline after user input */
-  line[(cap - 1 < (size_t)n) ? cap - 1 : n] = 0;
-  snprintf(out, cap, "%s", line);
+  size_t copy_n = (size_t)n;
+  if (copy_n >= cap) copy_n = cap - 1;
+  memcpy(out, line, copy_n);
+  out[copy_n] = '\0';
   return n;
 }
 
@@ -963,8 +953,10 @@ static int prompt_password(Session *s, const char *prompt, char *out, size_t cap
   if (n < 0)
     return n;
   send_str(s, "\r\n"); /* newline after user input */
-  line[(cap - 1 < (size_t)n) ? cap - 1 : n] = 0;
-  snprintf(out, cap, "%s", line);
+  size_t copy_n = (size_t)n;
+  if (copy_n >= cap) copy_n = cap - 1;
+  memcpy(out, line, copy_n);
+  out[copy_n] = '\0';
   return n;
 }
 
@@ -1049,7 +1041,7 @@ static int authenticate(Session *s, DbUser *user_out)
   }
   log_info("auth: handle=%s", handle);
 
-  if (login_throttled(&s->cfg, s->ip, handle))
+  if (bbs_login_throttled(&s->cfg, s->ip, handle))
   {
     send_str(s, "\r\nToo many attempts. Please wait and try again.\r\n");
     return -1;
@@ -1087,7 +1079,7 @@ static int authenticate(Session *s, DbUser *user_out)
       *user_out = guest;
     log_info("auth: guest login from %s (%s)", guest_name, guest_location);
     log_audit(guest.handle, "guest_login", guest_referral[0] ? guest_referral : "no referral");
-    login_record(&s->cfg, s->ip, handle, true);
+    bbs_login_record(&s->cfg, s->ip, handle, true);
     send_str(s, "\r\nWelcome, guest! Your access is limited.\r\n");
     return 1;
   }
@@ -1114,7 +1106,7 @@ static int authenticate(Session *s, DbUser *user_out)
     if (!pw_hash_verify(pw, user.pw_hash))
     {
       send_str(s, "\r\nInvalid password.\r\n");
-      login_record(&s->cfg, s->ip, handle, false);
+      bbs_login_record(&s->cfg, s->ip, handle, false);
       log_warn("auth: invalid password for %s", handle);
 
       /* Offer password recovery if security question is set */
@@ -1236,7 +1228,7 @@ static int authenticate(Session *s, DbUser *user_out)
 
     if (user_out)
       *user_out = user;
-    login_record(&s->cfg, s->ip, handle, true);
+    bbs_login_record(&s->cfg, s->ip, handle, true);
     return 1;
   }
   else
@@ -1349,7 +1341,7 @@ static int authenticate(Session *s, DbUser *user_out)
   }
 }
 
-static void handle_action(Session *s, const char *action)
+void bbs_handle_action(Session *s, const char *action)
 {
   if (!strcmp(action, "who"))
   {
@@ -1690,27 +1682,27 @@ static void handle_action(Session *s, const char *action)
 
     prompt_line(s, "Real Name: ", buf, sizeof(buf));
     if (buf[0])
-      strncpy(u.real_name, buf, sizeof(u.real_name) - 1);
+      session_copy(u.real_name, sizeof(u.real_name), buf);
 
     prompt_line(s, "Email: ", buf, sizeof(buf));
     if (buf[0])
-      strncpy(u.email, buf, sizeof(u.email) - 1);
+      session_copy(u.email, sizeof(u.email), buf);
 
     prompt_line(s, "Phone: ", buf, sizeof(buf));
     if (buf[0])
-      strncpy(u.phone, buf, sizeof(u.phone) - 1);
+      session_copy(u.phone, sizeof(u.phone), buf);
 
     prompt_line(s, "Street: ", buf, sizeof(buf));
     if (buf[0])
-      strncpy(u.street, buf, sizeof(u.street) - 1);
+      session_copy(u.street, sizeof(u.street), buf);
 
     prompt_line(s, "City/State: ", buf, sizeof(buf));
     if (buf[0])
-      strncpy(u.city_state, buf, sizeof(u.city_state) - 1);
+      session_copy(u.city_state, sizeof(u.city_state), buf);
 
     prompt_line(s, "ZIP: ", buf, sizeof(buf));
     if (buf[0])
-      strncpy(u.zip_code, buf, sizeof(u.zip_code) - 1);
+      session_copy(u.zip_code, sizeof(u.zip_code), buf);
 
     prompt_line(s, "Sex (M/F): ", buf, sizeof(buf));
     if (buf[0])
@@ -1718,7 +1710,7 @@ static void handle_action(Session *s, const char *action)
 
     prompt_line(s, "Birth Date (YYYY-MM-DD): ", buf, sizeof(buf));
     if (buf[0])
-      strncpy(u.birth_date, buf, sizeof(u.birth_date) - 1);
+      session_copy(u.birth_date, sizeof(u.birth_date), buf);
 
     prompt_line(s, "Security Level: ", buf, sizeof(buf));
     if (buf[0])
@@ -1758,11 +1750,11 @@ static void handle_action(Session *s, const char *action)
 
     prompt_line(s, "Expiration Date (YYYY-MM-DD): ", buf, sizeof(buf));
     if (buf[0])
-      strncpy(u.expires_at, buf, sizeof(u.expires_at) - 1);
+      session_copy(u.expires_at, sizeof(u.expires_at), buf);
 
     prompt_line(s, "Sysop Note: ", buf, sizeof(buf));
     if (buf[0])
-      strncpy(u.note, buf, sizeof(u.note) - 1);
+      session_copy(u.note, sizeof(u.note), buf);
 
     send_str(s, "\r\nSave changes? (Y/N): ");
     uint8_t confirm[8];
@@ -2683,7 +2675,7 @@ static void handle_action(Session *s, const char *action)
     {
       if (strstr(ent->d_name, ".mnu"))
       {
-        snprintf(menu_files[menu_count], sizeof(menu_files[0]), "%s", ent->d_name);
+        session_copy(menu_files[menu_count], sizeof(menu_files[0]), ent->d_name);
         menu_count++;
       }
     }
@@ -2692,7 +2684,7 @@ static void handle_action(Session *s, const char *action)
     char buf[256];
     for (int i = 0; i < menu_count; i++)
     {
-      snprintf(buf, sizeof(buf), "  [%2d] %s\r\n", i + 1, menu_files[i]);
+      snprintf(buf, sizeof(buf), "  [%2d] %.63s\r\n", i + 1, menu_files[i]);
       send_str(s, buf);
     }
 
@@ -2749,7 +2741,7 @@ static void handle_action(Session *s, const char *action)
         return;
       }
 
-      snprintf(buf, sizeof(buf), "\r\nCreated menu: %s\r\n", filepath);
+      snprintf(buf, sizeof(buf), "\r\nCreated menu: %.220s\r\n", filepath);
       send_str(s, buf);
       return;
     }
@@ -2807,7 +2799,7 @@ static void handle_action(Session *s, const char *action)
         return;
       }
 
-      snprintf(buf, sizeof(buf), "\r\nEditing: %s\r\n", filepath);
+      snprintf(buf, sizeof(buf), "\r\nEditing: %.230s\r\n", filepath);
       send_str(s, buf);
       snprintf(buf, sizeof(buf), "Title: %s\r\n", menu.title);
       send_str(s, buf);
@@ -2828,9 +2820,9 @@ static void handle_action(Session *s, const char *action)
         }
         else
         {
-          snprintf(key_disp, sizeof(key_disp), "%s", menu.items[i].key_str);
+          session_copy(key_disp, sizeof(key_disp), menu.items[i].key_str);
         }
-        snprintf(buf, sizeof(buf), "  [%2zu] %s | %s | %s | %s\r\n",
+        snprintf(buf, sizeof(buf), "  [%2zu] %.15s | %.80s | %.48s | %.48s\r\n",
                  i + 1, key_disp, menu.items[i].label, menu.items[i].action, menu.items[i].acs);
         send_str(s, buf);
       }
@@ -2886,7 +2878,7 @@ static void handle_action(Session *s, const char *action)
             memset(it, 0, sizeof(*it));
             if (strlen(key) > 1)
             {
-              snprintf(it->key_str, sizeof(it->key_str), "%s", key);
+              session_copy(it->key_str, sizeof(it->key_str), key);
               for (char *p = it->key_str; *p; p++)
                 *p = (char)toupper((unsigned char)*p);
             }
@@ -3511,7 +3503,7 @@ static void handle_action(Session *s, const char *action)
       DbConference conf;
       if (db_conference_get(s->db, conf_ids[i], &conf))
       {
-        snprintf(buf, sizeof(buf), "%2d. %-30s - %s\r\n", conf.id, conf.name, conf.description);
+        snprintf(buf, sizeof(buf), "%2d. %-30.30s - %.180s\r\n", conf.id, conf.name, conf.description);
         send_str(s, buf);
       }
     }
@@ -4692,7 +4684,11 @@ void *session_thread_main(void *arg)
 
   pthread_mutex_init(&s->chat_inbox_lock, NULL);
 
-  online_add(s);
+  if (!online_add(s))
+  {
+    send_str(s, "\r\nAll nodes are busy or locked. Please try again later.\r\n");
+    goto cleanup;
+  }
 
   /* Mark node as logging in */
   db_node_upsert(s->db, s->node_num, 0, "logging_in", "connecting", s->ip);
@@ -4931,7 +4927,7 @@ void *session_thread_main(void *arg)
     {
       log_audit(s->user.handle, "menu_sysop_command", it->action);
     }
-    handle_action(s, it->action);
+    bbs_handle_action(s, it->action);
     send_str(s, "\r\n");
   }
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# PNG screenshots: expect telnet captures + headless render; WFC via docker TTY + render.
+# PNG screenshots: expect telnet captures + headless render; WFC via mutineer-console + render.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
@@ -8,7 +8,7 @@ mkdir -p screenshots/raw
 
 if ! timeout 2 bash -c 'cat < /dev/null > /dev/tcp/127.0.0.1/2929' 2>/dev/null; then
   echo "==> Starting BBS..."
-  docker compose up -d
+  docker compose -f docker/compose.yml up -d
   sleep 6
 fi
 

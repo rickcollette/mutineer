@@ -51,7 +51,8 @@ docker compose up -d
 
 ### Screenshots / WFC
 
-WFC needs an interactive terminal. From WSL or Git Bash inside the repo:
+The WFC dashboard runs as `mutineer-console` and needs an interactive terminal.
+From WSL or Git Bash inside the repo:
 
 ```bash
 ./scripts/open-wfc.sh
@@ -80,8 +81,8 @@ Best if you want to **build from source**, run tests, or develop on Windows.
 
    ```bash
    sudo apt update
-   sudo apt install -y git cmake build-essential libsqlite3-dev libssl-dev \
-     telnet dosbox expect
+   sudo apt install -y git cmake build-essential libsqlite3-dev sqlite3 \
+     libssl-dev libarchive-dev telnet dosbox expect
    ```
 
 ### Clone and build

@@ -7,6 +7,15 @@
 #include <string.h>
 #include <ctype.h>
 
+static void menu_copy(char* dst, size_t cap, const char* src) {
+  if (!dst || cap == 0) return;
+  if (!src) src = "";
+  size_t n = strlen(src);
+  if (n >= cap) n = cap - 1;
+  memcpy(dst, src, n);
+  dst[n] = '\0';
+}
+
 static unsigned parse_menu_flags(const char* str) {
   unsigned flags = 0;
   char tmp[256];
@@ -136,7 +145,7 @@ static bool parse_line(const char* line, MenuItem* it) {
   /* Handle multi-char keys */
   if (strlen(key) > 1) {
     it->key = '\0';
-    snprintf(it->key_str, sizeof(it->key_str), "%s", key);
+    menu_copy(it->key_str, sizeof(it->key_str), key);
     for (size_t i = 0; it->key_str[i]; i++) {
       it->key_str[i] = (char)toupper((unsigned char)it->key_str[i]);
     }

@@ -21,6 +21,21 @@ Native doors are executables launched via `fork`/`exec` from `src/doors.c`.
 
 Native door commands are argv templates, not shell scripts. Mutineer parses quoted arguments and backslash escapes, then launches the child directly with `execvp()`. Shell metacharacters such as pipes, redirects, command substitution, `;`, `&&`, and `||` are rejected.
 
+Native door templates may include `%D`, which is replaced with the per-door dropfile directory before launch. This is intended for clients that need to read `DOOR32.SYS` and Mutineer-specific session metadata, for example:
+
+```ini
+/opt/anavir/src/anavir-door-client --dropdir %D --socket /run/anavir/anavir.sock
+```
+
+Example Anavir native door command:
+
+```sql
+INSERT INTO doors (name, runner, command, enabled, acs)
+VALUES ('Anavir', 'native',
+        '/opt/anavir/src/anavir-door-client --dropdir %D --socket /run/anavir/anavir.sock',
+        1, 'L10');
+```
+
 ### Database Record (`doors` table)
 
 | Field | Purpose |
@@ -36,10 +51,26 @@ Native door commands are argv templates, not shell scripts. Mutineer parses quot
 
 1. User selects door from `doors` menu action
 2. ACS check on door record
-3. Dropfile written to `dropfile_path` with session/user/node info
-4. Child process spawned with inherited telnet socket FD
-5. Parent waits for exit or timeout (`door_default_timeout_sec`)
-6. Session resumes at BBS menu
+3. Dropfiles are written to `dropfile_path/<door-name>/` with session/user/node info
+4. `MUTINEER_SESSION.JSON` is written beside the dropfiles for native doors
+5. Child process spawned with inherited telnet socket FD
+6. Parent waits for exit or timeout (`door_default_timeout_sec`)
+7. Session resumes at BBS menu
+
+### Anavir BBS Door Workflow
+
+Anavir runs as a persistent multiplayer server. Mutineer BBS authenticates the caller and launches only a lightweight bridge client.
+
+1. Caller connects to Mutineer BBS over telnet, SSH, or a TLS terminator.
+2. Caller logs in with normal BBS credentials.
+3. Caller selects the `Anavir` native door.
+4. Mutineer performs the door ACS check.
+5. Mutineer writes standard dropfiles including `DOOR32.SYS`; line 2 contains the inherited caller socket FD.
+6. Mutineer writes `MUTINEER_SESSION.JSON` with `bbs_user_id`, `handle`, `real_name`, `security_level`, `node_num`, `time_left_sec`, `ansi`, `remote_ip`, `issued_at`, `expires_at`, `nonce`, and `hmac`.
+7. Mutineer launches `anavir-door-client --dropdir %D --socket /run/anavir/anavir.sock`.
+8. The client reads `DOOR32.SYS`, validates the session file is present and unexpired, connects to the Anavir Unix socket, sends the signed JSON auth frame, and proxies bytes both ways.
+9. Anavir validates HMAC, expiry, replay nonce, and required fields, then skips MUD password prompts for that verified BBS account.
+10. When the user quits or disconnects, the client exits and Mutineer returns the caller to the BBS menu or applies the configured door policy.
 
 ## DOSBox Doors
 
@@ -163,6 +194,17 @@ Written to `dropfile_path` before door launch with:
 - Node number, COM port (socket FD mapping)
 - BBS name, sysop name
 
+Native doors also receive `MUTINEER_SESSION.JSON`. Its `hmac` signs a canonical form of the JSON fields using `door_session_hmac_secret`; services such as Anavir must validate this signature and use `bbs_user_id`, not the handle alone, as the external account identity.
+
+Generate a production secret with:
+
+```sh
+openssl rand -hex 32
+```
+
+Configure the same value in Mutineer as `door_session_hmac_secret` and in the
+Anavir service as `--bbs-secret` or an equivalent secret-injection mechanism.
+
 ## Door Menu
 
 `menus/door.mnu` lists available doors. The `doors` action in session.c reads from `doors` table and launches selected door.
@@ -170,6 +212,8 @@ Written to `dropfile_path` before door launch with:
 ## Security Considerations
 
 - Native doors run as the BBS user — trust door binaries
+- Use a production-only `door_session_hmac_secret`; the compiled default is for local development only
+- BBS-authenticated game servers must validate HMAC, expiry, and nonce replay before trusting session fields
 - DOSBox isolation limits filesystem exposure to runtime tree
 - Path traversal blocked in door manifest parsing (`path_is_safe_relative()`)
 - Timeout prevents hung doors from blocking nodes indefinitely

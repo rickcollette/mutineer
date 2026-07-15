@@ -57,7 +57,7 @@ static int test_config_roundtrip(void) {
   snprintf(cfg.wfc_shell_command, sizeof(cfg.wfc_shell_command), "%s", "/bin/sh");
   CHECK(cfg_save(cfg.source_path, &cfg), "cfg_save writes atomically");
   CHECK(access(path, R_OK) == 0, "saved config exists");
-  char bak[256];
+  char bak[320];
   snprintf(bak, sizeof(bak), "%s.bak", path);
   CHECK(access(bak, R_OK) == 0, "config save creates backup");
   CHECK(cfg_load(path, &cfg), "reload saved config");
@@ -72,7 +72,8 @@ int main(void) {
   char* cmake = read_file("CMakeLists.txt");
   char* session = read_file("src/session.c");
   char* mainc = read_file("src/main.c");
-  char* wfc = read_file("src/wfc.c");
+  char* console = read_file("src/console_service.c");
+  char* console_tool = read_file("src/tools/mutineer-console.c");
   char* sched = read_file("src/scheduler.c");
   char* maint = read_file("src/tools/mutineer-maint.c");
   char* config = read_file("src/config.c");
@@ -82,7 +83,7 @@ int main(void) {
   char* conf = read_file("conf/mutineer.conf");
   char* matrix = read_file("docs/status/feature-matrix.md");
 
-  CHECK(cmake && session && mainc && wfc && sched && maint && config &&
+  CHECK(cmake && session && mainc && console && console_tool && sched && maint && config &&
         filecmds && coved && docs && conf && matrix, "read source files");
 
   CHECK(contains(session, "cmd_config_editor") &&
@@ -115,6 +116,11 @@ int main(void) {
         !contains(session, "guest.id = 0"),
         "guest login uses normal throttling and persistent DB user accounting");
 
+  CHECK(contains(session, "bool online_add(Session *s)") &&
+        contains(session, "if (!online_add(s))") &&
+        contains(session, "All nodes are busy or locked"),
+        "locked or exhausted node table refuses new sessions cleanly");
+
   CHECK(contains(session, "maintenance_start") &&
         contains(session, "parse_strict_int((char *)line, 1, 36500") &&
         contains(session, "Type DELETE to confirm") &&
@@ -124,16 +130,16 @@ int main(void) {
 
   CHECK(contains(sched, "void scheduler_stop(void)") &&
         contains(sched, "pthread_join(th, NULL)") &&
-        contains(mainc, "scheduler_stop();\n  wfc_stop();\n  plugin_loader_shutdown();"),
-        "scheduler and WFC stop before plugin shutdown and db_close");
+        contains(mainc, "scheduler_stop();\n  console_service_stop();\n  plugin_loader_shutdown();"),
+        "scheduler and console service stop before plugin shutdown and db_close");
 
-  CHECK(contains(wfc, "wfc_shell_enabled") &&
-        contains(wfc, "bbs_argv_parse_template") &&
-        contains(wfc, "bbs_exec_argv") &&
-        !contains(wfc, "system(\"/bin/sh\")"),
-        "WFC shell escape is disabled by default and uses supervised argv execution");
-  CHECK(contains(docs, "wfc_shell_enabled") && contains(conf, "wfc_shell_enabled=0"),
-        "WFC shell gate documented and disabled in sample config");
+  CHECK(contains(console, "wfc_shell_enabled") &&
+        contains(console, "bbs_argv_parse_template") &&
+        contains(console, "bbs_exec_argv") &&
+        !contains(console, "system(\"/bin/sh\")"),
+        "console shell escape is disabled by default and uses supervised argv execution");
+  CHECK(contains(docs, "console_enabled") && contains(conf, "console_enabled=1"),
+        "remote console gate documented and enabled in sample config");
 
   CHECK(contains(maint, "copy_file_plain") &&
         contains(maint, "VACUUM INTO %s") &&
@@ -166,7 +172,7 @@ int main(void) {
         contains(matrix, "Validation Snapshot"),
         "feature matrix marks current reviewed batch complete");
 
-  free(cmake); free(session); free(mainc); free(wfc); free(sched); free(maint);
+  free(cmake); free(session); free(mainc); free(console); free(console_tool); free(sched); free(maint);
   free(config); free(filecmds); free(coved); free(docs); free(conf); free(matrix);
   return 0;
 }

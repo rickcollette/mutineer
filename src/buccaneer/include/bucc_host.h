@@ -197,6 +197,7 @@ bucc_value_t bucc_host_user_alias(bucc_host_context_t* ctx, bucc_value_t* args, 
 bucc_value_t bucc_host_user_id(bucc_host_context_t* ctx, bucc_value_t* args, int argc);
 bucc_value_t bucc_host_user_security(bucc_host_context_t* ctx, bucc_value_t* args, int argc);
 bucc_value_t bucc_host_user_time_left(bucc_host_context_t* ctx, bucc_value_t* args, int argc);
+bucc_value_t bucc_host_user_flags(bucc_host_context_t* ctx, bucc_value_t* args, int argc);
 
 bucc_value_t bucc_host_data_insert(bucc_host_context_t* ctx, bucc_value_t* args, int argc);
 bucc_value_t bucc_host_data_update(bucc_host_context_t* ctx, bucc_value_t* args, int argc);

@@ -38,7 +38,7 @@ static void cfg_defaults(BbsConfig *c)
   snprintf(c->logs_path, sizeof(c->logs_path), "logs/mutineer.log");
   snprintf(c->art_path, sizeof(c->art_path), "art");
   c->session_time_limit_min = 60; /* per-call default */
-  c->wfc_enabled = 1;
+  c->wfc_enabled = 0;
   c->wfc_refresh_ms = 1000;
   c->wfc_blank_sec = 300; /* 5 minutes default */
   c->wfc_node_num = 1;
@@ -50,6 +50,10 @@ static void cfg_defaults(BbsConfig *c)
   c->wfc_status_chat_char = 'S';
   c->wfc_shell_enabled = 0;
   c->wfc_shell_command[0] = '\0';
+  c->console_enabled = 1;
+  snprintf(c->console_bind, sizeof(c->console_bind), "127.0.0.1");
+  c->console_port = 2931;
+  c->console_idle_timeout_sec = 600;
   c->scheduler_enabled = 1;
   c->scheduler_tick_sec = 30;
   c->login_window_sec = 120;
@@ -77,6 +81,8 @@ static void cfg_defaults(BbsConfig *c)
   c->door_default_timeout_sec = 300; /* 5 minutes */
   c->door_cleanup_on_exit = 1;
   c->door_keep_failed_runs = 0;
+  snprintf(c->door_session_hmac_secret, sizeof(c->door_session_hmac_secret),
+           "mutineer-dev-door-secret");
   c->max_page_sysop = 3;
   c->max_calls_per_day = 0; /* unlimited by default */
 }
@@ -202,6 +208,22 @@ bool cfg_load(const char *path, BbsConfig *out)
     {
       snprintf(out->wfc_shell_command, sizeof(out->wfc_shell_command), "%s", v);
     }
+    else if (!strcmp(k, "console_enabled"))
+    {
+      out->console_enabled = cfg_bool(v);
+    }
+    else if (!strcmp(k, "console_bind"))
+    {
+      snprintf(out->console_bind, sizeof(out->console_bind), "%s", v);
+    }
+    else if (!strcmp(k, "console_port"))
+    {
+      out->console_port = atoi(v);
+    }
+    else if (!strcmp(k, "console_idle_timeout_sec"))
+    {
+      out->console_idle_timeout_sec = atoi(v);
+    }
     else if (!strcmp(k, "scheduler_enabled"))
     {
       out->scheduler_enabled = cfg_bool(v);
@@ -318,6 +340,10 @@ bool cfg_load(const char *path, BbsConfig *out)
     {
       out->door_keep_failed_runs = cfg_bool(v);
     }
+    else if (!strcmp(k, "door_session_hmac_secret"))
+    {
+      snprintf(out->door_session_hmac_secret, sizeof(out->door_session_hmac_secret), "%s", v);
+    }
     else if (!strcmp(k, "max_page_sysop"))
     {
       out->max_page_sysop = atoi(v);
@@ -376,6 +402,10 @@ bool cfg_save(const char *path, const BbsConfig *c)
   WCHR("wfc_status_chat_char", c->wfc_status_chat_char);
   WINT("wfc_shell_enabled", c->wfc_shell_enabled);
   WSTR("wfc_shell_command", c->wfc_shell_command);
+  WINT("console_enabled", c->console_enabled);
+  WSTR("console_bind", c->console_bind);
+  WINT("console_port", c->console_port);
+  WINT("console_idle_timeout_sec", c->console_idle_timeout_sec);
   WINT("scheduler_enabled", c->scheduler_enabled);
   WINT("scheduler_tick_sec", c->scheduler_tick_sec);
   WINT("login_window_sec", c->login_window_sec);
@@ -405,6 +435,7 @@ bool cfg_save(const char *path, const BbsConfig *c)
   WINT("door_default_timeout_sec", c->door_default_timeout_sec);
   WINT("door_cleanup_on_exit", c->door_cleanup_on_exit);
   WINT("door_keep_failed_runs", c->door_keep_failed_runs);
+  WSTR("door_session_hmac_secret", c->door_session_hmac_secret);
   WINT("max_page_sysop", c->max_page_sysop);
   WINT("max_calls_per_day", c->max_calls_per_day);
   WSTR("chat_log_path", c->chat_log_path);

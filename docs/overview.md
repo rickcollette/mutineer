@@ -148,7 +148,7 @@ Built from `src/buccaneer/Makefile`:
 
 | Library / Tool | Required | Notes |
 |----------------|----------|-------|
-| SQLite3 | Yes | `libsqlite3-dev` — persistent storage |
+| SQLite3 | Yes | `libsqlite3-dev`, `sqlite3` — storage and maintenance scripts |
 | OpenSSL | Yes | `libssl-dev` — PBKDF2 password hashing, PLANK crypto |
 | pthreads | Yes | Thread-per-connection model |
 | libarchive | Yes | `libarchive-dev` — archive and QWK package handling |
@@ -159,7 +159,7 @@ Built from `src/buccaneer/Makefile`:
 Debian/Ubuntu install:
 
 ```bash
-apt-get install libsqlite3-dev libssl-dev libargon2-dev dosbox
+apt-get install libsqlite3-dev sqlite3 libssl-dev libarchive-dev libargon2-dev dosbox
 ```
 
 ## Configuration Entry Point

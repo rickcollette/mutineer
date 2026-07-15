@@ -2,7 +2,7 @@
 
 # Architecture
 
-Mutineer BBS is a single-process, multi-threaded telnet server. One main thread accepts connections; each caller gets a dedicated session thread. Background threads run the WFC console and event scheduler. SQLite provides shared persistence with per-thread connections where needed.
+Mutineer BBS is a single-process, multi-threaded telnet server. One main thread accepts caller connections; each caller gets a dedicated session thread. Background threads run the remote console-control service and event scheduler. SQLite provides shared persistence with per-thread connections where needed.
 
 ## System Overview
 
@@ -15,8 +15,8 @@ Mutineer BBS is a single-process, multi-threaded telnet server. One main thread 
          ┌──────────────────────────┼──────────────────────────┐
          │                          │                          │
          ▼                          ▼                          ▼
-  net_listener.c              wfc.c                    scheduler.c
-  (accept loop)            (sysop console)            (cron events)
+  net_listener.c        console_service.c              scheduler.c
+  (accept loop)         (mutineer-console API)         (cron events)
          │
          │  spawn per connection
          ▼
@@ -46,9 +46,9 @@ Mutineer BBS is a single-process, multi-threaded telnet server. One main thread 
 7. Run `startup_init_database()` — verify schema and seed data
 8. Initialize teleconference (`teleconf_init`)
 9. Initialize plugin loader (`plugin_loader_init`)
-10. Start WFC thread (`wfc_start`) and scheduler (`scheduler_start`)
+10. Start console service (`console_service_start`) and scheduler (`scheduler_start`)
 11. Enter listener loop (`net_run_listener`) until stop flag set
-12. Shutdown: scheduler, WFC, plugins, DB, logs
+12. Shutdown: scheduler, console service, plugins, DB, logs
 
 ### Connection Threads
 
@@ -64,7 +64,7 @@ Mutineer BBS is a single-process, multi-threaded telnet server. One main thread 
 
 | Thread | Source | Purpose |
 |--------|--------|---------|
-| WFC | `wfc.c` | Local sysop console showing node grid |
+| Console | `console_service.c` + `mutineer-console` | Remote sysop console showing node grid |
 | Scheduler | `scheduler.c` | Poll `events` table, run scheduled/logon/permission events |
 
 PLANK daemons (`plankd`, `coved`) run as **separate processes**, not inside `mutineer`.
@@ -98,9 +98,10 @@ Key fields carried through the session:
 ```mermaid
 graph TD
     Main[main.c] --> Net[net_listener.c]
-    Main --> WFC[wfc.c]
+    Main --> Console[console_service.c]
     Main --> Sched[scheduler.c]
     Main --> DB[(SQLite db.c)]
+    Console --> ConsoleClient[mutineer-console]
     Net --> Session[session.c]
     Session --> Telnet[telnet.c]
     Session --> Menu[menu.c]
@@ -157,7 +158,8 @@ graph TD
 | `chat.c` | Split chat, teleconference, paging |
 | `qwk.c` | QWK packet generation/import |
 | `fido_netmail.c` | FidoNet netmail export |
-| `wfc.c` | Who's On Full Color console |
+| `console_service.c` | TCP control service for the standalone sysop console |
+| `tools/mutineer-console.c` | Who's On Full Color dashboard client |
 | `scheduler.c` | Event scheduler thread |
 | `maint.c` | In-BBS maintenance menu actions |
 | `hash.c` | Password hashing (PBKDF2/Argon2) |
@@ -230,7 +232,7 @@ Lexer, parser, semantic analyzer, bytecode emitter, runtime, host bridge, and `b
 - Global online user list protected by mutex (`online_*` functions in session.c)
 - SQLite connections: main DB handle shared; WAL mode recommended for concurrent readers
 - Node table updated on login/logout with status transitions
-- WFC reads node state read-only on refresh interval
+- `mutineer-console` reads node state through the TCP console-control service on its refresh interval
 - Plugin loader initializes once; per-session plugin instances created on demand
 
 ## Extension Points

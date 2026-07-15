@@ -116,6 +116,14 @@ static bool file_download_allowed(Session *s, const DbFileArea *area, const DbFi
   return true;
 }
 
+static void filecmd_copy(char *dst, size_t cap, const char *src) {
+  if (!dst || cap == 0) return;
+  if (!src) src = "";
+  size_t n = strnlen(src, cap - 1);
+  memcpy(dst, src, n);
+  dst[n] = '\0';
+}
+
 static void file_record_download_success(Session *s, const DbFileArea *area, const DbFileRec *rec, int cost) {
   bool free_file = (rec->flags & FILE_FLAG_FREE) || area->free_files || (area->flags & FA_FLAG_FREEFILES);
   if (!free_file && !HAS_AC_FLAG(&s->user, AC_FNOCREDITS)) {
@@ -815,8 +823,9 @@ void cmd_file_raw_dir(Session* s, const char* data) {
   }
   
   char buf[256];
-  snprintf(buf, sizeof(buf), "\r\nRaw directory listing of: %s\r\n", area.path);
-  send_str(s, buf);
+  send_str(s, "\r\nRaw directory listing of: ");
+  send_str(s, area.path);
+  send_str(s, "\r\n");
   
   DIR* dir = opendir(area.path);
   if (!dir) {
@@ -829,11 +838,11 @@ void cmd_file_raw_dir(Session* s, const char* data) {
     if (ent->d_name[0] == '.') continue;
     
     char fullpath[512];
-    snprintf(fullpath, sizeof(fullpath), "%s/%s", area.path, ent->d_name);
+    path_join(area.path, ent->d_name, fullpath, sizeof(fullpath));
     
     struct stat st;
     if (stat(fullpath, &st) == 0) {
-      snprintf(buf, sizeof(buf), "%-30s %10ld bytes\r\n", ent->d_name, (long)st.st_size);
+      snprintf(buf, sizeof(buf), "%-30.30s %10ld bytes\r\n", ent->d_name, (long)st.st_size);
       send_str(s, buf);
     }
   }
@@ -970,8 +979,9 @@ void cmd_file_archive_extract(Session* s, const char* data) {
   char buf[256];
   snprintf(buf, sizeof(buf), "\r\n\x1b[1;36mExtracting: %s\x1b[0m\r\n", rec.filename);
   send_str(s, buf);
-  snprintf(buf, sizeof(buf), "Temp dir: %s\r\n", tmpdir);
-  send_str(s, buf);
+  send_str(s, "Temp dir: ");
+  send_str(s, tmpdir);
+  send_str(s, "\r\n");
   send_str(s, "--------------------------------------------------------------\r\n");
 
   char errbuf[256];
@@ -994,7 +1004,7 @@ void cmd_file_archive_extract(Session* s, const char* data) {
       path_join(tmpdir, ent->d_name, outpath, sizeof(outpath));
       struct stat st;
       if (stat(outpath, &st) == 0) {
-        snprintf(buf, sizeof(buf), "%-40s %10ld bytes\r\n", ent->d_name, (long)st.st_size);
+        snprintf(buf, sizeof(buf), "%-40.40s %10ld bytes\r\n", ent->d_name, (long)st.st_size);
         send_str(s, buf);
       }
     }
@@ -1116,7 +1126,12 @@ void cmd_file_batch_upload(Session* s, const char* data) {
   /* Launch protocol receive into staging dir (use "." as the path so the
      protocol tool writes into the staging dir via workdir) */
   char dummy_path[512];
-  snprintf(dummy_path, sizeof(dummy_path), "%s/", recvdir);
+  filecmd_copy(dummy_path, sizeof(dummy_path), recvdir);
+  size_t dummy_len = strlen(dummy_path);
+  if (dummy_len + 1 < sizeof(dummy_path)) {
+    dummy_path[dummy_len] = '/';
+    dummy_path[dummy_len + 1] = '\0';
+  }
   protocol_launch(s, proto, dummy_path, "up");
 
   /* Scan staging dir for received files */
@@ -1128,7 +1143,7 @@ void cmd_file_batch_upload(Session* s, const char* data) {
       if (ent->d_name[0] == '.') continue;
 
       if (!bbs_safe_filename(ent->d_name, sizeof(((DbFileRec*)0)->filename) - 1)) {
-        snprintf(buf, sizeof(buf), "  Rejected unsafe filename: %s\r\n", ent->d_name);
+        snprintf(buf, sizeof(buf), "  Rejected unsafe filename: %.220s\r\n", ent->d_name);
         send_str(s, buf);
         continue;
       }
@@ -1136,19 +1151,19 @@ void cmd_file_batch_upload(Session* s, const char* data) {
       char srcpath[512], destpath[512];
       path_join(recvdir, ent->d_name, srcpath, sizeof(srcpath));
       if (!file_area_resolve(area.path, ent->d_name, destpath, sizeof(destpath))) {
-        snprintf(buf, sizeof(buf), "  Rejected path outside area: %s\r\n", ent->d_name);
+        snprintf(buf, sizeof(buf), "  Rejected path outside area: %.220s\r\n", ent->d_name);
         send_str(s, buf);
         continue;
       }
 
       struct stat st;
       if (lstat(srcpath, &st) != 0 || !S_ISREG(st.st_mode)) {
-        snprintf(buf, sizeof(buf), "  Rejected non-regular upload: %s\r\n", ent->d_name);
+        snprintf(buf, sizeof(buf), "  Rejected non-regular upload: %.220s\r\n", ent->d_name);
         send_str(s, buf);
         continue;
       }
       if (access(destpath, F_OK) == 0) {
-        snprintf(buf, sizeof(buf), "  Rejected duplicate filename: %s\r\n", ent->d_name);
+        snprintf(buf, sizeof(buf), "  Rejected duplicate filename: %.220s\r\n", ent->d_name);
         send_str(s, buf);
         continue;
       }
@@ -1156,7 +1171,7 @@ void cmd_file_batch_upload(Session* s, const char* data) {
       int size = (int)st.st_size;
       if (rename(srcpath, destpath) != 0) {
         if (errno != EXDEV || !file_copy(srcpath, destpath, &size)) {
-          snprintf(buf, sizeof(buf), "  Could not move upload: %s\r\n", ent->d_name);
+          snprintf(buf, sizeof(buf), "  Could not move upload: %.220s\r\n", ent->d_name);
           send_str(s, buf);
           unlink(destpath);
           continue;
@@ -1166,7 +1181,7 @@ void cmd_file_batch_upload(Session* s, const char* data) {
 
       char desc[256] = {0};
       char prompt_buf[64];
-      snprintf(prompt_buf, sizeof(prompt_buf), "Description for %s: ", ent->d_name);
+      snprintf(prompt_buf, sizeof(prompt_buf), "Description for %.45s: ", ent->d_name);
       prompt_line(s, prompt_buf, desc, sizeof(desc));
 
       if (db_file_add_ex(s->db, s->current_file_area, ent->d_name, desc, "", NULL,
@@ -1177,7 +1192,7 @@ void cmd_file_batch_upload(Session* s, const char* data) {
         s->user.file_points += 10;
         uploaded++;
 
-        snprintf(buf, sizeof(buf), "  Queued for validation: %s (%d bytes)\r\n",
+        snprintf(buf, sizeof(buf), "  Queued for validation: %.200s (%d bytes)\r\n",
                  ent->d_name, size);
         send_str(s, buf);
       }

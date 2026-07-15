@@ -43,17 +43,4 @@ typedef enum WfcStatus {
   WFC_STATUS_SHUTDOWN
 } WfcStatus;
 
-/* Start the local WFC (Waiting for Call) console UI in a detached thread. */
-void wfc_start(const BbsConfig* cfg, BbsDb* db);
-
-/* Stop the WFC thread gracefully */
-void wfc_stop(void);
-
-/* Set WFC status message */
-void wfc_set_status(WfcStatus status, const char* extra);
-
-/* Force a screen refresh */
-void wfc_refresh(void);
-
-/* Check if WFC is running */
-int wfc_is_running(void);
+/* WFC is rendered by the standalone mutineer-console tool. */

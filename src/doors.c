@@ -16,6 +16,117 @@
 #include <string.h>
 #include <time.h>
 #include <ctype.h>
+#include <openssl/hmac.h>
+#include <openssl/rand.h>
+#include <openssl/evp.h>
+
+static void hex_encode(const unsigned char* in, unsigned int len,
+                       char* out, size_t outcap) {
+  static const char hexdigits[] = "0123456789abcdef";
+  size_t need = (size_t)len * 2 + 1;
+  if (outcap < need) {
+    if (outcap > 0) out[0] = '\0';
+    return;
+  }
+  for (unsigned int i = 0; i < len; i++) {
+    out[i * 2] = hexdigits[(in[i] >> 4) & 0x0f];
+    out[i * 2 + 1] = hexdigits[in[i] & 0x0f];
+  }
+  out[len * 2] = '\0';
+}
+
+static void json_escape(FILE* f, const char* s) {
+  fputc('"', f);
+  for (const unsigned char* p = (const unsigned char*)(s ? s : ""); *p; p++) {
+    if (*p == '"' || *p == '\\') {
+      fputc('\\', f);
+      fputc(*p, f);
+    } else if (*p == '\n') {
+      fputs("\\n", f);
+    } else if (*p == '\r') {
+      fputs("\\r", f);
+    } else if (*p == '\t') {
+      fputs("\\t", f);
+    } else if (*p >= 32) {
+      fputc(*p, f);
+    }
+  }
+  fputc('"', f);
+}
+
+static void door_fixed_copy(unsigned char* dst, size_t len, const char* src) {
+  if (!dst || len == 0) return;
+  if (!src) src = "";
+  size_t n = strnlen(src, len);
+  memcpy(dst, src, n);
+}
+
+static bool write_mutineer_session_json(Session* s, const char* dir) {
+  if (!s || !dir || !dir[0]) return false;
+  char nonce_bytes[16];
+  unsigned char hmac[EVP_MAX_MD_SIZE];
+  unsigned int hmac_len = 0;
+  char nonce[sizeof(nonce_bytes) * 2 + 1];
+  char hmac_hex[EVP_MAX_MD_SIZE * 2 + 1];
+  time_t issued = time(NULL);
+  time_t expires = issued + (s->time_left_min > 0 ? s->time_left_min * 60 : 300);
+  const char* secret = s->cfg.door_session_hmac_secret[0]
+                         ? s->cfg.door_session_hmac_secret
+                         : "mutineer-dev-door-secret";
+
+  if (RAND_bytes((unsigned char*)nonce_bytes, sizeof(nonce_bytes)) != 1) {
+    for (size_t i = 0; i < sizeof(nonce_bytes); i++)
+      nonce_bytes[i] = (char)(rand() & 0xff);
+  }
+  hex_encode((const unsigned char*)nonce_bytes, sizeof(nonce_bytes),
+             nonce, sizeof(nonce));
+
+  char canonical[2048];
+  snprintf(canonical, sizeof(canonical),
+           "bbs_user_id=%d\nhandle=%s\nreal_name=%s\nsecurity_level=%d\n"
+           "node_num=%d\ntime_left_sec=%d\nansi=%d\nremote_ip=%s\n"
+           "issued_at=%ld\nexpires_at=%ld\nnonce=%s\n",
+           s->user.id,
+           s->user.handle,
+           s->user.real_name[0] ? s->user.real_name : s->user.handle,
+           s->user.level,
+           s->node_num,
+           s->time_left_min * 60,
+           s->ansi ? 1 : 0,
+           s->ip,
+           (long)issued,
+           (long)expires,
+           nonce);
+
+  if (!HMAC(EVP_sha256(), secret, (int)strlen(secret),
+            (const unsigned char*)canonical, strlen(canonical),
+            hmac, &hmac_len))
+    return false;
+  hex_encode(hmac, hmac_len, hmac_hex, sizeof(hmac_hex));
+
+  char path[512];
+  path_join(dir, "MUTINEER_SESSION.JSON", path, sizeof(path));
+  FILE* f = fopen(path, "w");
+  if (!f) return false;
+  fprintf(f, "{\n");
+  fprintf(f, "  \"bbs_user_id\": %d,\n", s->user.id);
+  fprintf(f, "  \"handle\": "); json_escape(f, s->user.handle); fprintf(f, ",\n");
+  fprintf(f, "  \"real_name\": ");
+  json_escape(f, s->user.real_name[0] ? s->user.real_name : s->user.handle);
+  fprintf(f, ",\n");
+  fprintf(f, "  \"security_level\": %d,\n", s->user.level);
+  fprintf(f, "  \"node_num\": %d,\n", s->node_num);
+  fprintf(f, "  \"time_left_sec\": %d,\n", s->time_left_min * 60);
+  fprintf(f, "  \"ansi\": %d,\n", s->ansi ? 1 : 0);
+  fprintf(f, "  \"remote_ip\": "); json_escape(f, s->ip); fprintf(f, ",\n");
+  fprintf(f, "  \"issued_at\": %ld,\n", (long)issued);
+  fprintf(f, "  \"expires_at\": %ld,\n", (long)expires);
+  fprintf(f, "  \"nonce\": "); json_escape(f, nonce); fprintf(f, ",\n");
+  fprintf(f, "  \"hmac\": "); json_escape(f, hmac_hex); fprintf(f, "\n");
+  fprintf(f, "}\n");
+  fclose(f);
+  return true;
+}
 
 static bool ensure_dir(const char* path) {
   return mkdir(path, 0755) == 0 || errno == EEXIST;
@@ -122,6 +233,12 @@ static bool path_is_safe_relative(const char* path) {
   }
   return true;
 }
+
+typedef struct BuccLiveCtx {
+  Session* s;
+  char scope[128];
+  char text_root[512];
+} BuccLiveCtx;
 
 /* =========================================================================
  * DOSBox manifest parsing and validation
@@ -236,12 +353,13 @@ bool dosbox_prepare_runtime(const DosboxManifest* m,
                             char* errbuf, size_t errcap) {
   /* <runtime_base>/<door_name>/node<NN>/<launch_id>/ */
   char door_base[1024], node_dir[1024], root[1024], game_dir[1024], logs_dir[1024];
-  snprintf(door_base, sizeof(door_base), "%s/%s", runtime_base,
-           m->name[0] ? m->name : "door");
-  snprintf(node_dir,  sizeof(node_dir),  "%s/node%02d", door_base, node_num);
-  snprintf(root,      sizeof(root),      "%s/%s",       node_dir,  launch_id);
-  snprintf(game_dir,  sizeof(game_dir),  "%s/game",     root);
-  snprintf(logs_dir,  sizeof(logs_dir),  "%s/logs",     root);
+  char node_leaf[32];
+  snprintf(node_leaf, sizeof(node_leaf), "node%02d", node_num);
+  path_join(runtime_base, m->name[0] ? m->name : "door", door_base, sizeof(door_base));
+  path_join(door_base, node_leaf, node_dir, sizeof(node_dir));
+  path_join(node_dir, launch_id, root, sizeof(root));
+  path_join(root, "game", game_dir, sizeof(game_dir));
+  path_join(root, "logs", logs_dir, sizeof(logs_dir));
 
   if (!ensure_dir(runtime_base) || !ensure_dir(door_base) ||
       !ensure_dir(node_dir)     || !ensure_dir(root)      ||
@@ -481,13 +599,13 @@ static bool write_pcboardsys(Session* s, const char* dir) {
   memcpy(&buf[12], "38400", 5);
   
   /* User name (25 bytes) - offset 17 */
-  strncpy((char*)&buf[17], s->user.handle, 25);
+  door_fixed_copy(&buf[17], 25, s->user.handle);
   
   /* First name (15 bytes) - offset 42 */
-  strncpy((char*)&buf[42], s->user.handle, 15);
+  door_fixed_copy(&buf[42], 15, s->user.handle);
   
   /* Password (12 bytes) - offset 57 */
-  strncpy((char*)&buf[57], "********", 12);           /* Password (masked) */
+  door_fixed_copy(&buf[57], 12, "********");           /* Password (masked) */
   
   /* User record number (2 bytes) - offset 69 */
   buf[69] = (unsigned char)(s->user.id & 0xFF);
@@ -552,7 +670,7 @@ static bool write_pcboardsys(Session* s, const char* dir) {
   memset(&buf[103], 0xFF, 9);
   
   /* Date last on (8 bytes) - offset 112 */
-  strncpy((char*)&buf[112], s->user.last_login_at, 8);
+  door_fixed_copy(&buf[112], 8, s->user.last_login_at);
   
   /* Time remaining (2 bytes) - offset 120 */
   buf[120] = (unsigned char)(s->time_left_min & 0xFF);
@@ -664,8 +782,20 @@ static bool write_sfdoors(Session* s, const char* dir) {
 
 static bool door_launch_native(Session* s, const DbDoor* door) {
   char dir[512];
-  path_join(s->cfg.dropfile_path, door->name, dir, sizeof(dir));
+  char door_dir[512];
+  char node_dir[512];
+  char launch_id[96];
+
+  snprintf(launch_id, sizeof(launch_id), "%ld_%d_%08lx",
+           (long)time(NULL), (int)getpid(), (unsigned long)rand());
+  path_join(s->cfg.dropfile_path, door->name, door_dir, sizeof(door_dir));
+  char node_leaf[32];
+  snprintf(node_leaf, sizeof(node_leaf), "node%02d", s->node_num);
+  path_join(door_dir, node_leaf, node_dir, sizeof(node_dir));
+  path_join(node_dir, launch_id, dir, sizeof(dir));
   ensure_dir(s->cfg.dropfile_path);
+  ensure_dir(door_dir);
+  ensure_dir(node_dir);
   ensure_dir(dir);
 
   write_doorsys(s, dir);
@@ -675,10 +805,15 @@ static bool door_launch_native(Session* s, const DbDoor* door) {
   write_pcboardsys(s, dir);
   write_callinfo(s, dir);
   write_sfdoors(s, dir);
+  if (!write_mutineer_session_json(s, dir)) {
+    log_error("native door %s: failed to write MUTINEER_SESSION.JSON", door->name);
+    send_str(s, "\r\nDoor session setup failed. Contact the sysop.\r\n");
+    return false;
+  }
 
   char errbuf[256];
   char** argv = NULL;
-  if (!bbs_argv_parse_template(door->command, NULL, &argv, errbuf, sizeof(errbuf))) {
+  if (!bbs_argv_parse_door_template(door->command, dir, &argv, errbuf, sizeof(errbuf))) {
     log_error("native door %s: invalid command template: %s", door->name, errbuf);
     send_str(s, "\r\nDoor command is invalid. Contact the sysop.\r\n");
     return false;
@@ -699,6 +834,14 @@ static bool door_launch_native(Session* s, const DbDoor* door) {
   if (!ok && errbuf[0]) log_error("native door %s: %s", door->name, errbuf);
   bbs_argv_free(argv);
   if (s->db) db_node_upsert(s->db, s->node_num, s->user.id, "online", "menu", s->ip);
+  if (ok && s->cfg.door_cleanup_on_exit) {
+    if (!remove_tree_recursive(dir))
+      log_warn("native door cleanup: recursive remove failed for %s: %s", dir, strerror(errno));
+    else
+      log_info("native door cleanup: removed launch dropdir %s", dir);
+  } else if (!ok && !s->cfg.door_keep_failed_runs) {
+    log_info("native door cleanup: preserving failed launch dropdir %s for diagnostics", dir);
+  }
   return ok;
 }
 
@@ -711,9 +854,9 @@ static void dosbox_write_dropfile(Session* s, const DbDoor* door,
                                   const char* runtime_root) {
   char dest[1024];
   if (m->dropfile_dest[0])
-    snprintf(dest, sizeof(dest), "%s/%s", runtime_root, m->dropfile_dest);
+    path_join(runtime_root, m->dropfile_dest, dest, sizeof(dest));
   else
-    snprintf(dest, sizeof(dest), "%s/game", runtime_root);
+    path_join(runtime_root, "game", dest, sizeof(dest));
   ensure_dir(dest);
 
   const char* fmt = m->dropfile[0] ? m->dropfile : door->dropfile;
@@ -790,8 +933,8 @@ static bool door_launch_dosbox(Session* s, const DbDoor* door) {
 
   /* Generate DOSBox config */
   char game_dir[1024], conf_path[1024];
-  snprintf(game_dir,  sizeof(game_dir),  "%s/game",       runtime_root);
-  snprintf(conf_path, sizeof(conf_path), "%s/dosbox.conf", runtime_root);
+  path_join(runtime_root, "game", game_dir, sizeof(game_dir));
+  path_join(runtime_root, "dosbox.conf", conf_path, sizeof(conf_path));
 
   if (!dosbox_build_conf(&m, game_dir, conf_path, errbuf, sizeof(errbuf))) {
     log_error("door %s: conf generation failed: %s", door->name, errbuf);
@@ -837,7 +980,9 @@ static bool door_launch_dosbox(Session* s, const DbDoor* door) {
 
     /* Redirect stdout/stderr to logs dir */
     char log_path[1024];
-    snprintf(log_path, sizeof(log_path), "%s/logs/dosbox.log", runtime_root);
+    char logs_dir[1024];
+    path_join(runtime_root, "logs", logs_dir, sizeof(logs_dir));
+    path_join(logs_dir, "dosbox.log", log_path, sizeof(log_path));
     int log_fd = open(log_path, O_WRONLY | O_CREAT | O_TRUNC, 0644);
     if (log_fd >= 0) {
       dup2(log_fd, STDOUT_FILENO);
@@ -1031,11 +1176,336 @@ static bool bucc_bbs_send_msg_cb(void* ctx, int node, const char* msg) {
 }
 
 static bucc_array_t* bucc_bbs_online_cb(void* ctx) {
+  Session* s = (Session*)ctx;
+  bucc_array_t* arr = bucc_array_new(8);
+  if (!arr) return NULL;
+  if (!s) return arr;
+  DbNode nodes[64];
+  int n = s->db ? db_node_list(s->db, nodes, 64) : 0;
+  for (int i = 0; i < n; i++) {
+    bucc_map_t* item = bucc_map_new(8);
+    if (!item) continue;
+    bucc_map_set_cstr(item, "node", BUCC_I64_VAL(nodes[i].node_num));
+    bucc_map_set_cstr(item, "user_id", BUCC_I64_VAL(nodes[i].user_id));
+    bucc_map_set_cstr(item, "handle", bucc_make_string(nodes[i].handle));
+    bucc_map_set_cstr(item, "status", bucc_make_string(nodes[i].status));
+    bucc_map_set_cstr(item, "activity", bucc_make_string(nodes[i].activity));
+    bucc_map_set_cstr(item, "ip", bucc_make_string(nodes[i].ip));
+    bucc_value_t v;
+    v.kind = BUCC_VAL_MAP;
+    v.as.map = item;
+    bucc_array_push(arr, v);
+  }
+  return arr;
+}
+
+static Session* bucc_live_session(void* ctx) {
+  BuccLiveCtx* live = (BuccLiveCtx*)ctx;
+  return live ? live->s : NULL;
+}
+
+static const char* bucc_live_scope(void* ctx) {
+  BuccLiveCtx* live = (BuccLiveCtx*)ctx;
+  return live && live->scope[0] ? live->scope : "bbs";
+}
+
+static char* bucc_kv_get_cb(void* ctx, const char* key, const char* default_val) {
+  Session* s = bucc_live_session(ctx);
+  char value[1024];
+  if (!s || !s->db || !key || !db_bucc_kv_get(s->db, bucc_live_scope(ctx), key, value, sizeof(value)))
+    return strdup(default_val ? default_val : "");
+  return strdup(value);
+}
+
+static void bucc_kv_set_cb(void* ctx, const char* key, const char* value) {
+  Session* s = bucc_live_session(ctx);
+  if (s && s->db && key) db_bucc_kv_set(s->db, bucc_live_scope(ctx), key, value ? value : "");
+}
+
+static void bucc_kv_delete_cb(void* ctx, const char* key) {
+  Session* s = bucc_live_session(ctx);
+  if (s && s->db && key) db_bucc_kv_delete(s->db, bucc_live_scope(ctx), key);
+}
+
+static bool bucc_kv_exists_cb(void* ctx, const char* key) {
+  Session* s = bucc_live_session(ctx);
+  return s && s->db && key && db_bucc_kv_exists(s->db, bucc_live_scope(ctx), key);
+}
+
+static bool bucc_text_resolve(void* ctx, const char* rel, char* out, size_t out_cap) {
+  BuccLiveCtx* live = (BuccLiveCtx*)ctx;
+  if (!live || !rel || !path_is_safe_relative(rel)) return false;
+  char root[512];
+  snprintf(root, sizeof(root), "%s", live->text_root);
+  if (!ensure_dir(root)) return false;
+  path_join(root, rel, out, out_cap);
+  return true;
+}
+
+static char* bucc_text_read_all_cb(void* ctx, const char* path) {
+  char resolved[1024];
+  if (!bucc_text_resolve(ctx, path, resolved, sizeof(resolved))) return NULL;
+  return file_read_all(resolved, NULL);
+}
+
+static bucc_array_t* bucc_text_read_lines_cb(void* ctx, const char* path) {
+  char* text = bucc_text_read_all_cb(ctx, path);
+  bucc_array_t* arr = bucc_array_new(8);
+  if (!arr) {
+    free(text);
+    return NULL;
+  }
+  if (!text) return arr;
+  char* save = NULL;
+  for (char* line = strtok_r(text, "\n", &save); line; line = strtok_r(NULL, "\n", &save))
+  {
+    size_t n = strlen(line);
+    if (n && line[n - 1] == '\r') line[n - 1] = '\0';
+    bucc_array_push(arr, bucc_make_string(line));
+  }
+  free(text);
+  return arr;
+}
+
+static bool bucc_text_write_all_cb(void* ctx, const char* path, const char* content) {
+  char resolved[1024];
+  if (!bucc_text_resolve(ctx, path, resolved, sizeof(resolved))) return false;
+  FILE* f = fopen(resolved, "wb");
+  if (!f) return false;
+  const char* s = content ? content : "";
+  bool ok = fwrite(s, 1, strlen(s), f) == strlen(s);
+  fclose(f);
+  return ok;
+}
+
+static bool bucc_text_append_cb(void* ctx, const char* path, const char* content) {
+  char resolved[1024];
+  if (!bucc_text_resolve(ctx, path, resolved, sizeof(resolved))) return false;
+  FILE* f = fopen(resolved, "ab");
+  if (!f) return false;
+  const char* s = content ? content : "";
+  bool ok = fwrite(s, 1, strlen(s), f) == strlen(s);
+  fclose(f);
+  return ok;
+}
+
+static bool bucc_text_exists_cb(void* ctx, const char* path) {
+  char resolved[1024];
+  struct stat st;
+  return bucc_text_resolve(ctx, path, resolved, sizeof(resolved)) && stat(resolved, &st) == 0 && S_ISREG(st.st_mode);
+}
+
+static bucc_map_t* bucc_user_map(const DbUser* u) {
+  bucc_map_t* m = bucc_map_new(12);
+  if (!m || !u) return m;
+  bucc_map_set_cstr(m, "id", BUCC_I64_VAL(u->id));
+  bucc_map_set_cstr(m, "handle", bucc_make_string(u->handle));
+  bucc_map_set_cstr(m, "real_name", bucc_make_string(u->real_name));
+  bucc_map_set_cstr(m, "level", BUCC_I64_VAL(u->level));
+  bucc_map_set_cstr(m, "flags", BUCC_I64_VAL(u->flags));
+  bucc_map_set_cstr(m, "city_state", bucc_make_string(u->city_state));
+  return m;
+}
+
+static bucc_array_t* bucc_users_find_cb(void* ctx, bucc_map_t* query, int limit) {
+  (void)query;
+  Session* s = bucc_live_session(ctx);
+  bucc_array_t* arr = bucc_array_new(1);
+  if (!arr || !s) return arr;
+  if (limit == 0 || limit > 0) {
+    bucc_value_t v = {.kind = BUCC_VAL_MAP, .as.map = bucc_user_map(&s->user)};
+    bucc_array_push(arr, v);
+  }
+  return arr;
+}
+
+static bucc_map_t* bucc_users_get_cb(void* ctx, int64_t id) {
+  Session* s = bucc_live_session(ctx);
+  if (!s || id != s->user.id) return NULL;
+  return bucc_user_map(&s->user);
+}
+
+static bucc_map_t* bucc_msg_map(const DbMessage* msg) {
+  bucc_map_t* m = bucc_map_new(12);
+  if (!m || !msg) return m;
+  bucc_map_set_cstr(m, "id", BUCC_I64_VAL(msg->id));
+  bucc_map_set_cstr(m, "area_id", BUCC_I64_VAL(msg->area_id));
+  bucc_map_set_cstr(m, "user_id", BUCC_I64_VAL(msg->user_id));
+  bucc_map_set_cstr(m, "from", bucc_make_string(msg->from_name[0] ? msg->from_name : msg->user_handle));
+  bucc_map_set_cstr(m, "to", bucc_make_string(msg->to_name));
+  bucc_map_set_cstr(m, "subject", bucc_make_string(msg->subject));
+  bucc_map_set_cstr(m, "body", bucc_make_string(msg->body));
+  bucc_map_set_cstr(m, "posted_at", bucc_make_string(msg->created_at));
+  return m;
+}
+
+static int bucc_area_id(const char* area) {
+  if (!area || !area[0]) return 1;
+  char* end = NULL;
+  long id = strtol(area, &end, 10);
+  return end && *end == '\0' && id > 0 ? (int)id : 1;
+}
+
+static bucc_map_t* bucc_msg_read_cb(void* ctx, const char* area, int64_t id) {
+  (void)area;
+  Session* s = bucc_live_session(ctx);
+  DbMessage msg;
+  if (!s || !s->db || !db_message_get(s->db, (int)id, &msg)) return NULL;
+  return bucc_msg_map(&msg);
+}
+
+static bucc_array_t* bucc_msg_list_cb(void* ctx, const char* area, int limit, int offset) {
+  (void)offset;
+  Session* s = bucc_live_session(ctx);
+  bucc_array_t* arr = bucc_array_new(8);
+  if (!arr || !s || !s->db) return arr;
+  if (limit <= 0 || limit > 50) limit = 50;
+  DbMessage msgs[50];
+  int n = db_messages_list(s->db, bucc_area_id(area), msgs, limit);
+  for (int i = 0; i < n; i++) {
+    bucc_value_t v = {.kind = BUCC_VAL_MAP, .as.map = bucc_msg_map(&msgs[i])};
+    bucc_array_push(arr, v);
+  }
+  return arr;
+}
+
+static int64_t bucc_msg_post_cb(void* ctx, const char* area, bucc_map_t* msg) {
+  Session* s = bucc_live_session(ctx);
+  if (!s || !s->db || !msg) return 0;
+  bucc_value_t* subject = bucc_map_get_cstr(msg, "subject");
+  bucc_value_t* body = bucc_map_get_cstr(msg, "body");
+  const char* subj = (subject && BUCC_IS_STRING(*subject)) ? subject->as.str->data : "Buccaneer post";
+  const char* text = (body && BUCC_IS_STRING(*body)) ? body->as.str->data : "";
+  if (!db_message_post(s->db, bucc_area_id(area), s->user.id, subj, text, 0)) return 0;
+  return db_last_insert_id(s->db);
+}
+
+static bucc_map_t* bucc_file_map(const DbFileRec* file) {
+  bucc_map_t* m = bucc_map_new(12);
+  if (!m || !file) return m;
+  bucc_map_set_cstr(m, "id", BUCC_I64_VAL(file->id));
+  bucc_map_set_cstr(m, "area_id", BUCC_I64_VAL(file->area_id));
+  bucc_map_set_cstr(m, "filename", bucc_make_string(file->filename));
+  bucc_map_set_cstr(m, "description", bucc_make_string(file->desc));
+  bucc_map_set_cstr(m, "size_bytes", BUCC_I64_VAL(file->size_bytes));
+  bucc_map_set_cstr(m, "uploaded_at", bucc_make_string(file->uploaded_at));
+  bucc_map_set_cstr(m, "uploader", bucc_make_string(file->uploader));
+  bucc_map_set_cstr(m, "downloads", BUCC_I64_VAL(file->download_count));
+  return m;
+}
+
+static bucc_array_t* bucc_file_list_cb(void* ctx, const char* area, int limit, int offset) {
+  (void)offset;
+  Session* s = bucc_live_session(ctx);
+  bucc_array_t* arr = bucc_array_new(8);
+  if (!arr || !s || !s->db) return arr;
+  if (limit <= 0 || limit > 50) limit = 50;
+  DbFileArea fa;
+  if (!db_file_area_get(s->db, bucc_area_id(area), &fa)) return arr;
+  DbFileRec files[50];
+  int n = db_file_list(&fa, s->db, files, limit);
+  for (int i = 0; i < n; i++) {
+    bucc_value_t v = {.kind = BUCC_VAL_MAP, .as.map = bucc_file_map(&files[i])};
+    bucc_array_push(arr, v);
+  }
+  return arr;
+}
+
+static bucc_map_t* bucc_file_info_cb(void* ctx, const char* area, int64_t id) {
+  (void)area;
+  Session* s = bucc_live_session(ctx);
+  DbFileRec file;
+  if (!s || !s->db || !db_file_get(s->db, (int)id, &file)) return NULL;
+  return bucc_file_map(&file);
+}
+
+static int64_t bucc_data_insert_cb(void* ctx, const char* dataset, bucc_map_t* record) {
+  Session* s = bucc_live_session(ctx);
+  if (!s || !s->db || !dataset || !record) return 0;
+  bucc_value_t v = {.kind = BUCC_VAL_MAP, .as.map = record};
+  char* value = bucc_value_to_cstring(v);
+  int64_t id = db_bucc_data_insert(s->db, bucc_live_scope(ctx), dataset, value ? value : "");
+  free(value);
+  return id;
+}
+
+static int bucc_data_update_cb(void* ctx, const char* dataset, int64_t id, bucc_map_t* fields) {
+  Session* s = bucc_live_session(ctx);
+  if (!s || !s->db || !dataset || !fields) return 0;
+  bucc_value_t v = {.kind = BUCC_VAL_MAP, .as.map = fields};
+  char* value = bucc_value_to_cstring(v);
+  bool ok = db_bucc_data_update(s->db, bucc_live_scope(ctx), dataset, id, value ? value : "");
+  free(value);
+  return ok ? 1 : 0;
+}
+
+static int bucc_data_delete_cb(void* ctx, const char* dataset, int64_t id) {
+  Session* s = bucc_live_session(ctx);
+  return s && s->db && dataset && db_bucc_data_delete(s->db, bucc_live_scope(ctx), dataset, id) ? 1 : 0;
+}
+
+static bucc_map_t* bucc_data_get_cb(void* ctx, const char* dataset, int64_t id) {
+  Session* s = bucc_live_session(ctx);
+  char value[512];
+  if (!s || !s->db || !dataset || !db_bucc_data_get(s->db, bucc_live_scope(ctx), dataset, id, value, sizeof(value))) return NULL;
+  bucc_map_t* m = bucc_map_new(4);
+  if (!m) return NULL;
+  bucc_map_set_cstr(m, "id", BUCC_I64_VAL(id));
+  bucc_map_set_cstr(m, "dataset", bucc_make_string(dataset));
+  bucc_map_set_cstr(m, "value", bucc_make_string(value));
+  return m;
+}
+
+static bucc_array_t* bucc_data_find_cb(void* ctx, const char* dataset, bucc_map_t* query, const char* order, int limit, int offset) {
+  (void)query; (void)order; (void)offset;
+  Session* s = bucc_live_session(ctx);
+  bucc_array_t* arr = bucc_array_new(8);
+  if (!arr || !s || !s->db || !dataset) return arr;
+  if (limit <= 0 || limit > 50) limit = 50;
+  int64_t ids[50];
+  char values[50][512];
+  int n = db_bucc_data_find(s->db, bucc_live_scope(ctx), dataset, ids, values, limit);
+  for (int i = 0; i < n; i++) {
+    bucc_map_t* m = bucc_map_new(4);
+    if (!m) continue;
+    bucc_map_set_cstr(m, "id", BUCC_I64_VAL(ids[i]));
+    bucc_map_set_cstr(m, "dataset", bucc_make_string(dataset));
+    bucc_map_set_cstr(m, "value", bucc_make_string(values[i]));
+    bucc_value_t v = {.kind = BUCC_VAL_MAP, .as.map = m};
+    bucc_array_push(arr, v);
+  }
+  return arr;
+}
+
+static int64_t bucc_data_count_cb(void* ctx, const char* dataset, bucc_map_t* query) {
+  (void)query;
+  Session* s = bucc_live_session(ctx);
+  return s && s->db && dataset ? db_bucc_data_count(s->db, bucc_live_scope(ctx), dataset) : 0;
+}
+
+static bool bucc_data_tx_cb(void* ctx) {
   (void)ctx;
-  return bucc_array_new(1);
+  return true;
+}
+
+static bool db_door_find_by_name_or_id(BbsDb* db, const char* target, DbDoor* out) {
+  if (!db || !target || !target[0] || !out) return false;
+  char* end = NULL;
+  long id = strtol(target, &end, 10);
+  if (end && *end == '\0' && id > 0 && db_door_get(db, (int)id, out)) return true;
+  DbDoor doors[128];
+  int n = db_doors_list(db, doors, 128);
+  for (int i = 0; i < n; i++) {
+    if (!strcasecmp(doors[i].name, target)) {
+      *out = doors[i];
+      return true;
+    }
+  }
+  return false;
 }
 
 static bool door_launch_bucc(Session* s, const DbDoor* door) {
+  static __thread int chain_depth = 0;
   if (!door->manifest[0]) {
     log_error("door %s: no Buccaneer manifest path set", door->name);
     send_str(s, "\r\nDoor manifest is missing. Contact the sysop.\r\n");
@@ -1096,10 +1566,63 @@ static bool door_launch_bucc(Session* s, const DbDoor* door) {
     .get_online = bucc_bbs_online_cb,
     .get_node = bucc_bbs_node_cb
   };
+  bucc_kv_api_t kv_api = {
+    .get = bucc_kv_get_cb,
+    .set = bucc_kv_set_cb,
+    .delete_key = bucc_kv_delete_cb,
+    .exists = bucc_kv_exists_cb
+  };
+  bucc_text_api_t text_api = {
+    .read_all = bucc_text_read_all_cb,
+    .read_lines = bucc_text_read_lines_cb,
+    .write_all = bucc_text_write_all_cb,
+    .append = bucc_text_append_cb,
+    .exists = bucc_text_exists_cb
+  };
+  bucc_users_api_t users_api = {
+    .find = bucc_users_find_cb,
+    .get = bucc_users_get_cb
+  };
+  bucc_msg_api_t msg_api = {
+    .read = bucc_msg_read_cb,
+    .list = bucc_msg_list_cb,
+    .post = bucc_msg_post_cb
+  };
+  bucc_file_api_t file_api = {
+    .list = bucc_file_list_cb,
+    .info = bucc_file_info_cb
+  };
+  bucc_data_api_t data_api = {
+    .insert = bucc_data_insert_cb,
+    .update = bucc_data_update_cb,
+    .delete_record = bucc_data_delete_cb,
+    .get = bucc_data_get_cb,
+    .find = bucc_data_find_cb,
+    .count = bucc_data_count_cb,
+    .begin_tx = bucc_data_tx_cb,
+    .commit_tx = bucc_data_tx_cb,
+    .rollback_tx = bucc_data_tx_cb
+  };
+
+  BuccLiveCtx live;
+  memset(&live, 0, sizeof(live));
+  live.s = s;
+  snprintf(live.scope, sizeof(live.scope), "door:%d:%s", door->id, door->name);
+  char bucc_root[512];
+  path_join(s->cfg.data_path, "buccaneer", bucc_root, sizeof(bucc_root));
+  ensure_dir(bucc_root);
+  path_join(bucc_root, door->name[0] ? door->name : "door", live.text_root, sizeof(live.text_root));
+  ensure_dir(live.text_root);
 
   bucc_host_set_term_api(runner->host_ctx, &term_api, s);
   bucc_host_set_user_api(runner->host_ctx, &user_api, s);
   bucc_host_set_bbs_api(runner->host_ctx, &bbs_api, s);
+  bucc_host_set_kv_api(runner->host_ctx, &kv_api, &live);
+  bucc_host_set_text_api(runner->host_ctx, &text_api, &live);
+  bucc_host_set_users_api(runner->host_ctx, &users_api, &live);
+  bucc_host_set_msg_api(runner->host_ctx, &msg_api, &live);
+  bucc_host_set_file_api(runner->host_ctx, &file_api, &live);
+  bucc_host_set_data_api(runner->host_ctx, &data_api, &live);
 
   char activity[128];
   snprintf(activity, sizeof(activity), "door:%s", door->name);
@@ -1111,6 +1634,21 @@ static bool door_launch_bucc(Session* s, const DbDoor* door) {
   if (result.status == DOOR_CHAIN_REQUESTED) {
     log_info("door %s: Buccaneer chain requested: %s", door->name,
              result.chain_target ? result.chain_target : "(none)");
+    if (chain_depth >= 8) {
+      log_error("door %s: Buccaneer chain depth exceeded", door->name);
+      ok = false;
+    } else if (result.chain_target && result.chain_target[0]) {
+      DbDoor next;
+      if (db_door_find_by_name_or_id(s->db, result.chain_target, &next)) {
+        chain_depth++;
+        ok = door_launch(s, &next);
+        chain_depth--;
+      } else {
+        log_error("door %s: Buccaneer chain target not found: %s", door->name, result.chain_target);
+        send_str(s, "\r\nChained door target was not found.\r\n");
+        ok = false;
+      }
+    }
   } else if (result.status != DOOR_OK) {
     log_error("door %s: Buccaneer error: %s%s%s", door->name,
               bucc_door_status_string(result.status),

@@ -227,8 +227,12 @@ int fsedit_edit(Session *s, char *text_out, size_t text_cap)
         int cur_len = (int)strlen(ed.lines[ed.cur_line]);
         if (prev_len + cur_len <= FSEDIT_LINE_LEN)
         {
-          strncat(ed.lines[ed.cur_line - 1], ed.lines[ed.cur_line],
-                  FSEDIT_LINE_LEN - (size_t)prev_len);
+          size_t room = FSEDIT_LINE_LEN - (size_t)prev_len;
+          if (room > 0) {
+            memcpy(ed.lines[ed.cur_line - 1] + prev_len,
+                   ed.lines[ed.cur_line],
+                   (size_t)cur_len + 1);
+          }
           for (int i = ed.cur_line; i < ed.line_count - 1; i++)
             copy_line(ed.lines[i], ed.lines[i + 1]);
           ed.line_count--;

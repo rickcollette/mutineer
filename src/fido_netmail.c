@@ -1,5 +1,6 @@
 #include "bbs_fido_netmail.h"
 #include "bbs_msg_defs.h"
+#include "bbs_util.h"
 #include <dirent.h>
 #include <errno.h>
 #include <stdio.h>
@@ -17,6 +18,15 @@ static bool ensure_dir(const char *path)
   if (stat(path, &st) == 0)
     return S_ISDIR(st.st_mode);
   return mkdir(path, 0755) == 0 || errno == EEXIST;
+}
+
+static void fido_copy(char *dst, size_t cap, const char *src)
+{
+  if (!dst || cap == 0) return;
+  if (!src) src = "";
+  size_t n = strnlen(src, cap - 1);
+  memcpy(dst, src, n);
+  dst[n] = '\0';
 }
 
 static void write_body(FILE *f, const char *body)
@@ -70,12 +80,14 @@ bool fido_netmail_export_pending(BbsDb *db, const char *out_dir, int limit, bool
   for (int i = 0; i < count; i++)
   {
     char path[256];
-    snprintf(path, sizeof(path), "%s/netmail_%08d_%ld.pkt", out_dir, mails[i].id, (long)time(NULL));
+    char leaf[96];
+    snprintf(leaf, sizeof(leaf), "netmail_%08d_%ld.pkt", mails[i].id, (long)time(NULL));
+    path_join(out_dir, leaf, path, sizeof(path));
 
     if (dry_run)
     {
       result->exported++;
-      snprintf(result->last_path, sizeof(result->last_path), "%s", path);
+      fido_copy(result->last_path, sizeof(result->last_path), path);
       continue;
     }
 
@@ -94,7 +106,7 @@ bool fido_netmail_export_pending(BbsDb *db, const char *out_dir, int limit, bool
     }
 
     result->exported++;
-    snprintf(result->last_path, sizeof(result->last_path), "%s", path);
+    fido_copy(result->last_path, sizeof(result->last_path), path);
   }
 
   return result->failed == 0;
@@ -167,8 +179,10 @@ bool fido_echomail_export_pending(BbsDb *db, const char *out_dir, int limit, boo
       }
 
       char path[512];
-      snprintf(path, sizeof(path), "%s/echo_%s_%08d_%ld.pkt",
-               out_dir, links[li].echotag, msg.id, (long)time(NULL));
+      char leaf[160];
+      snprintf(leaf, sizeof(leaf), "echo_%.64s_%08d_%ld.pkt",
+               links[li].echotag, msg.id, (long)time(NULL));
+      path_join(out_dir, leaf, path, sizeof(path));
 
       if (dry_run) {
         result->exported++;
@@ -218,8 +232,8 @@ bool fido_echomail_import(BbsDb *db, const char *in_dir, FidoEchomailImportResul
   memset(result, 0, sizeof(*result));
 
   char done_dir[512], bad_dir[512];
-  snprintf(done_dir, sizeof(done_dir), "%s/done", in_dir);
-  snprintf(bad_dir, sizeof(bad_dir), "%s/bad", in_dir);
+  path_join(in_dir, "done", done_dir, sizeof(done_dir));
+  path_join(in_dir, "bad", bad_dir, sizeof(bad_dir));
   ensure_dir(done_dir);
   ensure_dir(bad_dir);
 
@@ -234,7 +248,7 @@ bool fido_echomail_import(BbsDb *db, const char *in_dir, FidoEchomailImportResul
     if (!dot || strcmp(dot, ".pkt") != 0) continue;
 
     char filepath[512];
-    snprintf(filepath, sizeof(filepath), "%s/%s", in_dir, ent->d_name);
+    path_join(in_dir, ent->d_name, filepath, sizeof(filepath));
 
     FILE *f = fopen(filepath, "r");
     if (!f) continue;
@@ -246,7 +260,7 @@ bool fido_echomail_import(BbsDb *db, const char *in_dir, FidoEchomailImportResul
     if (!fgets(line, sizeof(line), f) || strncmp(line, "MUTINEER-FTN-ECHOMAIL 1", 23) != 0) {
       fclose(f);
       char bad_path[512];
-      snprintf(bad_path, sizeof(bad_path), "%s/%s", bad_dir, ent->d_name);
+      path_join(bad_dir, ent->d_name, bad_path, sizeof(bad_path));
       rename(filepath, bad_path);
       result->failed++;
       continue;
@@ -260,22 +274,22 @@ bool fido_echomail_import(BbsDb *db, const char *in_dir, FidoEchomailImportResul
       trim_nl(line);
       if (line[0] == '\0') break; /* blank line = start of body */
       if (strncmp(line, "Area: ", 6) == 0)
-        snprintf(echotag, sizeof(echotag), "%s", line + 6);
+        fido_copy(echotag, sizeof(echotag), line + 6);
       else if (strncmp(line, "From: ", 6) == 0) {
         /* "From: Name <addr>" — extract name part */
         char *lt = strchr(line + 6, '<');
-        if (lt) { *lt = '\0'; snprintf(from_name, sizeof(from_name), "%s", line + 6); }
-        else      snprintf(from_name, sizeof(from_name), "%s", line + 6);
+        if (lt) { *lt = '\0'; fido_copy(from_name, sizeof(from_name), line + 6); }
+        else      fido_copy(from_name, sizeof(from_name), line + 6);
         /* trim trailing space */
         size_t n = strlen(from_name);
         while (n > 0 && from_name[n-1] == ' ') from_name[--n] = '\0';
       }
       else if (strncmp(line, "To: ", 4) == 0)
-        snprintf(to_name, sizeof(to_name), "%s", line + 4);
+        fido_copy(to_name, sizeof(to_name), line + 4);
       else if (strncmp(line, "Subject: ", 9) == 0)
-        snprintf(subject, sizeof(subject), "%s", line + 9);
+        fido_copy(subject, sizeof(subject), line + 9);
       else if (strncmp(line, "Created: ", 9) == 0)
-        snprintf(created_at, sizeof(created_at), "%s", line + 9);
+        fido_copy(created_at, sizeof(created_at), line + 9);
     }
 
     /* Read body (up to 2048 bytes, stripping FTN tearline) */
@@ -297,7 +311,7 @@ bool fido_echomail_import(BbsDb *db, const char *in_dir, FidoEchomailImportResul
 
     if (!echotag[0] || !subject[0]) {
       char bad_path[512];
-      snprintf(bad_path, sizeof(bad_path), "%s/%s", bad_dir, ent->d_name);
+      path_join(bad_dir, ent->d_name, bad_path, sizeof(bad_path));
       rename(filepath, bad_path);
       result->failed++;
       continue;
@@ -317,7 +331,7 @@ bool fido_echomail_import(BbsDb *db, const char *in_dir, FidoEchomailImportResul
     if (!linked_area_id) {
       /* No echolink for this tag — discard gracefully */
       char bad_path[512];
-      snprintf(bad_path, sizeof(bad_path), "%s/%s", bad_dir, ent->d_name);
+      path_join(bad_dir, ent->d_name, bad_path, sizeof(bad_path));
       rename(filepath, bad_path);
       result->failed++;
       continue;
@@ -329,20 +343,20 @@ bool fido_echomail_import(BbsDb *db, const char *in_dir, FidoEchomailImportResul
     msg.area_id = linked_area_id;
     msg.user_id = 0;
     snprintf(msg.user_handle, sizeof(msg.user_handle), "FidoNet");
-    snprintf(msg.from_name, sizeof(msg.from_name), "%s", from_name[0] ? from_name : "FidoNet");
-    snprintf(msg.to_name, sizeof(msg.to_name), "%s", to_name[0] ? to_name : "All");
-    snprintf(msg.subject, sizeof(msg.subject), "%s", subject);
-    snprintf(msg.body, sizeof(msg.body), "%s", body);
+    fido_copy(msg.from_name, sizeof(msg.from_name), from_name[0] ? from_name : "FidoNet");
+    fido_copy(msg.to_name, sizeof(msg.to_name), to_name[0] ? to_name : "All");
+    fido_copy(msg.subject, sizeof(msg.subject), subject);
+    fido_copy(msg.body, sizeof(msg.body), body);
 
     if (db_message_post_ex(db, &msg)) {
       result->imported++;
       char done_path[512];
-      snprintf(done_path, sizeof(done_path), "%s/%s", done_dir, ent->d_name);
+      path_join(done_dir, ent->d_name, done_path, sizeof(done_path));
       rename(filepath, done_path);
     } else {
       result->failed++;
       char bad_path[512];
-      snprintf(bad_path, sizeof(bad_path), "%s/%s", bad_dir, ent->d_name);
+      path_join(bad_dir, ent->d_name, bad_path, sizeof(bad_path));
       rename(filepath, bad_path);
     }
   }

@@ -29,7 +29,7 @@ Default telnet port: **2929**. See [docs/quick-start.md](docs/quick-start.md), [
 
 | Library | Required | Notes |
 |---------|----------|-------|
-| SQLite3 | Yes | `libsqlite3-dev` |
+| SQLite3 | Yes | `libsqlite3-dev`; `sqlite3` CLI for maintenance scripts |
 | OpenSSL | Yes | PBKDF2 password hashing |
 | pthreads | Yes | One thread per connection |
 | libarchive | Yes | Archive and QWK package handling |
@@ -38,7 +38,7 @@ Default telnet port: **2929**. See [docs/quick-start.md](docs/quick-start.md), [
 
 Install on Debian/Ubuntu:
 ```bash
-apt-get install libsqlite3-dev libssl-dev libarchive-dev libargon2-dev dosbox
+apt-get install libsqlite3-dev sqlite3 libssl-dev libarchive-dev libargon2-dev dosbox
 ```
 
 ## Features

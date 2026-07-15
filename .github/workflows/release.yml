@@ -33,7 +33,7 @@ jobs:
           apt-get install -y --no-install-recommends \
             ca-certificates git \
             build-essential cmake pkg-config \
-            libsqlite3-dev libssl-dev libargon2-dev libzstd-dev
+            libsqlite3-dev libssl-dev libargon2-dev libzstd-dev libarchive-dev sqlite3
 
       - name: Build
         env:
@@ -64,7 +64,7 @@ jobs:
         run: |
           dnf install -y --setopt=install_weak_deps=False \
             git gcc gcc-c++ make cmake pkg-config \
-            sqlite-devel openssl-devel libzstd-devel libargon2-devel
+            sqlite-devel openssl-devel libzstd-devel libargon2-devel libarchive-devel sqlite
 
       - name: Build
         env:
@@ -97,7 +97,7 @@ jobs:
             bash \
             build-base cmake pkgconfig git \
             sqlite-dev openssl-dev linux-headers \
-            argon2-dev zstd-dev
+            argon2-dev zstd-dev libarchive-dev sqlite
 
       - name: Build
         env:

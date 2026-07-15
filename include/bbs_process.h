@@ -14,6 +14,8 @@ typedef struct BbsProcessResult {
 
 bool bbs_argv_parse_template(const char* command, const char* filepath,
                              char*** argv_out, char* errbuf, size_t errcap);
+bool bbs_argv_parse_door_template(const char* command, const char* dropdir,
+                                  char*** argv_out, char* errbuf, size_t errcap);
 void bbs_argv_free(char** argv);
 
 bool bbs_exec_argv(char** argv, const char* label, const char* workdir,

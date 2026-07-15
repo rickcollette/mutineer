@@ -263,12 +263,12 @@ static int cmd_compile(int argc, char** argv) {
     }
     
     if (debug && debug_map) {
-        char bmap_path[260];
+        char bmap_path[1024];
         size_t out_len = strlen(output_path);
         if (out_len > 3 && strcmp(output_path + out_len - 3, ".bc") == 0) {
-            snprintf(bmap_path, sizeof(bmap_path), "%.*s.bmap", (int)(out_len - 3), output_path);
+            snprintf(bmap_path, sizeof(bmap_path), "%.*s.bmap", (int)((out_len - 3) > 1000 ? 1000 : (out_len - 3)), output_path);
         } else {
-            snprintf(bmap_path, sizeof(bmap_path), "%s.bmap", output_path);
+            snprintf(bmap_path, sizeof(bmap_path), "%.1018s.bmap", output_path);
         }
         
         if (verbose) {

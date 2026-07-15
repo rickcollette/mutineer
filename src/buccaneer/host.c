@@ -44,6 +44,7 @@ static bucc_host_function_t host_functions[] = {
     { "USER", "TIMELEFT", "user.read",   NULL, 0, 0, false },
     { "USER", "TIME_LEFT", "user.read",  NULL, 0, 0, false },
     { "USER", "TIME_REMAINING", "user.read", NULL, 0, 0, false },
+    { "USER", "FLAGS",    "user.read",   NULL, 0, 0, false },
     
     { "DATA", "INSERT",   "data.write",  NULL, 2, 2, true  },
     { "DATA", "UPDATE",   "data.write",  NULL, 3, 3, true  },
@@ -444,6 +445,17 @@ bucc_value_t bucc_host_user_time_left(bucc_host_context_t* ctx, bucc_value_t* ar
     }
     
     return BUCC_I64_VAL(ctx->user->get_time_left(ctx->user_ctx));
+}
+
+bucc_value_t bucc_host_user_flags(bucc_host_context_t* ctx, bucc_value_t* args, int argc) {
+    (void)args;
+    (void)argc;
+
+    if (!ctx || !ctx->user || !ctx->user->get_flags) {
+        return BUCC_I64_VAL(0);
+    }
+
+    return BUCC_I64_VAL(ctx->user->get_flags(ctx->user_ctx));
 }
 
 bucc_value_t bucc_host_data_insert(bucc_host_context_t* ctx, bucc_value_t* args, int argc) {
@@ -1261,6 +1273,7 @@ bucc_value_t bucc_host_dispatch(bucc_vm_t* vm, const char* ns, const char* fn,
         if (strcasecmp_local(fn, "TIMELEFT") == 0 ||
             strcasecmp_local(fn, "TIME_LEFT") == 0 ||
             strcasecmp_local(fn, "TIME_REMAINING") == 0) return bucc_host_user_time_left(ctx, args, argc);
+        if (strcasecmp_local(fn, "FLAGS") == 0) return bucc_host_user_flags(ctx, args, argc);
     }
     else if (strcasecmp_local(ns, "DATA") == 0) {
         if (strcasecmp_local(fn, "INSERT") == 0) return bucc_host_data_insert(ctx, args, argc);

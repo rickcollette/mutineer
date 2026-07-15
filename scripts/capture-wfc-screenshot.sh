@@ -1,23 +1,24 @@
 #!/usr/bin/env bash
-# Capture WFC console ANSI via docker TTY, then render PNG.
+# Capture WFC console ANSI via mutineer-console, then render PNG.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 RAW="$ROOT/screenshots/raw"
 mkdir -p "$RAW"
 
-IMAGE="${MUTINEER_IMAGE:-mutineer-bbs:latest}"
-VOL="${MUTINEER_DATA_VOL:-mutineer-bbs_mutineer-data}"
+CONSOLE="${MUTINEER_CONSOLE:-build-make/mutineer-console}"
+CONF="${MUTINEER_CONFIG:-conf/mutineer.conf}"
 OUT="$RAW/05-wfc-console.ansi"
 
-echo "==> Capturing WFC console (requires -it TTY, port 2930)..."
-# Record terminal output from a short WFC session (separate port from compose).
+echo "==> Capturing WFC console (requires console service and TTY)..."
+if [[ ! -x "$CONSOLE" ]]; then
+  echo "mutineer-console not found at $CONSOLE" >&2
+  exit 1
+fi
+
+# Record terminal output from a short standalone console session.
 script -q -c \
-  "timeout 4 docker run --rm -it \
-    -p 2930:2929 \
-    -v ${VOL}:/opt/mutineer/data \
-    -e MUTINEER_CONFIG=conf/mutineer.wfc.conf \
-    ${IMAGE}" \
+  "timeout 4 ${CONSOLE} -c ${CONF}" \
   "$OUT" 2>/dev/null || true
 
 # script may leave CRLF; trim expect noise
@@ -27,6 +28,6 @@ if [[ -f "$OUT" ]]; then
   grep -v '^Script started' "$OUT" | grep -v '^Script done' > "${OUT}.tmp" && mv "${OUT}.tmp" "$OUT" || true
   echo "WFC capture: $(wc -c < "$OUT") bytes -> $OUT"
 else
-  echo "WFC capture failed — try: docker run -it -e MUTINEER_CONFIG=conf/mutineer.wfc.conf ${IMAGE}" >&2
+  echo "WFC capture failed — try: ./scripts/open-wfc.sh" >&2
   exit 1
 fi

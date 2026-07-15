@@ -16,6 +16,7 @@
 #include <sys/socket.h>
 #include <fcntl.h>
 #include <errno.h>
+#include <dirent.h>
 
 #include "bbs_doors.h"
 #include "bbs_db.h"
@@ -78,6 +79,39 @@ static char* write_tmp_file(const char* name, const char* content) {
 
 static void rm_rf(const char* path) {
   bbs_remove_tree(path);
+}
+
+static bool newest_session_json(const char* root, const char* door_name,
+                                int node_num, char* out, size_t outcap) {
+  char door_dir[512];
+  char node_dir[512];
+  DIR* d;
+  struct dirent* ent;
+  time_t newest = 0;
+  bool found = false;
+
+  path_join(root, door_name, door_dir, sizeof(door_dir));
+  char node_leaf[32];
+  snprintf(node_leaf, sizeof(node_leaf), "node%02d", node_num);
+  path_join(door_dir, node_leaf, node_dir, sizeof(node_dir));
+  d = opendir(node_dir);
+  if (!d) return false;
+  while ((ent = readdir(d)) != NULL) {
+    if (!strcmp(ent->d_name, ".") || !strcmp(ent->d_name, "..")) continue;
+    char candidate[600];
+    struct stat st;
+    char run_dir[512];
+    path_join(node_dir, ent->d_name, run_dir, sizeof(run_dir));
+    path_join(run_dir, "MUTINEER_SESSION.JSON", candidate, sizeof(candidate));
+    if (stat(candidate, &st) == 0 && S_ISREG(st.st_mode) &&
+        (!found || st.st_mtime >= newest)) {
+      newest = st.st_mtime;
+      snprintf(out, outcap, "%s", candidate);
+      found = true;
+    }
+  }
+  closedir(d);
+  return found;
 }
 
 /* =========================================================================
@@ -527,7 +561,7 @@ static void test_native_door_argv_and_rejection(void) {
   memset(&door, 0, sizeof(door));
   snprintf(door.name, sizeof(door.name), "argvdoor");
   snprintf(door.runner, sizeof(door.runner), "native");
-  snprintf(door.command, sizeof(door.command), "/bin/sh -c \"printf %%s 'hello world' > %s\"", out_path);
+  snprintf(door.command, sizeof(door.command), "/bin/sh -c \"printf %%s 'hello world' > %.180s\"", out_path);
   door.enabled = 1;
 
   bool ok = door_launch(&s, &door);
@@ -539,6 +573,65 @@ static void test_native_door_argv_and_rejection(void) {
 
   rm_rf(s.cfg.dropfile_path);
   unlink(out_path);
+}
+
+static void test_native_door_session_json_and_dropdir_marker(void) {
+  printf("\n[native door: signed session json and %%D marker]\n");
+
+  Session s;
+  memset(&s, 0, sizeof(s));
+  s.alive = 1;
+  s.node_num = 7;
+  s.fd = STDIN_FILENO;
+  s.time_left_min = 12;
+  s.ansi = 1;
+  make_tmp_path(s.cfg.dropfile_path, sizeof(s.cfg.dropfile_path),
+                "test_native_session_drop_%d", (int)getpid());
+  snprintf(s.cfg.door_session_hmac_secret,
+           sizeof(s.cfg.door_session_hmac_secret), "unit-test-door-secret");
+  snprintf(s.ip, sizeof(s.ip), "127.0.0.42");
+  s.user.id = 42;
+  s.user.level = 90;
+  snprintf(s.user.handle, sizeof(s.user.handle), "testuser");
+  snprintf(s.user.real_name, sizeof(s.user.real_name), "Test User");
+  snprintf(s.user.last_login_at, sizeof(s.user.last_login_at), "2026-01-01");
+
+  DbDoor door;
+  memset(&door, 0, sizeof(door));
+  snprintf(door.name, sizeof(door.name), "sessiondoor");
+  snprintf(door.runner, sizeof(door.runner), "native");
+  snprintf(door.command, sizeof(door.command),
+           "/usr/bin/test -f %%D/MUTINEER_SESSION.JSON");
+  door.enabled = 1;
+
+  bool ok = door_launch(&s, &door);
+  CHECK(ok, "native door command can reference session json through %D");
+
+  char json_path[600];
+  CHECK(newest_session_json(s.cfg.dropfile_path, door.name, s.node_num,
+                            json_path, sizeof(json_path)),
+        "session json is under a per-node launch directory");
+  char* first = file_read_all(json_path, NULL);
+  CHECK(first != NULL, "MUTINEER_SESSION.JSON was written");
+  if (first) {
+    CHECK(strstr(first, "\"bbs_user_id\": 42") != NULL, "session includes bbs_user_id");
+    CHECK(strstr(first, "\"handle\": \"testuser\"") != NULL, "session includes handle");
+    CHECK(strstr(first, "\"security_level\": 90") != NULL, "session includes security level");
+    CHECK(strstr(first, "\"hmac\": \"") != NULL, "session includes hmac");
+  }
+
+  sleep(1);
+  ok = door_launch(&s, &door);
+  CHECK(ok, "second launch with same door still succeeds");
+  newest_session_json(s.cfg.dropfile_path, door.name, s.node_num,
+                      json_path, sizeof(json_path));
+  char* second = file_read_all(json_path, NULL);
+  if (first && second)
+    CHECK(strcmp(first, second) != 0, "session json changes between launches");
+
+  free(first);
+  free(second);
+  rm_rf(s.cfg.dropfile_path);
 }
 
 static void test_protocol_argv_and_rejection(void) {
@@ -599,6 +692,7 @@ int main(void) {
   test_disabled_door();
   test_native_door_regression();
   test_native_door_argv_and_rejection();
+  test_native_door_session_json_and_dropdir_marker();
   test_protocol_argv_and_rejection();
 
   printf("\n=== Results: %d passed, %d failed ===\n", g_pass, g_fail);

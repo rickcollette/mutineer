@@ -16,6 +16,15 @@ extern void send_str(Session* s, const char* str);
 extern int session_readline(Session* s, uint8_t* buf, size_t cap, int timeout);
 extern int prompt_line(Session* s, const char* prompt, char* out, size_t cap);
 
+static void chat_copy(char* dst, size_t cap, const char* src) {
+  if (!dst || cap == 0) return;
+  if (!src) src = "";
+  size_t n = strlen(src);
+  if (n >= cap) n = cap - 1;
+  memcpy(dst, src, n);
+  dst[n] = '\0';
+}
+
 static void chat_log_file(Session* s, const char* other_handle, const char* speaker, const char* msg) {
   if (!s || !s->cfg.chat_log_path[0]) return;
 
@@ -84,8 +93,10 @@ static void chat_inbox_post(Session* dest, const char* line) {
   pthread_mutex_lock(&dest->chat_inbox_lock);
   int next = (dest->chat_inbox_tail + 1) % 8;
   if (next != dest->chat_inbox_head) { /* not full */
-    strncpy(dest->chat_inbox[dest->chat_inbox_tail], line, 255);
-    dest->chat_inbox[dest->chat_inbox_tail][255] = '\0';
+    char* slot = dest->chat_inbox[dest->chat_inbox_tail];
+    size_t n = strnlen(line, 255);
+    memcpy(slot, line, n);
+    slot[n] = '\0';
     dest->chat_inbox_tail = next;
   }
   pthread_mutex_unlock(&dest->chat_inbox_lock);
@@ -125,7 +136,7 @@ void split_chat_start(Session* s, Session* other) {
   ansi_clear_line(s);
   char hdr[128];
   snprintf(hdr, sizeof(hdr),
-           "\x1b[1;32m Mutineer Chat \x1b[0m\x1b[1;36m %s \x1b[0m<> \x1b[1;32m%s\x1b[0m",
+           "\x1b[1;32m Mutineer Chat \x1b[0m\x1b[1;36m %.30s \x1b[0m<> \x1b[1;32m%.30s\x1b[0m",
            other->user.handle, s->user.handle);
   send_str(s, hdr);
 
@@ -133,7 +144,7 @@ void split_chat_start(Session* s, Session* other) {
   ansi_goto(s, 2, 1);
   ansi_clear_line(s);
   char lbl[64];
-  snprintf(lbl, sizeof(lbl), "\x1b[0;36m %s >\x1b[0m", other->user.handle);
+  snprintf(lbl, sizeof(lbl), "\x1b[0;36m %.45s >\x1b[0m", other->user.handle);
   send_str(s, lbl);
 
   /* Divider */
@@ -142,7 +153,7 @@ void split_chat_start(Session* s, Session* other) {
   /* Local panel label */
   ansi_goto(s, SPLIT_BOTTOM_START, 1);
   ansi_clear_line(s);
-  snprintf(lbl, sizeof(lbl), "\x1b[0;32m %s >\x1b[0m", s->user.handle);
+  snprintf(lbl, sizeof(lbl), "\x1b[0;32m %.45s >\x1b[0m", s->user.handle);
   send_str(s, lbl);
 
   /* Clear remote and local message areas */
@@ -282,14 +293,14 @@ int teleconf_create_room(Session* s, const char* name, const char* topic, int pr
   for (int i = 0; i < MAX_TELECONF_ROOMS; i++) {
     if (!teleconf_rooms[i].active) {
       teleconf_rooms[i].active = 1;
-      strncpy(teleconf_rooms[i].name, name, sizeof(teleconf_rooms[i].name) - 1);
-      strncpy(teleconf_rooms[i].topic, topic, sizeof(teleconf_rooms[i].topic) - 1);
+      chat_copy(teleconf_rooms[i].name, sizeof(teleconf_rooms[i].name), name);
+      chat_copy(teleconf_rooms[i].topic, sizeof(teleconf_rooms[i].topic), topic);
       teleconf_rooms[i].moderator_node = s->node_num;
       teleconf_rooms[i].users[0] = s->node_num;
       teleconf_rooms[i].user_count = 1;
       teleconf_rooms[i].private = private_room;
       if (password) {
-        strncpy(teleconf_rooms[i].password, password, sizeof(teleconf_rooms[i].password) - 1);
+        chat_copy(teleconf_rooms[i].password, sizeof(teleconf_rooms[i].password), password);
       }
       pthread_mutex_unlock(&teleconf_mutex);
       return i;

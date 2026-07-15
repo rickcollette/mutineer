@@ -38,6 +38,9 @@ static int check_public_doc(const char* path) {
   CHECK(!contains(text, "DOOR.CHAIN sets wrong VM status"), "public docs do not keep completed chain bug");
   CHECK(!contains(text, "DOOR.EXIT discards"), "public docs do not keep completed exit bug");
   CHECK(!contains(text, "SHARED.CAS uses shallow equality"), "public docs do not keep completed CAS bug");
+  CHECK(!contains(text, "WFC runs as a background thread"), "public docs do not describe old local WFC thread");
+  CHECK(!contains(text, "local WFC thread"), "public docs do not describe old local WFC thread");
+  CHECK(!contains(text, "not wired"), "public docs do not advertise stale unwired Buccaneer APIs");
   free(text);
   return 0;
 }
@@ -61,12 +64,16 @@ int main(void) {
   CHECK(check_public_doc("docs/overview.md") == 0, "overview consistency");
   CHECK(check_public_doc("docs/doors-and-scripting.md") == 0, "doors consistency");
   CHECK(check_public_doc("docs/buccaneer/host-api.md") == 0, "host API consistency");
+  CHECK(check_public_doc("docs/console-protocol.md") == 0, "console protocol consistency");
+  CHECK(check_public_doc("docs/website-source.md") == 0, "website source consistency");
   CHECK(check_public_doc("docs/buccaneer/index.md") == 0, "Buccaneer index consistency");
   CHECK(check_public_doc("website/index.html") == 0, "website home consistency");
   CHECK(check_public_doc("website/docs/overview.html") == 0, "generated overview consistency");
   CHECK(check_public_doc("website/docs/doors-and-scripting.html") == 0, "generated doors consistency");
   CHECK(check_public_doc("website/docs/buccaneer/index.html") == 0, "generated Buccaneer index consistency");
   CHECK(check_public_doc("website/docs/buccaneer/host-api.html") == 0, "generated Buccaneer host API consistency");
+  CHECK(check_public_doc("website/docs/console-protocol.html") == 0, "generated console protocol consistency");
+  CHECK(check_public_doc("website/docs/website-source.html") == 0, "generated website source consistency");
   CHECK(check_legacy_status_doc("docs/SPEC.md") == 0, "legacy spec consistency");
   CHECK(check_legacy_status_doc("docs/status/FUNCTIONAL_MUTINEER.md") == 0, "functional status consistency");
   CHECK(check_legacy_status_doc("docs/status/DELTA_BBS.md") == 0, "delta status consistency");
@@ -89,6 +96,25 @@ int main(void) {
         "matrix marks Buccaneer issue script complete");
   CHECK(contains(matrix, "P1 | 100% | Complete | `SHARED.CAS`"),
         "matrix marks SHARED.CAS complete");
+
+  char* cfg = read_file("docs/configuration.md");
+  CHECK(cfg, "read configuration doc");
+  CHECK(contains(cfg, "console_port` | int | `2931`"), "configuration documents console port");
+  CHECK(contains(cfg, "mutineer-console"), "configuration mentions mutineer-console");
+  free(cfg);
+
+  char* proto = read_file("docs/console-protocol.md");
+  CHECK(proto, "read console protocol doc");
+  CHECK(contains(proto, "newline-delimited JSON"), "console protocol documents framing");
+  CHECK(contains(proto, "passthrough.begin"), "console protocol documents passthrough begin");
+  CHECK(contains(proto, "menu.session.start"), "console protocol documents menu session command");
+  free(proto);
+
+  char* website_source = read_file("docs/website-source.md");
+  CHECK(website_source, "read website source doc");
+  CHECK(contains(website_source, "Markdown documentation"), "website source doc states canonical Markdown source");
+  CHECK(contains(website_source, "generated artifacts"), "website source doc identifies generated artifacts");
+  free(website_source);
   free(todo);
   free(matrix);
   return 0;

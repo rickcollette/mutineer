@@ -13,9 +13,11 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <errno.h>
+#include <sys/socket.h>
 #include "bbs_plugin_api.h"
 #include "bbs_plugin_loader.h"
 #include "bbs_plugin_registry.h"
+#include "bbs_session.h"
 #include "bbs_util.h"
 
 #define TEST_ASSERT(cond, msg) do { \
@@ -23,6 +25,34 @@
 } while(0)
 
 static const char* g_hello_plugin_path = "build/plugins/hello.so";
+
+static bbs_plugin_query_fn test_plugin_query_symbol(void* handle) {
+  void* sym = dlsym(handle, "bbs_plugin_query");
+#if defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wpedantic"
+#endif
+  bbs_plugin_query_fn fn = (bbs_plugin_query_fn)sym;
+#if defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
+  return fn;
+}
+
+void send_str(Session* s, const char* str) {
+  if (!s || !str) return;
+  fd_write_all(s->fd, str, strlen(str));
+}
+
+int session_readline(Session* s, uint8_t* buf, size_t cap, int timeout) {
+  if (!s) return -1;
+  return fd_readline(s->fd, timeout, buf, cap);
+}
+
+int session_readline_echo(Session* s, uint8_t* buf, size_t cap, int timeout, int echo) {
+  (void)echo;
+  return session_readline(s, buf, cap, timeout);
+}
 
 static void rm_rf(const char* path) {
   bbs_remove_tree(path);
@@ -243,7 +273,7 @@ static int test_plugin_load(void) {
   void* handle = dlopen(plugin_path, RTLD_NOW | RTLD_LOCAL);
   TEST_ASSERT(handle != NULL, "dlopen should succeed");
   
-  bbs_plugin_query_fn query = (bbs_plugin_query_fn)dlsym(handle, "bbs_plugin_query");
+  bbs_plugin_query_fn query = test_plugin_query_symbol(handle);
   TEST_ASSERT(query != NULL, "dlsym should find bbs_plugin_query");
   
   bbs_plugin_desc_t desc;
@@ -281,7 +311,7 @@ static int test_abi_mismatch(void) {
   void* handle = dlopen(plugin_path, RTLD_NOW | RTLD_LOCAL);
   TEST_ASSERT(handle != NULL, "dlopen should succeed");
   
-  bbs_plugin_query_fn query = (bbs_plugin_query_fn)dlsym(handle, "bbs_plugin_query");
+  bbs_plugin_query_fn query = test_plugin_query_symbol(handle);
   TEST_ASSERT(query != NULL, "dlsym should find bbs_plugin_query");
   
   bbs_plugin_desc_t desc;
@@ -431,6 +461,38 @@ static int test_host_api_filesystem_safety(void) {
   return 0;
 }
 
+static int test_host_api_io_crlf_normalization(void) {
+  BbsConfig cfg = {0};
+  cfg.plugins_enabled = 0;
+  snprintf(cfg.data_path, sizeof(cfg.data_path), "%s", getenv("TMPDIR") ? getenv("TMPDIR") : "/tmp");
+  TEST_ASSERT(plugin_loader_init(&cfg), "host API config init succeeds");
+  const bbs_host_api_t* api = plugin_get_host_api();
+  TEST_ASSERT(api != NULL && api->io != NULL && api->io->write != NULL, "host IO API available");
+
+  int fds[2];
+  TEST_ASSERT(socketpair(AF_UNIX, SOCK_STREAM, 0, fds) == 0, "socketpair succeeds");
+
+  Session sess;
+  memset(&sess, 0, sizeof(sess));
+  sess.fd = fds[0];
+
+  const char* text = "one\ntwo\r\nthree";
+  TEST_ASSERT(api->io->write((bbs_session_t*)&sess, text, strlen(text)) == BBS_OK,
+              "host IO write succeeds");
+
+  char buf[64];
+  ssize_t n = read(fds[1], buf, sizeof(buf) - 1);
+  TEST_ASSERT(n > 0, "host IO data readable");
+  buf[n] = '\0';
+  TEST_ASSERT(strcmp(buf, "one\r\ntwo\r\nthree") == 0,
+              "host IO normalizes bare LF without doubling CRLF");
+
+  close(fds[0]);
+  close(fds[1]);
+  plugin_loader_shutdown();
+  return 0;
+}
+
 int main(int argc, char** argv) {
   int failures = 0;
   int total = 0;
@@ -470,6 +532,7 @@ int main(int argc, char** argv) {
   RUN_TEST(test_loader_init);
   RUN_TEST(test_loader_config_rules);
   RUN_TEST(test_host_api_filesystem_safety);
+  RUN_TEST(test_host_api_io_crlf_normalization);
   
   printf("\n%d/%d tests passed\n", total - failures, total);
   return failures > 0 ? 1 : 0;

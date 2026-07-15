@@ -22,6 +22,7 @@ OUTPUT_DIR="${OUTPUT_DIR:-dist/releases}"
 # Binaries to ship
 CORE_BIN=(mutineer)
 TOOL_BIN=(
+  mutineer-console
   mutineer-initbbs
   mutineer-qwkgen
   mutineer-msgpack
@@ -88,7 +89,7 @@ cp -a menus/. "$STAGING/menus/"
 cp -a sql/. "$STAGING/sql/"
 
 # Runtime helper scripts only (exclude build/CI tooling)
-RUNTIME_SCRIPTS=(start stop backup bbs-wall start-screen crontabs watchdog update-version)
+RUNTIME_SCRIPTS=(start stop backup bbs-wall start-screen crontabs watchdog update-version open-wfc.sh)
 mkdir -p "$STAGING/scripts"
 for s in "${RUNTIME_SCRIPTS[@]}"; do
   [[ -f "scripts/$s" ]] && cp "scripts/$s" "$STAGING/scripts/"
@@ -112,19 +113,19 @@ EOF
 # Platform-specific install notes
 case "$PLATFORM" in
   debian)
-    DEPS="libsqlite3-0 libssl3 dosbox (optional, for DOS doors)"
+    DEPS="libsqlite3-0 libssl3 libarchive13 sqlite3 dosbox (optional, for DOS doors)"
     DISTRO_NOTE="Debian 12 (Bookworm) and Ubuntu 24.04 LTS or newer"
-    INSTALL_CMD="sudo apt-get install -y libsqlite3-0 libssl3 dosbox"
+    INSTALL_CMD="sudo apt-get install -y libsqlite3-0 libssl3 libarchive13 sqlite3 dosbox"
     ;;
   fedora)
-    DEPS="sqlite-libs openssl-libs dosbox (optional)"
+    DEPS="sqlite-libs openssl-libs libarchive sqlite dosbox (optional)"
     DISTRO_NOTE="Fedora 39 or newer"
-    INSTALL_CMD="sudo dnf install -y sqlite openssl-libs dosbox"
+    INSTALL_CMD="sudo dnf install -y sqlite openssl-libs libarchive dosbox"
     ;;
   alpine)
-    DEPS="sqlite-libs libcrypto3 dosbox (optional)"
+    DEPS="sqlite-libs libcrypto3 libarchive-tools sqlite dosbox (optional)"
     DISTRO_NOTE="Alpine 3.18 or newer"
-    INSTALL_CMD="sudo apk add sqlite-libs libcrypto3 dosbox"
+    INSTALL_CMD="sudo apk add sqlite-libs libcrypto3 libarchive-tools sqlite dosbox"
     ;;
   *)
     echo "Unknown PLATFORM: $PLATFORM" >&2
@@ -182,6 +183,20 @@ telnet localhost 2929
 
 https://rickcollette.github.io/mutineer/docs/getting-started.html
 EOF
+
+for required in \
+  "$STAGING/mutineer" \
+  "$STAGING/bin/mutineer-console" \
+  "$STAGING/bin/mutineer-initbbs" \
+  "$STAGING/plank/bin/coved" \
+  "$STAGING/scripts/open-wfc.sh" \
+  "$STAGING/sql/schema.sql" \
+  "$STAGING/conf/mutineer.conf"; do
+  if [[ ! -e "$required" ]]; then
+    echo "ERROR: release package missing required file: ${required#$STAGING/}" >&2
+    exit 1
+  fi
+done
 
 # Create tarball
 mkdir -p "$OUTPUT_DIR"

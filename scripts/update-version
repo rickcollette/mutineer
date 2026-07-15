@@ -4,7 +4,13 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 BBS_ROOT="$(dirname "$SCRIPT_DIR")"
-BBS_DIR="${MUTINEER_DIST_DIR:-$BBS_ROOT/dist}"
+if [[ -n "${MUTINEER_DIST_DIR:-}" ]]; then
+  BBS_DIR="$MUTINEER_DIST_DIR"
+elif [[ -x "$BBS_ROOT/mutineer" ]]; then
+  BBS_DIR="$BBS_ROOT"
+else
+  BBS_DIR="$BBS_ROOT/dist"
+fi
 VERSION_FILE="$BBS_DIR/VERSION"
 ARCHIVE_NAME="${MUTINEER_UPDATE_ARCHIVE:-mutineer-linux-x64.tar.gz}"
 UPDATE_URL="${MUTINEER_UPDATE_URL:-}"
@@ -125,32 +131,64 @@ do_update() {
   local extract_dir="$temp_dir/extract"
   mkdir -p "$extract_dir"
   tar -xzf "$temp_dir/$ARCHIVE_NAME" -C "$extract_dir"
+  local package_dir
+  package_dir="$(find "$extract_dir" -mindepth 1 -maxdepth 1 -type d | head -1)"
+  if [[ -z "$package_dir" ]]; then
+    package_dir="$extract_dir"
+  fi
 
-  if [[ ! -f "$extract_dir/mutineer" ]]; then
+  if [[ ! -x "$package_dir/mutineer" || ! -x "$package_dir/bin/mutineer-console" ]]; then
     echo "Error: invalid update package; mutineer binary missing" >&2
     exit 1
   fi
 
-  echo "Step 6: Installing binary..."
-  install -m 0755 "$extract_dir/mutineer" "$BBS_DIR/mutineer.new"
-  if [[ -f "$BBS_DIR/mutineer" ]]; then
-    mv "$BBS_DIR/mutineer" "$BBS_DIR/mutineer.old"
-  fi
-  mv "$BBS_DIR/mutineer.new" "$BBS_DIR/mutineer"
-  cp "$temp_dir/VERSION" "$VERSION_FILE"
-
-  echo "Step 7: Applying verified migrations and assets..."
-  if [[ -f "$extract_dir/migrate.sql" ]]; then
-    sqlite3 "$BBS_DIR/data/mutineer.db" < "$extract_dir/migrate.sql"
-  fi
-  for dir in art menus sql; do
-    if [[ -d "$extract_dir/$dir" ]]; then
-      mkdir -p "$BBS_DIR/$dir"
-      cp -Rn "$extract_dir/$dir/." "$BBS_DIR/$dir/"
+  echo "Step 6: Installing package payload atomically..."
+  local backup_dir="$temp_dir/rollback"
+  mkdir -p "$backup_dir"
+  for path in mutineer bin plank plugins scripts docs sql art menus README.md LICENSE INSTALL.md; do
+    if [[ -e "$BBS_DIR/$path" ]]; then
+      mkdir -p "$backup_dir/$(dirname "$path")"
+      cp -a "$BBS_DIR/$path" "$backup_dir/$path"
     fi
   done
 
-  rm -f "$BBS_DIR/mutineer.old"
+  install_payload() {
+    install -m 0755 "$package_dir/mutineer" "$BBS_DIR/mutineer"
+    for dir in bin plank plugins scripts docs sql art menus; do
+      if [[ -d "$package_dir/$dir" ]]; then
+        mkdir -p "$BBS_DIR/$dir"
+        rm -rf "$BBS_DIR/$dir.new"
+        cp -a "$package_dir/$dir" "$BBS_DIR/$dir.new"
+        rm -rf "$BBS_DIR/$dir"
+        mv "$BBS_DIR/$dir.new" "$BBS_DIR/$dir"
+      fi
+    done
+    for file in README.md LICENSE INSTALL.md; do
+      [[ -f "$package_dir/$file" ]] && cp -f "$package_dir/$file" "$BBS_DIR/$file"
+    done
+    cp "$temp_dir/VERSION" "$VERSION_FILE"
+  }
+
+  rollback_payload() {
+    echo "Update failed; restoring previous package payload..." >&2
+    for path in mutineer bin plank plugins scripts docs sql art menus README.md LICENSE INSTALL.md; do
+      rm -rf "$BBS_DIR/$path"
+      if [[ -e "$backup_dir/$path" ]]; then
+        mkdir -p "$BBS_DIR/$(dirname "$path")"
+        cp -a "$backup_dir/$path" "$BBS_DIR/$path"
+      fi
+    done
+  }
+
+  if ! install_payload; then
+    rollback_payload
+    exit 1
+  fi
+
+  echo "Step 7: Applying verified migrations and assets..."
+  if [[ -f "$package_dir/migrate.sql" ]]; then
+    sqlite3 "$BBS_DIR/data/mutineer.db" < "$package_dir/migrate.sql"
+  fi
 
   echo ""
   echo "Update complete."

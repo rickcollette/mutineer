@@ -3,7 +3,12 @@
 # Designed to be called from cron
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-BBS_DIR="$(dirname "$SCRIPT_DIR")/dist"
+BBS_ROOT="$(dirname "$SCRIPT_DIR")"
+if [ -x "$BBS_ROOT/mutineer" ]; then
+    BBS_DIR="$BBS_ROOT"
+else
+    BBS_DIR="$BBS_ROOT/dist"
+fi
 PID_FILE="$BBS_DIR/mutineer.pid"
 PORT=2929
 
@@ -37,7 +42,7 @@ echo "[$(date '+%Y-%m-%d %H:%M:%S')] BBS not running, attempting restart..."
 rm -f "$PID_FILE"
 
 # Kill any orphaned screen sessions
-screen -ls | grep mutineer-console | cut -d. -f1 | xargs -r kill 2>/dev/null || true
+screen -ls | grep mutineer-daemon | cut -d. -f1 | xargs -r kill 2>/dev/null || true
 
 # Start fresh
 "$SCRIPT_DIR/start-screen"

@@ -4,19 +4,20 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Sysop Guide — Mutineer BBS</title>
-  <link rel="stylesheet" href="assets/css/site.css">
+  <link rel="stylesheet" href="../assets/css/site.css">
 </head>
 <body>
   <header class="site-header">
-    <a href="index.html" class="logo">MUTINEER BBS</a>
-    <span class="tagline">Documentation</span>
+    <a href="index.html" class="logo"><span class="mark">☠</span> MUTINEER BBS</a>
+    <span class="tagline">CAPTAIN'S MANUAL // STATIC ARCHIVE</span>
   </header>
-  <nav class="doc-nav"><a href="index.html" class="home">← Home</a><a href="quick-start.html">Quick Start</a><a href="windows.html">Windows</a><a href="getting-started.html">Getting Started</a><a href="deployment.html">Deployment</a><a href="overview.html">Overview</a><a href="configuration.html">Configuration</a><a href="architecture.html">Architecture</a><a href="menus-and-ui.html">Menus & UI</a><a href="messages-and-mail.html">Messages & Mail</a><a href="files-and-protocols.html">Files & Protocols</a><a href="chat-and-social.html">Chat & Social</a><a href="doors-and-scripting.html">Doors & Scripting</a><a href="sysop-guide.html" class="active">Sysop Guide</a><a href="networking-plank.html">PLANK</a><a href="buccaneer/programmers-guide.html">BUCC Guide</a><a href="buccaneer/host-api.html">BUCC API</a><a href="plugins.html">Plugins</a><a href="developer-guide.html">Developer</a><a href="cli-tools.html">CLI Tools</a><a href="reference/menu-actions.html">Menu Actions</a><a href="reference/message-commands.html">Messages Ref</a><a href="reference/file-commands.html">Files Ref</a><a href="reference/acs-mci.html">ACS & MCI</a><a href="reference/database.html">Database</a></nav>
-  <main class="doc-content"><p>&lt;!-- generated-by: gsd-doc-writer --&gt;</p>
-<h1>Sysop Guide</h1>
+  <nav class="doc-nav"><a href="index.html" class="home">← Home</a><a href="quick-start.html">Quick Start</a><a href="windows.html">Windows</a><a href="getting-started.html">Getting Started</a><a href="deployment.html">Deployment</a><a href="overview.html">Overview</a><a href="configuration.html">Configuration</a><a href="architecture.html">Architecture</a><a href="menus-and-ui.html">Menus & UI</a><a href="messages-and-mail.html">Messages & Mail</a><a href="files-and-protocols.html">Files & Protocols</a><a href="chat-and-social.html">Chat & Social</a><a href="doors-and-scripting.html">Doors & Scripting</a><a href="sysop-guide.html" class="active">Sysop Guide</a><a href="console-protocol.html">Console Protocol</a><a href="networking-plank.html">PLANK</a><a href="buccaneer/programmers-guide.html">BUCC Guide</a><a href="buccaneer/host-api.html">BUCC API</a><a href="plugins.html">Plugins</a><a href="developer-guide.html">Developer</a><a href="website-source.html">Website Source</a><a href="cli-tools.html">CLI Tools</a><a href="reference/menu-actions.html">Menu Actions</a><a href="reference/message-commands.html">Messages Ref</a><a href="reference/file-commands.html">Files Ref</a><a href="reference/acs-mci.html">ACS & MCI</a><a href="reference/database.html">Database</a></nav>
+  <main class="doc-content"><h1>Sysop Guide</h1>
 <p>This guide covers day-to-day BBS administration: WFC monitoring, user management, editors, scheduled maintenance, and security practices.</p>
 <h2>WFC Console</h2>
-<p>The Who&#x27;s On Full Color (WFC) console runs as a background thread when <code>wfc_enabled=1</code> (default). Implemented in <code>src/wfc.c</code>.</p>
+<p>The Who&#x27;s On Full Color (WFC) console is now the standalone <code>mutineer-console</code></p>
+<p>tool. The main <code>mutineer</code> server exposes a loopback console-control TCP port,</p>
+<p>and the console logs in with a sysop BBS account.</p>
 <h3>Display</h3>
 <p>WFC shows a grid of node slots with status characters:</p>
 <table>
@@ -28,7 +29,10 @@
 </table>
 <h3>Tuning</h3>
 <pre><code class="ini">
-wfc_enabled=1
+console_enabled=1
+console_bind=127.0.0.1
+console_port=2931
+console_idle_timeout_sec=600
 wfc_refresh_ms=1000
 wfc_blank_sec=300
 wfc_node_num=1
@@ -37,8 +41,8 @@ wfc_bg_color=0
 </code></pre>
 <ul>
 <li><code>wfc_blank_sec=0</code> disables screen blanking</li>
-<li>WFC runs on the local terminal where <code>mutineer</code> was started</li>
-<li>Remote sysops use telnet + F-key editors instead</li>
+<li>Run <code>mutineer-console -c conf/mutineer.conf</code> from an interactive terminal</li>
+<li>Large editor actions run on the server through console passthrough mode</li>
 </ul>
 <h2>User Administration</h2>
 <h3>User Editor (<code>useredit</code> action)</h3>
@@ -239,6 +243,7 @@ build/mutineer-stats -s    # key=value short format
 <h2>Related Documentation</h2>
 <ul>
 <li><a href="configuration.html">Configuration</a></li>
+<li><a href="console-protocol.html">Console Protocol</a></li>
 <li><a href="cli-tools.html">CLI Tools</a></li>
 <li><a href="architecture.html">Architecture</a></li>
 <li><a href="reference/menu-actions.html">Reference: Menu Actions</a></li>

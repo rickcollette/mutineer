@@ -65,11 +65,63 @@ Hub-style redistribution daemon for COVE nodes:
 - Fans out messages to all subscribed downstream nodes
 - Forwards messages to upstream COVEs
 - Enforces area policies and moderation
+- Can run standalone as a COVE mail hub with a loopback-only management API
 
 **Usage:**
 ```bash
 coved -c /etc/mutineer/mutineer.conf -f
 ```
+
+Standalone hub mode:
+
+```bash
+coved -mode=hub /etc/mutineer/cove-hub.conf
+```
+
+Hub mode makes COVE the owning process for mail-hub operation. It opens the
+configured Mutineer/PLANK message base, keeps COVE fanout and upstream queues
+moving, listens for PLANK node traffic, and exposes a management HTTP API bound
+to `127.0.0.1` only.
+
+Example `cove-hub.conf`:
+
+```ini
+message_base_path=/var/lib/mutineer/mutineer.db
+base_id=blackflag-main
+listen_bind=0.0.0.0
+listen_port=5150
+auth_db_path=/var/lib/mutineer/cove-auth.db
+management_db_path=/var/lib/mutineer/cove-management.db
+management_port=5151
+foreground=1
+```
+
+Hub config keys:
+
+- `message_base_path` - SQLite message/PLANK database used as the message base.
+- `base_id` - Human-readable identifier for this COVE message base.
+- `listen_bind` / `listen_port` - Public PLANK hub listener.
+- `auth_db_path` - Reserved path for COVE auth material.
+- `management_db_path` - COVE-owned management database for audit events,
+  connection records, managed nodes, and operational history.
+- `management_port` - Local management API port. The bind address is forced to
+  `127.0.0.1` in hub mode.
+
+Management API:
+
+```bash
+curl http://127.0.0.1:5151/health
+curl http://127.0.0.1:5151/config
+curl http://127.0.0.1:5151/nodes
+curl http://127.0.0.1:5151/areas
+curl http://127.0.0.1:5151/events
+
+curl -X POST http://127.0.0.1:5151/nodes \
+  -d 'node_addr=portroyal@blackflag&node_name=portroyal&network_name=blackflag&remote_host=portroyal.example.net&remote_port=5150'
+```
+
+`POST /nodes` creates or updates a COVE-managed node record and ensures the
+corresponding PLANK peer/link rows exist in the message base.
 
 ### plankctl - Admin Control Tool
 

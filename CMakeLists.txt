@@ -12,6 +12,7 @@ endif()
 add_executable(mutineer
   src/main.c
   src/config.c
+  src/auth.c
   src/util.c
   src/process.c
   src/archive_util.c
@@ -25,7 +26,7 @@ add_executable(mutineer
   src/hash.c
   src/acs.c
   src/mci.c
-  src/wfc.c
+  src/console_service.c
   src/scheduler.c
   src/doors.c
   src/file_cmds.c
@@ -274,6 +275,9 @@ target_compile_options(test_docs_consistency PRIVATE -Wall -Wextra -Wpedantic)
 add_test(NAME docs_consistency COMMAND test_docs_consistency WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 find_program(PYTHON3_EXECUTABLE python3)
 if(PYTHON3_EXECUTABLE)
+  add_test(NAME website_renderer
+    COMMAND ${PYTHON3_EXECUTABLE} scripts/build-website.py --self-test
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
   add_test(NAME website_generation
     COMMAND ${PYTHON3_EXECUTABLE} scripts/build-website.py --check-or-temp-output
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
@@ -343,6 +347,26 @@ add_mutineer_tool(mutineer-maint)
 add_mutineer_tool(mutineer-initbbs)
 add_mutineer_tool(mutineer-netmail-export)
 
+add_executable(mutineer-console
+  src/tools/mutineer-console.c
+  src/config.c
+  src/util.c
+)
+target_include_directories(mutineer-console PRIVATE include src/tools)
+target_compile_options(mutineer-console PRIVATE -Wall -Wextra -Wpedantic)
+
+add_test(NAME console_protocol
+         COMMAND ${CMAKE_SOURCE_DIR}/tests/test_console_protocol.sh ${CMAKE_BINARY_DIR}
+         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+
+add_test(NAME cove_hub_smoke
+         COMMAND ${CMAKE_SOURCE_DIR}/tests/test_cove_hub.sh ${CMAKE_BINARY_DIR}
+         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+
+add_test(NAME release_scripts_smoke
+         COMMAND ${CMAKE_SOURCE_DIR}/tests/test_release_scripts.sh ${CMAKE_BINARY_DIR}
+         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+
 # mutineer-validate needs additional sources for menu/template validation
 add_executable(mutineer-validate 
   src/tools/mutineer-validate.c 
@@ -371,6 +395,7 @@ add_custom_target(tools DEPENDS
   mutineer-maint
   mutineer-initbbs
   mutineer-netmail-export
+  mutineer-console
   mutineer-validate
 )
 

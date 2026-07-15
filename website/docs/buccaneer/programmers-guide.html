@@ -8,10 +8,10 @@
 </head>
 <body>
   <header class="site-header">
-    <a href="../index.html" class="logo">MUTINEER BBS</a>
-    <span class="tagline">Documentation</span>
+    <a href="../index.html" class="logo"><span class="mark">☠</span> MUTINEER BBS</a>
+    <span class="tagline">CAPTAIN'S MANUAL // STATIC ARCHIVE</span>
   </header>
-  <nav class="doc-nav"><a href="../index.html" class="home">← Home</a><a href="../quick-start.html">Quick Start</a><a href="../windows.html">Windows</a><a href="../getting-started.html">Getting Started</a><a href="../deployment.html">Deployment</a><a href="../overview.html">Overview</a><a href="../configuration.html">Configuration</a><a href="../architecture.html">Architecture</a><a href="../menus-and-ui.html">Menus & UI</a><a href="../messages-and-mail.html">Messages & Mail</a><a href="../files-and-protocols.html">Files & Protocols</a><a href="../chat-and-social.html">Chat & Social</a><a href="../doors-and-scripting.html">Doors & Scripting</a><a href="../sysop-guide.html">Sysop Guide</a><a href="../networking-plank.html">PLANK</a><a href="../buccaneer/programmers-guide.html">BUCC Guide</a><a href="../buccaneer/host-api.html">BUCC API</a><a href="../plugins.html">Plugins</a><a href="../developer-guide.html">Developer</a><a href="../cli-tools.html">CLI Tools</a><a href="../reference/menu-actions.html">Menu Actions</a><a href="../reference/message-commands.html">Messages Ref</a><a href="../reference/file-commands.html">Files Ref</a><a href="../reference/acs-mci.html">ACS & MCI</a><a href="../reference/database.html">Database</a></nav>
+  <nav class="doc-nav"><a href="../index.html" class="home">← Home</a><a href="../quick-start.html">Quick Start</a><a href="../windows.html">Windows</a><a href="../getting-started.html">Getting Started</a><a href="../deployment.html">Deployment</a><a href="../overview.html">Overview</a><a href="../configuration.html">Configuration</a><a href="../architecture.html">Architecture</a><a href="../menus-and-ui.html">Menus & UI</a><a href="../messages-and-mail.html">Messages & Mail</a><a href="../files-and-protocols.html">Files & Protocols</a><a href="../chat-and-social.html">Chat & Social</a><a href="../doors-and-scripting.html">Doors & Scripting</a><a href="../sysop-guide.html">Sysop Guide</a><a href="../console-protocol.html">Console Protocol</a><a href="../networking-plank.html">PLANK</a><a href="../buccaneer/programmers-guide.html">BUCC Guide</a><a href="../buccaneer/host-api.html">BUCC API</a><a href="../plugins.html">Plugins</a><a href="../developer-guide.html">Developer</a><a href="../website-source.html">Website Source</a><a href="../cli-tools.html">CLI Tools</a><a href="../reference/menu-actions.html">Menu Actions</a><a href="../reference/message-commands.html">Messages Ref</a><a href="../reference/file-commands.html">Files Ref</a><a href="../reference/acs-mci.html">ACS & MCI</a><a href="../reference/database.html">Database</a></nav>
   <main class="doc-content"><h1>Buccaneer Programmer&#x27;s Guide</h1>
 <p>A complete guide for writing BBS door programs in Buccaneer. For API details see <a href="host-api.html">Host API Reference</a>; for packaging see <a href="door-packages.html">Door Packages</a>.</p>
 <h2>1. What Buccaneer is</h2>
@@ -211,11 +211,15 @@ area = APP.GET(&quot;area&quot;, &quot;default&quot;)
 <tr><td><code>TERM.PRINTLN(s)</code></td><td>Print line</td></tr>
 <tr><td><code>TERM.CLS()</code></td><td>Clear screen</td></tr>
 <tr><td><code>TERM.COLOR(fg, bg)</code></td><td>Set colors</td></tr>
+<tr><td><code>TERM.GOTOXY(x, y)</code></td><td>Move cursor</td></tr>
 <tr><td><code>TERM.GETKEY()</code></td><td>Read one key</td></tr>
 <tr><td><code>TERM.INPUT(prompt, default)</code></td><td>Read line</td></tr>
+<tr><td><code>TERM.INPUT_PASSWORD(prompt)</code></td><td>Read masked input</td></tr>
+<tr><td><code>TERM.PAUSE(prompt)</code></td><td>Prompt and wait</td></tr>
+<tr><td><code>TERM.SUPPORTS_ANSI()</code></td><td>Detect ANSI support</td></tr>
 <tr><td><code>TERM.WIDTH()</code> / <code>TERM.HEIGHT()</code></td><td>Terminal size</td></tr>
 </table>
-<p>Spec-defined but not yet wired in production host: <code>GOTOXY</code>, <code>PAUSE</code>, <code>INPUT_PASSWORD</code>, <code>SUPPORTS_ANSI</code>, paging helpers. The <strong>simulator</strong> implements more of the spec — test there first.</p>
+<p>Paging helpers remain simulator/spec territory until they have a live BBS implementation.</p>
 <p>See <a href="host-api.html">Host API Reference</a>.</p>
 <h2>12. User and session context</h2>
 <p>Read-only caller information (requires <code>user.read</code> / <code>session.read</code> capabilities):</p>
