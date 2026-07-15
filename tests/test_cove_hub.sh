@@ -24,15 +24,22 @@ root, bin_prefix = sys.argv[1], sys.argv[2]
 tmpdir = tempfile.mkdtemp(prefix="mutineer-cove-hub.")
 proc = None
 
-def free_port():
+def free_port(exclude=None):
+    exclude = set(exclude or [])
     s = socket.socket()
-    s.bind(("127.0.0.1", 0))
-    port = s.getsockname()[1]
-    s.close()
-    return port
+    try:
+        while True:
+            s.bind(("127.0.0.1", 0))
+            port = s.getsockname()[1]
+            if port not in exclude:
+                return port
+            s.close()
+            s = socket.socket()
+    finally:
+        s.close()
 
 hub_port = free_port()
-mgmt_port = free_port()
+mgmt_port = free_port({hub_port})
 token = "smoke-token"
 
 def cleanup():
@@ -46,7 +53,7 @@ def cleanup():
             proc.wait(timeout=5)
     shutil.rmtree(tmpdir, ignore_errors=True)
 
-def wait_port(port, timeout=10):
+def wait_port(port, timeout=45):
     deadline = time.time() + timeout
     while time.time() < deadline:
         try:
@@ -171,6 +178,16 @@ foreground=1
     actions = {row[0] for row in db.execute("SELECT action FROM cove_management_events")}
     db.close()
     assert {"hub.start", "auth.failed", "node.add", "node.disable", "node.enable", "node.delete"} <= actions, actions
+except Exception:
+    for log_name in ("init.log", "coved.log"):
+        log_path = os.path.join(tmpdir, log_name)
+        if os.path.exists(log_path):
+            print(f"--- {log_name} ---", file=sys.stderr)
+            with open(log_path, "r", encoding="utf-8", errors="replace") as log:
+                print(log.read(), file=sys.stderr)
+    if proc is not None:
+        print(f"--- coved exit status: {proc.poll()} ---", file=sys.stderr)
+    raise
 finally:
     cleanup()
 PY

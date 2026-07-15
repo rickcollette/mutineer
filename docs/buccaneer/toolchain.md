@@ -70,7 +70,10 @@ See [Door Packages](door-packages.md).
 
 ## CMake integration note
 
-Buccaneer currently builds via `src/buccaneer/Makefile`, not the top-level CMake graph. The main `mutineer` binary does not yet link BUCC by default — see [GitHub BUCC build issues](https://github.com/rickcollette/mutineer/issues?q=BUILD).
+Buccaneer builds through the top-level CMake graph. The main `mutineer` binary
+links the BBS embedding, and the standalone `bucc` compiler target is built with
+the normal tool set. The historical `src/buccaneer/Makefile` remains useful for
+focused compiler/runtime work inside that subtree.
 
 ## Next steps
 

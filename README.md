@@ -145,7 +145,7 @@ networking protocol for offline packet exchange between BBS nodes. See
 | Windows (Docker / WSL) | [docs/windows.md](docs/windows.md) |
 | Buccaneer programmer's guide | [docs/buccaneer/programmers-guide.md](docs/buccaneer/programmers-guide.md) |
 
-Website: [rickcollette.github.io/mutineer](https://rickcollette.github.io/mutineer/)
+Website: [mutineerbbs.com](https://mutineerbbs.com/)
 
 ## License
 

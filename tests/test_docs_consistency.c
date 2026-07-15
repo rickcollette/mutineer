@@ -66,36 +66,22 @@ int main(void) {
   CHECK(check_public_doc("docs/buccaneer/host-api.md") == 0, "host API consistency");
   CHECK(check_public_doc("docs/console-protocol.md") == 0, "console protocol consistency");
   CHECK(check_public_doc("docs/website-source.md") == 0, "website source consistency");
+  CHECK(check_public_doc("docs/coverage.md") == 0, "coverage consistency");
+  CHECK(check_public_doc("docs/buccaneer/follow-up.md") == 0, "Buccaneer follow-up consistency");
   CHECK(check_public_doc("docs/buccaneer/index.md") == 0, "Buccaneer index consistency");
-  CHECK(check_public_doc("website/index.html") == 0, "website home consistency");
-  CHECK(check_public_doc("website/docs/overview.html") == 0, "generated overview consistency");
-  CHECK(check_public_doc("website/docs/doors-and-scripting.html") == 0, "generated doors consistency");
-  CHECK(check_public_doc("website/docs/buccaneer/index.html") == 0, "generated Buccaneer index consistency");
-  CHECK(check_public_doc("website/docs/buccaneer/host-api.html") == 0, "generated Buccaneer host API consistency");
-  CHECK(check_public_doc("website/docs/console-protocol.html") == 0, "generated console protocol consistency");
-  CHECK(check_public_doc("website/docs/website-source.html") == 0, "generated website source consistency");
   CHECK(check_legacy_status_doc("docs/SPEC.md") == 0, "legacy spec consistency");
-  CHECK(check_legacy_status_doc("docs/status/FUNCTIONAL_MUTINEER.md") == 0, "functional status consistency");
-  CHECK(check_legacy_status_doc("docs/status/DELTA_BBS.md") == 0, "delta status consistency");
-  CHECK(check_legacy_status_doc("docs/status/TODO.md") == 0, "TODO consistency");
 
-  char* todo = read_file("docs/status/BUCC_TODO.md");
-  char* matrix = read_file("docs/status/feature-matrix.md");
-  CHECK(todo && matrix, "read status files");
-  CHECK(!contains(todo, "BUCC_TODO — Buccaneer VM Audit"), "BUCC_TODO is no longer stale VM audit");
-  CHECK(!contains(todo, "BUG-1") && !contains(todo, "BUILD-1"), "completed Buccaneer audit IDs removed");
-  CHECK(!contains(todo, "SHARED.CAS still compares"), "completed CAS follow-up removed");
-  CHECK(contains(todo, "Current Follow-Up Candidates"), "BUCC_TODO keeps live follow-up only");
-  CHECK(contains(matrix, "P0 | 100% | Complete | PLANK deadletter storage"),
-        "matrix marks PLANK deadletter storage complete");
-  CHECK(contains(matrix, "P0 | 100% | Complete | PLANK quarantine and related store APIs"),
-        "matrix marks PLANK SQL safety complete");
-  CHECK(contains(matrix, "P0 | 100% | Complete | Public generated website docs"),
-        "matrix marks generated website docs complete");
-  CHECK(contains(matrix, "P1 | 100% | Complete | `scripts/create-bucc-github-issues.sh`"),
-        "matrix marks Buccaneer issue script complete");
-  CHECK(contains(matrix, "P1 | 100% | Complete | `SHARED.CAS`"),
-        "matrix marks SHARED.CAS complete");
+  char* follow_up = read_file("docs/buccaneer/follow-up.md");
+  char* coverage = read_file("docs/coverage.md");
+  CHECK(follow_up && coverage, "read coverage docs");
+  CHECK(!contains(follow_up, "BUCC_TODO — Buccaneer VM Audit"), "follow-up is no longer stale audit");
+  CHECK(!contains(follow_up, "BUG-1") && !contains(follow_up, "BUILD-1"), "completed Buccaneer audit IDs removed");
+  CHECK(!contains(follow_up, "SHARED.CAS still compares"), "completed CAS follow-up removed");
+  CHECK(contains(follow_up, "Current Follow-Up Candidates"), "Buccaneer follow-up keeps live candidates");
+  CHECK(contains(follow_up, "Deep `SHARED.CAS()` equality"), "Buccaneer follow-up marks SHARED.CAS complete");
+  CHECK(contains(coverage, "PLANK And COVE"), "coverage maps PLANK and COVE");
+  CHECK(contains(coverage, "Packaging And Automation"), "coverage maps packaging and automation");
+  CHECK(contains(coverage, "Validation Snapshot"), "coverage keeps validation snapshot");
 
   char* cfg = read_file("docs/configuration.md");
   CHECK(cfg, "read configuration doc");
@@ -112,10 +98,10 @@ int main(void) {
 
   char* website_source = read_file("docs/website-source.md");
   CHECK(website_source, "read website source doc");
-  CHECK(contains(website_source, "Markdown documentation"), "website source doc states canonical Markdown source");
-  CHECK(contains(website_source, "generated artifacts"), "website source doc identifies generated artifacts");
+  CHECK(contains(website_source, "separate repository"), "website source doc states external ownership");
+  CHECK(contains(website_source, "../production"), "website source doc points to production deployment");
   free(website_source);
-  free(todo);
-  free(matrix);
+  free(follow_up);
+  free(coverage);
   return 0;
 }

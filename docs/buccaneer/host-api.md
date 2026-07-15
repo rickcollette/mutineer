@@ -102,7 +102,7 @@ Host functions are called from bytecode as `NAMESPACE.NAME(args)`. The Mutineer 
 |----------|-----|-------|
 | `SHARED.GET(key, default)` | shared.read | Not mutex-protected yet |
 | `SHARED.SET(key, value)` | shared.write | |
-| `SHARED.CAS(key, expected, new)` | shared.write | Scalar compare-and-swap; structured-value equality is a follow-up |
+| `SHARED.CAS(key, expected, new)` | shared.write | Compare-and-swap with scalar and structured-value equality |
 
 ## TEXT — mediated files
 

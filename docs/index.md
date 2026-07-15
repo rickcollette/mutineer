@@ -47,6 +47,7 @@ Deep guides for each major subsystem:
 | [Host API Reference](buccaneer/host-api.md) | `TERM`, `USER`, `DATA`, `KV`, … |
 | [Toolchain](buccaneer/toolchain.md) | `bucc`, linter, formatter, simulator |
 | [Door Packages](buccaneer/door-packages.md) | `door.json`, capabilities, install |
+| [Follow-Up](buccaneer/follow-up.md) | Current issue candidates only |
 
 ---
 
@@ -56,6 +57,7 @@ Deep guides for each major subsystem:
 |----------|-------------|
 | [Architecture](architecture.md) | Processes, sessions, components, source map |
 | [Developer Guide](developer-guide.md) | Contributing, tests, code layout |
+| [Documentation Coverage](coverage.md) | Source-to-doc ownership map |
 
 ---
 

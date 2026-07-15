@@ -118,7 +118,6 @@ htmlcov/
 .ccache/
 .npm/
 node_modules/
-/website/dist/
 
 # Docker/local environment overrides
 .env

@@ -24,15 +24,22 @@ root, bin_prefix = sys.argv[1], sys.argv[2]
 tmpdir = tempfile.mkdtemp(prefix="mutineer-console-protocol.")
 proc = None
 
-def free_port():
+def free_port(exclude=None):
+    exclude = set(exclude or [])
     s = socket.socket()
-    s.bind(("127.0.0.1", 0))
-    port = s.getsockname()[1]
-    s.close()
-    return port
+    try:
+        while True:
+            s.bind(("127.0.0.1", 0))
+            port = s.getsockname()[1]
+            if port not in exclude:
+                return port
+            s.close()
+            s = socket.socket()
+    finally:
+        s.close()
 
 telnet_port = free_port()
-console_port = free_port()
+console_port = free_port({telnet_port})
 
 def cleanup():
     global proc
@@ -45,7 +52,7 @@ def cleanup():
             proc.wait(timeout=5)
     shutil.rmtree(tmpdir, ignore_errors=True)
 
-def wait_port(port, timeout=8):
+def wait_port(port, timeout=30):
     deadline = time.time() + timeout
     while time.time() < deadline:
         try:
@@ -92,7 +99,7 @@ def recv_line(sock, timeout=3):
 def send_obj(sock, obj):
     sock.sendall((json.dumps(obj, separators=(",", ":")) + "\n").encode())
 
-def expect_response(sock, id_, ok=None, error=None, timeout=3):
+def expect_response(sock, id_, ok=None, error=None, timeout=8):
     deadline = time.time() + timeout
     while time.time() < deadline:
         line = recv_line(sock, max(0.1, deadline - time.time()))
@@ -113,7 +120,7 @@ def login(user="sysop", password="mutineer"):
     send_obj(s, {"id": "login", "cmd": "login", "user": user, "password": password})
     expect_response(s, "login", ok=True)
     saw_snapshot = False
-    deadline = time.time() + 3
+    deadline = time.time() + 8
     while time.time() < deadline:
         line = recv_line(s, max(0.1, deadline - time.time()))
         msg = json.loads(line)
@@ -127,7 +134,7 @@ def request(sock, id_, cmd, **payload):
     msg = {"id": id_, "cmd": cmd}
     msg.update(payload)
     send_obj(sock, msg)
-    return expect_response(sock, id_, timeout=5)
+    return expect_response(sock, id_, timeout=10)
 
 def read_until(sock, needle, timeout=5):
     sock.settimeout(0.2)

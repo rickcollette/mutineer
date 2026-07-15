@@ -80,7 +80,7 @@ Keys match `BbsConfig` fields in `include/bbs_config.h`. Defaults shown are from
 | `console_bind` | string | `127.0.0.1` | No | Console-control bind address |
 | `console_port` | int | `2931` | No | Console-control TCP port |
 | `console_idle_timeout_sec` | int | `600` | No | Idle timeout for console-control clients |
-| `wfc_enabled` | int | `0` | No | Deprecated local WFC thread flag; use `mutineer-console` |
+| `wfc_enabled` | int | `0` | No | Deprecated embedded WFC flag; use `mutineer-console` |
 | `wfc_refresh_ms` | int | `1000` | No | `mutineer-console` refresh interval (ms) |
 | `wfc_blank_sec` | int | `300` | No | `mutineer-console` blank screen timeout; `0` = disabled |
 | `wfc_node_num` | int | `1` | No | `mutineer-console` display node number |

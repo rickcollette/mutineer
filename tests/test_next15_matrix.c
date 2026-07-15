@@ -81,7 +81,7 @@ int main(void) {
   char* coved = read_file("src/tools/coved.c");
   char* docs = read_file("docs/configuration.md");
   char* conf = read_file("conf/mutineer.conf");
-  char* matrix = read_file("docs/status/feature-matrix.md");
+  char* matrix = read_file("docs/coverage.md");
 
   CHECK(cmake && session && mainc && console && console_tool && sched && maint && config &&
         filecmds && coved && docs && conf && matrix, "read source files");
@@ -166,11 +166,12 @@ int main(void) {
         contains(cmake, "sanitizer"),
         "Docker and sanitizer/load coverage are registered");
 
-  CHECK(contains(matrix, "| P0 | 100% | Complete | PLANK deadletter storage") &&
-        contains(matrix, "| P1 | 100% | Complete | `SHARED.CAS`") &&
-        contains(matrix, "| P1 | 100% | Complete | Release/update tooling") &&
+  CHECK(contains(matrix, "PLANK And COVE") &&
+        contains(matrix, "`src/tools/coved.c`") &&
+        contains(matrix, "Buccaneer Follow-Up") &&
+        contains(matrix, "Release/package requirements including `sqlite3` CLI") &&
         contains(matrix, "Validation Snapshot"),
-        "feature matrix marks current reviewed batch complete");
+        "coverage map documents current reviewed batch");
 
   free(cmake); free(session); free(mainc); free(console); free(console_tool); free(sched); free(maint);
   free(config); free(filecmds); free(coved); free(docs); free(conf); free(matrix);

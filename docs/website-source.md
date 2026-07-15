@@ -1,17 +1,14 @@
-# Website Source Ownership
+# Website Ownership
 
-The canonical public website source is the Markdown documentation under
-`docs/` plus `scripts/build-website.py`.
+The public Mutineer marketing website is intentionally not part of this core BBS
+repository. Its source lives in a separate repository/worktree at `../website`
+in the local development layout.
 
-Generated static HTML under `website/` is checked in so releases and GitHub
-Pages can publish without a Node build. CI verifies that the generated output is
-fresh by running the website generator in check mode.
+This repository keeps the BBS software, operator documentation, protocol
+references, tests, packaging, and runtime scripts. Website build artifacts,
+Vite/React source, marketing copy, and static web assets belong to the website
+repository.
 
-The Vite/React files under `website/` are experimental development material and
-are not the release or publication source of truth. They must not replace the
-Markdown-generated website unless this document, CI, release packaging, and the
-deployment scripts are changed together.
-
-Release package trees under `dist/` and Vite output under `website/dist/` are
-generated artifacts. Rebuild them with the release or website scripts instead of
-editing them by hand.
+Production deployment is coordinated from `../production`. That deployment
+system builds the BBS package from this repository and the website package from
+the separate website source, then uploads both artifacts to production.

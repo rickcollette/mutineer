@@ -273,15 +273,6 @@ add_test(NAME plank_temp_policy_tmpdir
 add_executable(test_docs_consistency tests/test_docs_consistency.c)
 target_compile_options(test_docs_consistency PRIVATE -Wall -Wextra -Wpedantic)
 add_test(NAME docs_consistency COMMAND test_docs_consistency WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
-find_program(PYTHON3_EXECUTABLE python3)
-if(PYTHON3_EXECUTABLE)
-  add_test(NAME website_renderer
-    COMMAND ${PYTHON3_EXECUTABLE} scripts/build-website.py --self-test
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
-  add_test(NAME website_generation
-    COMMAND ${PYTHON3_EXECUTABLE} scripts/build-website.py --check-or-temp-output
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
-endif()
 
 add_executable(test_fsedit tests/test_fsedit.c src/fsedit.c)
 target_include_directories(test_fsedit PRIVATE include)
