@@ -4,12 +4,14 @@
 
 Mutineer BBS is a single-process, multi-threaded telnet server. One main thread accepts caller connections; each caller gets a dedicated session thread. Background threads run the remote console-control service and event scheduler. SQLite provides shared persistence with per-thread connections where needed.
 
+Reusable BBS functionality is also packaged as `bbslib.a`, a static SDK for standalone tools and sibling services. The daemon, command-line tools, PLANK utilities, and `mutineer-rest` share this archive rather than each compiling their own copies of database, config, session, door, metrics, and PLANK support code.
+
 ## System Overview
 
 ```
                     ┌─────────────────────────────────────┐
                     │           mutineer (main)            │
-                    │  config.c │ db.c │ log.c │ startup  │
+                    │  bbslib.a │ listener │ startup      │
                     └───────────────┬─────────────────────┘
                                     │
          ┌──────────────────────────┼──────────────────────────┐
@@ -125,6 +127,7 @@ graph TD
 | `BbsConfig` | `include/bbs_config.h` | Runtime configuration struct |
 | `Session` | `include/bbs_session.h` | Per-connection state and I/O |
 | `BbsDb` | `include/bbs_db.h` | SQLite wrapper with typed queries |
+| `BbsLibContext` | `include/bbslib.h` | Standalone SDK context for tools and services |
 | `Menu` / `MenuItem` | `include/bbs_menu.h` | Parsed menu with ACS and flags |
 | `acs_allows()` | `src/acs.c` | ACS expression evaluator |
 | `mci_expand()` | `src/mci.c` | MCI template token expansion |
@@ -132,6 +135,7 @@ graph TD
 | `handle_msg_command()` | `src/msg_cmds.c` | M*/R* message commands |
 | `handle_file_command()` | `src/file_cmds.c` | F* file commands |
 | `door_launch()` | `src/doors.c` | Native and DOSBox door runner |
+| `BbsLibSession` | `include/bbslib/bridge.h` | Callback-backed pseudo-session for bridges |
 | `bbs_plugin_desc_t` | `include/bbs_plugin_api.h` | Plugin ABI descriptor |
 | `plank_store_t` | `include/plank/plank_store.h` | PLANK object store |
 

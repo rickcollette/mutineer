@@ -57,6 +57,7 @@ Deep guides for each major subsystem:
 |----------|-------------|
 | [Architecture](architecture.md) | Processes, sessions, components, source map |
 | [Developer Guide](developer-guide.md) | Contributing, tests, code layout |
+| [bbslib Static SDK](bbslib.md) | Static library API for tools, REST, and bridge integrations |
 | [Documentation Coverage](coverage.md) | Source-to-doc ownership map |
 
 ---

@@ -78,6 +78,7 @@ conf/              Default configuration
 | `handle_file_command()` | `file_cmds.c` | F* input |
 | `cfg_load()` | `config.c` | Config parse |
 | `db_open()` | `db.c` | Database open |
+| `bbslib_open_path()` | `bbslib.c` | Standalone SDK context open |
 
 ## Adding a Menu Action
 
@@ -93,9 +94,13 @@ For command-style actions (M*/F*), add to `msg_cmds.c` or `file_cmds.c` instead.
 
 1. Create `src/tools/mutineer-mytool.c`
 2. Add to CMakeLists.txt via `add_mutineer_tool(mutineer-mytool)`
-3. Share common sources via `TOOL_COMMON_SOURCES`
+3. Link shared BBS functionality through `bbslib`; do not add duplicate core source lists
 4. Document in `docs/cli-tools.md`
 5. Add test in `tests/test_tools.c` or shell script
+
+## Adding a Standalone Integration
+
+Use `include/bbslib.h` and the `bbslib` CMake target for metrics collectors, REST services, import/export tools, and web-to-door bridges. Prefer `BbsLibContext` and `BbsLibSessionAdapter` over direct `Session` construction. Document new public SDK behavior in [bbslib Static SDK](bbslib.md).
 
 ## Database Changes
 
@@ -122,6 +127,7 @@ ctest --test-dir build --exclude-regex "tools_cli|expect_suite"
 | `test_doors` | Door launcher |
 | `test_plugin` | Plugin loader |
 | `test_plank_*` | PLANK subsystems |
+| `test_bbslib` | Static SDK facade and bridge adapter |
 | `test_tools` | CLI tool DB operations |
 | `test_file_cmds` | File command logic |
 | `test_smoke` | Basic integration |

@@ -9,14 +9,12 @@ if (MUTINEER_WARNINGS_AS_ERRORS)
   set(CMAKE_COMPILE_WARNING_AS_ERROR ON)
 endif()
 
-add_executable(mutineer
-  src/main.c
+set(BBSLIB_CORE_SOURCES
   src/config.c
   src/auth.c
   src/util.c
   src/process.c
   src/archive_util.c
-  src/net_listener.c
   src/session.c
   src/telnet.c
   src/menu.c
@@ -42,7 +40,16 @@ add_executable(mutineer
   src/plugin_host_api.c
 )
 
-target_include_directories(mutineer PRIVATE include)
+set(BBSLIB_DAEMON_SOURCES
+  src/main.c
+  src/net_listener.c
+)
+
+add_library(bbs_core_obj OBJECT ${BBSLIB_CORE_SOURCES})
+target_include_directories(bbs_core_obj PUBLIC include PRIVATE src/buccaneer)
+target_compile_options(bbs_core_obj PRIVATE -Wall -Wextra -Wpedantic)
+
+add_executable(mutineer ${BBSLIB_DAEMON_SOURCES})
 
 target_compile_options(mutineer PRIVATE -Wall -Wextra -Wpedantic)
 
@@ -62,6 +69,7 @@ function(target_require_sqlite target)
 endfunction()
 
 target_require_sqlite(mutineer)
+target_require_sqlite(bbs_core_obj)
 
 find_library(LIBARCHIVE_LIBRARY
   NAMES archive libarchive.so.13
@@ -83,8 +91,10 @@ if (PkgConfig_FOUND)
   pkg_check_modules(ARGON2 libargon2)
   if (ARGON2_FOUND)
     target_compile_definitions(mutineer PRIVATE HAVE_ARGON2=1)
+    target_compile_definitions(bbs_core_obj PRIVATE HAVE_ARGON2=1)
     target_link_libraries(mutineer PRIVATE ${ARGON2_LIBRARIES})
     target_include_directories(mutineer PRIVATE ${ARGON2_INCLUDE_DIRS})
+    target_include_directories(bbs_core_obj PRIVATE ${ARGON2_INCLUDE_DIRS})
   endif()
 endif()
 
@@ -93,6 +103,7 @@ include(CheckLibraryExists)
 check_library_exists(crypt crypt "" HAVE_LIBCRYPT)
 if (HAVE_LIBCRYPT)
   target_compile_definitions(mutineer PRIVATE HAVE_CRYPT=1)
+  target_compile_definitions(bbs_core_obj PRIVATE HAVE_CRYPT=1)
   target_link_libraries(mutineer PRIVATE crypt)
 endif()
 
@@ -121,13 +132,46 @@ set(BUCCANEER_SOURCES
   src/buccaneer/bbs.c
 )
 
-add_library(buccaneer STATIC ${BUCCANEER_SOURCES})
+add_library(buccaneer_obj OBJECT ${BUCCANEER_SOURCES})
+target_include_directories(buccaneer_obj PUBLIC src/buccaneer)
+target_compile_options(buccaneer_obj PRIVATE -Wall -Wextra -Wpedantic)
+
+add_library(buccaneer STATIC $<TARGET_OBJECTS:buccaneer_obj>)
 target_include_directories(buccaneer PUBLIC src/buccaneer)
 target_compile_options(buccaneer PRIVATE -Wall -Wextra -Wpedantic)
 target_link_libraries(buccaneer PUBLIC m)
 
+add_library(bbslib STATIC
+  src/bbslib.c
+  $<TARGET_OBJECTS:bbs_core_obj>
+  $<TARGET_OBJECTS:buccaneer_obj>
+)
+set_target_properties(bbslib PROPERTIES OUTPUT_NAME bbslib)
+target_include_directories(bbslib PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src/buccaneer>
+  $<INSTALL_INTERFACE:include>
+)
+target_compile_options(bbslib PRIVATE -Wall -Wextra -Wpedantic)
+target_require_sqlite(bbslib)
+target_link_libraries(bbslib PUBLIC
+  ${SQLite3_LIBRARIES}
+  ${LIBARCHIVE_LIBRARY}
+  Threads::Threads
+  OpenSSL::SSL
+  OpenSSL::Crypto
+  ${CMAKE_DL_LIBS}
+  m
+)
+if(ARGON2_FOUND)
+  target_link_libraries(bbslib PUBLIC ${ARGON2_LIBRARIES})
+  target_include_directories(bbslib PUBLIC ${ARGON2_INCLUDE_DIRS})
+endif()
+if(HAVE_LIBCRYPT)
+  target_link_libraries(bbslib PUBLIC crypt)
+endif()
+
 target_include_directories(mutineer PRIVATE src/buccaneer)
-target_link_libraries(mutineer PRIVATE buccaneer)
 
 add_executable(test_buccaneer_host tests/test_buccaneer_host.c)
 target_include_directories(test_buccaneer_host PRIVATE src/buccaneer)
@@ -213,6 +257,12 @@ target_include_directories(test_tools PRIVATE include)
 target_require_sqlite(test_tools)
 target_link_libraries(test_tools PRIVATE OpenSSL::Crypto)
 add_test(NAME tools COMMAND test_tools WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+
+add_executable(test_bbslib tests/test_bbslib.c)
+target_include_directories(test_bbslib PRIVATE include)
+target_compile_options(test_bbslib PRIVATE -Wall -Wextra -Wpedantic)
+target_link_libraries(test_bbslib PRIVATE bbslib)
+add_test(NAME bbslib COMMAND test_bbslib WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 
 add_executable(test_file_cmds tests/test_file_cmds.c src/archive_util.c src/util.c)
 target_include_directories(test_file_cmds PRIVATE include)
@@ -318,17 +368,16 @@ set(TOOL_COMMON_SOURCES
 
 # Helper function to create a tool executable
 function(add_mutineer_tool name)
-  add_executable(${name} src/tools/${name}.c ${TOOL_COMMON_SOURCES})
+  add_executable(${name} src/tools/${name}.c)
   target_include_directories(${name} PRIVATE include src/tools)
   target_compile_options(${name} PRIVATE -Wall -Wextra -Wpedantic)
 
   target_require_sqlite(${name})
-  target_link_libraries(${name} PRIVATE OpenSSL::Crypto ${LIBARCHIVE_LIBRARY})
+  target_link_libraries(${name} PRIVATE bbslib OpenSSL::Crypto ${LIBARCHIVE_LIBRARY})
 endfunction()
 
 # Build all tools
 add_mutineer_tool(mutineer-qwkgen)
-target_sources(mutineer-qwkgen PRIVATE src/archive_util.c)
 target_link_libraries(mutineer-qwkgen PRIVATE ${LIBARCHIVE_LIBRARY})
 add_mutineer_tool(mutineer-msgpack)
 add_mutineer_tool(mutineer-userpack)
@@ -338,13 +387,17 @@ add_mutineer_tool(mutineer-maint)
 add_mutineer_tool(mutineer-initbbs)
 add_mutineer_tool(mutineer-netmail-export)
 
+add_executable(mutineer-rest src/tools/mutineer-rest.c)
+target_include_directories(mutineer-rest PRIVATE include src/tools)
+target_compile_options(mutineer-rest PRIVATE -Wall -Wextra -Wpedantic)
+target_link_libraries(mutineer-rest PRIVATE bbslib)
+
 add_executable(mutineer-console
   src/tools/mutineer-console.c
-  src/config.c
-  src/util.c
 )
 target_include_directories(mutineer-console PRIVATE include src/tools)
 target_compile_options(mutineer-console PRIVATE -Wall -Wextra -Wpedantic)
+target_link_libraries(mutineer-console PRIVATE bbslib)
 
 add_test(NAME console_protocol
          COMMAND ${CMAKE_SOURCE_DIR}/tests/test_console_protocol.sh ${CMAKE_BINARY_DIR}
@@ -361,15 +414,11 @@ add_test(NAME release_scripts_smoke
 # mutineer-validate needs additional sources for menu/template validation
 add_executable(mutineer-validate 
   src/tools/mutineer-validate.c 
-  src/menu.c 
-  src/menu_template.c 
-  src/mci.c
-  ${TOOL_COMMON_SOURCES}
 )
 target_include_directories(mutineer-validate PRIVATE include src/tools)
 target_compile_options(mutineer-validate PRIVATE -Wall -Wextra -Wpedantic)
 target_require_sqlite(mutineer-validate)
-target_link_libraries(mutineer-validate PRIVATE OpenSSL::Crypto)
+target_link_libraries(mutineer-validate PRIVATE bbslib OpenSSL::Crypto)
 
 # Validation test using mutineer-validate
 add_test(NAME validate_menus 
@@ -386,6 +435,7 @@ add_custom_target(tools DEPENDS
   mutineer-maint
   mutineer-initbbs
   mutineer-netmail-export
+  mutineer-rest
   mutineer-console
   mutineer-validate
 )
@@ -412,14 +462,30 @@ set(PLANK_SOURCES
   src/plank/plank_policy.c
 )
 
+add_library(plank_obj OBJECT ${PLANK_SOURCES})
+target_include_directories(plank_obj PUBLIC include)
+target_compile_options(plank_obj PRIVATE -Wall -Wextra -Wpedantic)
+target_require_sqlite(plank_obj)
+if(ZSTD_FOUND)
+  target_compile_definitions(plank_obj PRIVATE HAVE_ZSTD=1)
+  target_include_directories(plank_obj PRIVATE ${ZSTD_INCLUDE_DIRS})
+endif()
+
+target_sources(bbslib PRIVATE $<TARGET_OBJECTS:plank_obj>)
+if(ZSTD_FOUND)
+  target_link_libraries(bbslib PUBLIC ${ZSTD_LIBRARIES})
+endif()
+
+target_link_libraries(mutineer PRIVATE bbslib)
+
 # Helper function to create a PLANK tool executable
 function(add_plank_tool name)
-  add_executable(${name} src/tools/${name}.c ${TOOL_COMMON_SOURCES} ${PLANK_SOURCES})
+  add_executable(${name} src/tools/${name}.c)
   target_include_directories(${name} PRIVATE include src/tools)
   target_compile_options(${name} PRIVATE -Wall -Wextra -Wpedantic)
 
   target_require_sqlite(${name})
-  target_link_libraries(${name} PRIVATE OpenSSL::SSL OpenSSL::Crypto Threads::Threads)
+  target_link_libraries(${name} PRIVATE bbslib OpenSSL::SSL OpenSSL::Crypto Threads::Threads)
   
   if(ZSTD_FOUND)
     target_compile_definitions(${name} PRIVATE HAVE_ZSTD=1)
@@ -590,3 +656,14 @@ add_test(NAME bucc_run_temp_fixture
          COMMAND ${CMAKE_COMMAND} -E env TMPDIR=${CMAKE_BINARY_DIR}/tmp $<TARGET_FILE:bucc> run ${CMAKE_SOURCE_DIR}/tests/fixtures/temp_run.bucc
          WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 set_tests_properties(bucc_run_temp_fixture PROPERTIES DEPENDS bucc)
+
+install(TARGETS bbslib
+  EXPORT bbslibTargets
+  ARCHIVE DESTINATION lib
+)
+install(DIRECTORY include/ DESTINATION include)
+install(EXPORT bbslibTargets
+  FILE bbslibTargets.cmake
+  NAMESPACE Mutineer::
+  DESTINATION lib/cmake/bbslib
+)

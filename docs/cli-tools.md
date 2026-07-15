@@ -2,7 +2,7 @@
 
 # CLI Tools
 
-Mutineer ships standalone command-line utilities for initialization, maintenance, statistics, offline mail, and PLANK networking. All tools share `db.c`, `config.c`, and related core sources.
+Mutineer ships standalone command-line utilities for initialization, maintenance, statistics, offline mail, REST integration, and PLANK networking. The tools link `bbslib.a`, the static SDK that packages shared config, database, metrics, session, door, and PLANK functionality.
 
 Build all BBS tools:
 
@@ -159,6 +159,19 @@ Examples:
   mutineer-validate menus
   mutineer-validate menus/main.mnu
 ```
+
+### mutineer-rest
+
+Reference REST service for status, metrics, area discovery, node snapshots, PLANK status, and callback-backed bridge sessions.
+
+```bash
+MUTINEER_REST_TOKEN=change-me \
+  mutineer-rest -c conf/mutineer.conf -b 127.0.0.1 -p 8788
+```
+
+Read-only endpoints include `/health`, `/api/status`, `/api/metrics`, `/api/nodes`, `/api/messages/areas`, `/api/files/areas`, and `/api/plank/status`. Bridge endpoints under `/api/bridge/session` require bearer authorization when `MUTINEER_REST_TOKEN` is set.
+
+See [bbslib Static SDK](bbslib.md) for the library API and bridge details.
 
 Checks parse errors, missing templates, invalid ACS/MCI. Registered as ctest `validate_menus`.
 

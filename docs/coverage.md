@@ -25,6 +25,7 @@ surface, tool, script, schema, and test family should have a stable home under
 | `src/config.c`, `include/bbs_config.h`, `conf/mutineer.conf` | [Configuration](configuration.md), [Getting Started](getting-started.md) |
 | `src/session.c`, `src/telnet.c`, `src/net_listener.c` | [Architecture](architecture.md), [Quick Start](quick-start.md), [Menus and UI](menus-and-ui.md) |
 | `src/db.c`, `include/bbs_db.h`, `sql/schema.sql` | [Database Schema](reference/database.md), [Architecture](architecture.md) |
+| `src/bbslib.c`, `include/bbslib.h`, `include/bbslib/*` | [bbslib Static SDK](bbslib.md), [Architecture](architecture.md), [Developer Guide](developer-guide.md) |
 | `src/auth.c`, `src/hash.c`, `include/bbs_auth.h`, `include/bbs_hash.h` | [Configuration](configuration.md), [Sysop Guide](sysop-guide.md), [Architecture](architecture.md) |
 | `src/log.c`, `include/bbs_log.h` | [Sysop Guide](sysop-guide.md), [Configuration](configuration.md) |
 | `src/process.c`, `include/bbs_process.h` | [Doors and Scripting](doors-and-scripting.md), [Sysop Guide](sysop-guide.md) |
@@ -54,6 +55,7 @@ surface, tool, script, schema, and test family should have a stable home under
 |--------|---------------|
 | `src/console_service.c`, `include/bbs_console_service.h` | [Console Protocol](console-protocol.md), [Sysop Guide](sysop-guide.md), [Configuration](configuration.md) |
 | `src/tools/mutineer-console.c`, `scripts/open-wfc.sh` | [Console Protocol](console-protocol.md), [CLI Tools](cli-tools.md), [Screenshots](screenshots.md) |
+| `src/tools/mutineer-rest.c` | [bbslib Static SDK](bbslib.md), [CLI Tools](cli-tools.md) |
 | `src/scheduler.c`, `include/bbs_scheduler.h` | [Sysop Guide](sysop-guide.md), [Configuration](configuration.md) |
 | `src/maint.c`, `include/bbs_maint.h`, `src/tools/mutineer-maint.c` | [CLI Tools](cli-tools.md), [Sysop Guide](sysop-guide.md) |
 | `scripts/start`, `scripts/start-screen`, `scripts/stop`, `scripts/watchdog` | [Deployment](deployment.md), [Sysop Guide](sysop-guide.md) |
@@ -95,6 +97,7 @@ surface, tool, script, schema, and test family should have a stable home under
 | Tests | Documentation |
 |-------|---------------|
 | `tests/test_*.c`, `tests/plank/test_*.c` | [Developer Guide](developer-guide.md), subsystem docs above |
+| `tests/test_bbslib.c` | [bbslib Static SDK](bbslib.md), [Developer Guide](developer-guide.md) |
 | `tests/*.exp`, `tests/run_expect_tests.sh` | [Getting Started](getting-started.md), [Developer Guide](developer-guide.md) |
 | `tests/test_console_protocol.sh` | [Console Protocol](console-protocol.md), [Developer Guide](developer-guide.md) |
 | `tests/test_cove_hub.sh` | [PLANK Networking](networking-plank.md), [Developer Guide](developer-guide.md) |

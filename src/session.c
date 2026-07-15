@@ -374,6 +374,8 @@ Session *online_get_node(int node_num)
    Returns 0 on disconnect, -1 on error, -3 when input was only telnet negotiation. */
 static int recv_clean(Session *s, uint8_t *out, size_t out_cap)
 {
+  if (s && s->io_read)
+    return s->io_read(s->io_user_data, out, out_cap, 0);
   uint8_t inbuf[512];
   ssize_t r = recv(s->fd, inbuf, sizeof(inbuf), 0);
   if (r == 0)
@@ -398,6 +400,11 @@ static int recv_clean(Session *s, uint8_t *out, size_t out_cap)
 /* Line reader with echo support */
 static int readline_echo(Session *s, uint8_t *buf, size_t cap, int timeout_sec, int echo_mode)
 {
+  if (!s || !buf || cap == 0)
+    return -1;
+  if (s->io_readline)
+    return s->io_readline(s->io_user_data, buf, cap, timeout_sec, echo_mode == ECHO_ON);
+
   size_t n = 0;
   while (n + 1 < cap)
   {
@@ -483,6 +490,24 @@ void send_str(Session *s, const char *str)
 {
   if (!s || !str)
     return;
+  if (s->io_write)
+  {
+    const char *start = str;
+    for (const char *p = str; *p; p++)
+    {
+      if (*p != '\n' || (p > str && p[-1] == '\r'))
+        continue;
+      if (p > start)
+        s->io_write(s->io_user_data, (const uint8_t *)start, (size_t)(p - start));
+      s->io_write(s->io_user_data, (const uint8_t *)"\r\n", 2);
+      start = p + 1;
+    }
+    if (*start)
+      s->io_write(s->io_user_data, (const uint8_t *)start, strlen(start));
+    if (s->io_flush)
+      s->io_flush(s->io_user_data);
+    return;
+  }
   const char *start = str;
   for (const char *p = str; *p; p++)
   {
@@ -946,10 +971,12 @@ static int prompt_password(Session *s, const char *prompt, char *out, size_t cap
     return -1;
   if (prompt)
     send_str(s, prompt);
-  telnet_password_begin(s->fd);
+  if (!s->io_readline)
+    telnet_password_begin(s->fd);
   uint8_t line[256];
   int n = readline_echo(s, line, sizeof(line), s->cfg.idle_timeout_sec, ECHO_DOTS);
-  telnet_password_end(s->fd);
+  if (!s->io_readline)
+    telnet_password_end(s->fd);
   if (n < 0)
     return n;
   send_str(s, "\r\n"); /* newline after user input */

@@ -9,6 +9,12 @@
 
 typedef struct Session {
   int fd;
+  int (*io_write)(void *user_data, const uint8_t *data, size_t len);
+  int (*io_readline)(void *user_data, uint8_t *buf, size_t cap, int timeout_sec, int echo);
+  int (*io_read)(void *user_data, uint8_t *buf, size_t cap, int timeout_sec);
+  void (*io_flush)(void *user_data);
+  void (*io_close)(void *user_data);
+  void *io_user_data;
   char ip[64];
   BbsConfig cfg;
   BbsDb* db;
