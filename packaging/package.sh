@@ -52,7 +52,9 @@ require_file() {
 
 log "Configuring Mutineer release build in $BUILD_DIR"
 rm -rf "$BUILD_DIR"
-cmake -S . -B "$BUILD_DIR" -DCMAKE_BUILD_TYPE="$CMAKE_BUILD_TYPE"
+cmake -S . -B "$BUILD_DIR" \
+  -DCMAKE_BUILD_TYPE="$CMAKE_BUILD_TYPE" \
+  -DCMAKE_EXE_LINKER_FLAGS="-Wl,-rpath,\\\$ORIGIN/lib:\\\$ORIGIN/../lib"
 
 log "Building Mutineer release targets"
 cmake --build "$BUILD_DIR" --parallel "$JOBS" --target \
@@ -68,7 +70,7 @@ done
 
 log "Staging package"
 rm -rf "$STAGING" "$TARBALL" "$INSTALLER"
-mkdir -p "$STAGING/bin" "$STAGING/plank/bin" "$STAGING/plugins" \
+mkdir -p "$STAGING/bin" "$STAGING/plank/bin" "$STAGING/plugins" "$STAGING/lib" \
   "$STAGING/conf" "$STAGING/art" "$STAGING/menus" "$STAGING/sql" \
   "$STAGING/scripts" "$STAGING/data" "$STAGING/logs" "$STAGING/doors" \
   "$STAGING/docs" "$STAGING/buccaneer/bin" "$STAGING/buccaneer/include/buccaneer" \
@@ -85,6 +87,21 @@ done
 
 for plugin in "${PLUGIN_BIN[@]}"; do
   install -m 0755 "$BUILD_DIR/plugins/$plugin" "$STAGING/plugins/$plugin"
+done
+
+if compgen -G "/usr/local/lib/libnotcurses-core.so*" >/dev/null; then
+  install -m 0755 /usr/local/lib/libnotcurses-core.so* "$STAGING/lib/"
+fi
+
+# The compatibility build may link OpenSSL 1.1 even when the target host only
+# ships OpenSSL 3. Bundle the exact SONAMEs selected by the linker. The release
+# RPATH above lets both root-level and bin/ executables find them in lib/.
+for soname in libssl.so.1.1 libcrypto.so.1.1; do
+  resolved="$(ldd "$BUILD_DIR/mutineer-rest" | awk -v name="$soname" '$1 == name && $2 == "=>" { print $3; exit }')"
+  [ -n "$resolved" ] || resolved="$(ldd "$BUILD_DIR/mutineer" | awk -v name="$soname" '$1 == name && $2 == "=>" { print $3; exit }')"
+  [ -n "$resolved" ] || die "unable to resolve required runtime library: $soname"
+  require_file "$resolved"
+  install -m 0755 "$resolved" "$STAGING/lib/$soname"
 done
 
 cp -a conf/. "$STAGING/conf/"
@@ -135,7 +152,8 @@ The installer can install missing runtime dependencies on Debian, Ubuntu,
 Rocky Linux, AlmaLinux, RHEL, Fedora, Alpine Linux, and SUSE/openSUSE.
 EOF
 
-build_glibc="$(ldd --version | head -1)"
+build_glibc="$(ldd --version 2>&1 || true)"
+build_glibc="${build_glibc%%$'\n'*}"
 {
   echo "name=mutineer"
   echo "version=$VERSION"
@@ -151,8 +169,9 @@ build_glibc="$(ldd --version | head -1)"
 } >"$STAGING/MANIFEST"
 
 log "Checking GLIBC symbol requirements"
-if strings "$STAGING/mutineer" "$STAGING/bin/"* "$STAGING/plank/bin/"* | \
-  grep -Eo 'GLIBC_[0-9]+\.[0-9]+' | sort -Vu | \
+glibc_versions="$(strings "$STAGING/mutineer" "$STAGING/bin/"* "$STAGING/plank/bin/"* "$STAGING/lib/"* 2>/dev/null | \
+  grep -Eo 'GLIBC_[0-9]+\.[0-9]+' | sort -Vu || true)"
+if printf '%s\n' "$glibc_versions" | \
   awk -F_ 'BEGIN{bad=0} {split($2,v,"."); if (v[1] > 2 || (v[1] == 2 && v[2] > 28)) bad=1} END{exit bad}'; then
   :
 else

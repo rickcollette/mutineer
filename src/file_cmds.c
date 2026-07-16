@@ -48,7 +48,7 @@ static bool file_area_password_ok(Session *s, const DbFileArea *area) {
   char entered[64] = {0};
   char prompt[128];
   snprintf(prompt, sizeof(prompt), "Password for %s: ", area->name);
-  if (prompt_line(s, prompt, entered, sizeof(entered)) < 0) return false;
+  if (prompt_password(s, prompt, entered, sizeof(entered)) < 0) return false;
   if (strcmp(entered, area->password) != 0) {
     send_str(s, "\r\nAccess denied.\r\n");
     return false;

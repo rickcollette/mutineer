@@ -2086,7 +2086,12 @@ int db_msg_area_list(BbsDb *db, DbMsgArea *out, int max_areas) {
   if (!db || !out || max_areas <= 0)
     return 0;
 #ifdef HAVE_SQLITE
-  const char *sql = "SELECT id, name, COALESCE(acs,'') FROM message_areas "
+  const char *sql =
+                    "SELECT id,name,COALESCE(filename,''),COALESCE(acs,''),"
+                    "COALESCE(acs_read,''),COALESCE(acs_post,''),"
+                    "COALESCE(acs_sysop,''),anon_policy,flags,"
+                    "COALESCE(password,''),COALESCE(origin,''),max_msgs "
+                    "FROM message_areas "
                     "ORDER BY id ASC LIMIT ?1";
   sqlite3_stmt *st = NULL;
   if (sqlite3_prepare_v2(db->db, sql, -1, &st, NULL) != SQLITE_OK) {
@@ -2096,11 +2101,27 @@ int db_msg_area_list(BbsDb *db, DbMsgArea *out, int max_areas) {
   sqlite3_bind_int(st, 1, max_areas);
   int count = 0;
   while (sqlite3_step(st) == SQLITE_ROW && count < max_areas) {
+    memset(&out[count], 0, sizeof(out[count]));
     out[count].id = sqlite3_column_int(st, 0);
     safe_copy(out[count].name, sizeof(out[count].name),
               (const char *)sqlite3_column_text(st, 1));
-    safe_copy(out[count].acs, sizeof(out[count].acs),
+    safe_copy(out[count].filename, sizeof(out[count].filename),
               (const char *)sqlite3_column_text(st, 2));
+    safe_copy(out[count].acs, sizeof(out[count].acs),
+              (const char *)sqlite3_column_text(st, 3));
+    safe_copy(out[count].acs_read, sizeof(out[count].acs_read),
+              (const char *)sqlite3_column_text(st, 4));
+    safe_copy(out[count].acs_post, sizeof(out[count].acs_post),
+              (const char *)sqlite3_column_text(st, 5));
+    safe_copy(out[count].acs_sysop, sizeof(out[count].acs_sysop),
+              (const char *)sqlite3_column_text(st, 6));
+    out[count].anon_policy = sqlite3_column_int(st, 7);
+    out[count].flags = (unsigned)sqlite3_column_int(st, 8);
+    safe_copy(out[count].password, sizeof(out[count].password),
+              (const char *)sqlite3_column_text(st, 9));
+    safe_copy(out[count].origin, sizeof(out[count].origin),
+              (const char *)sqlite3_column_text(st, 10));
+    out[count].max_msgs = sqlite3_column_int(st, 11);
     count++;
   }
   sqlite3_finalize(st);
@@ -3066,7 +3087,10 @@ bool db_msg_area_get(BbsDb *db, int area_id, DbMsgArea *out) {
     return false;
 #ifdef HAVE_SQLITE
   const char *sql =
-      "SELECT id, name, COALESCE(acs,'') FROM message_areas WHERE id = ?1";
+      "SELECT id,name,COALESCE(filename,''),COALESCE(acs,''),"
+      "COALESCE(acs_read,''),COALESCE(acs_post,''),"
+      "COALESCE(acs_sysop,''),anon_policy,flags,COALESCE(password,''),"
+      "COALESCE(origin,''),max_msgs FROM message_areas WHERE id = ?1";
   sqlite3_stmt *st = NULL;
   if (sqlite3_prepare_v2(db->db, sql, -1, &st, NULL) != SQLITE_OK) {
     set_err(db, sqlite3_errmsg(db->db));
@@ -3074,11 +3098,27 @@ bool db_msg_area_get(BbsDb *db, int area_id, DbMsgArea *out) {
   }
   sqlite3_bind_int(st, 1, area_id);
   if (sqlite3_step(st) == SQLITE_ROW) {
+    memset(out, 0, sizeof(*out));
     out->id = sqlite3_column_int(st, 0);
     safe_copy(out->name, sizeof(out->name),
               (const char *)sqlite3_column_text(st, 1));
-    safe_copy(out->acs, sizeof(out->acs),
+    safe_copy(out->filename, sizeof(out->filename),
               (const char *)sqlite3_column_text(st, 2));
+    safe_copy(out->acs, sizeof(out->acs),
+              (const char *)sqlite3_column_text(st, 3));
+    safe_copy(out->acs_read, sizeof(out->acs_read),
+              (const char *)sqlite3_column_text(st, 4));
+    safe_copy(out->acs_post, sizeof(out->acs_post),
+              (const char *)sqlite3_column_text(st, 5));
+    safe_copy(out->acs_sysop, sizeof(out->acs_sysop),
+              (const char *)sqlite3_column_text(st, 6));
+    out->anon_policy = sqlite3_column_int(st, 7);
+    out->flags = (unsigned)sqlite3_column_int(st, 8);
+    safe_copy(out->password, sizeof(out->password),
+              (const char *)sqlite3_column_text(st, 9));
+    safe_copy(out->origin, sizeof(out->origin),
+              (const char *)sqlite3_column_text(st, 10));
+    out->max_msgs = sqlite3_column_int(st, 11);
     sqlite3_finalize(st);
     return true;
   }

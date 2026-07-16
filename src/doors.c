@@ -236,6 +236,16 @@ int door_janitor_run_once(const BbsConfig* cfg, BbsDb* db) {
   removed = janitor_scan_base(cfg->dropfile_path, age, time(NULL));
   if (strcmp(cfg->door_runtime_path, cfg->dropfile_path))
     removed += janitor_scan_base(cfg->door_runtime_path, age, time(NULL));
+  /* The configured dropfile directory can be nested beneath the runtime
+   * directory. The second scan may then correctly remove it as an empty
+   * child after cleaning sessions. Keep both configured base directories as
+   * stable parts of the installed runtime layout. */
+  if (!ensure_dir(cfg->door_runtime_path))
+    log_warn("door janitor: failed to preserve runtime directory %s: %s",
+             cfg->door_runtime_path, strerror(errno));
+  if (!ensure_dir(cfg->dropfile_path))
+    log_warn("door janitor: failed to preserve dropfile directory %s: %s",
+             cfg->dropfile_path, strerror(errno));
   if (db) {
     DbNode nodes[256];
     int count = db_node_list(db, nodes, 256);
@@ -690,7 +700,7 @@ static bool write_door32sys(Session* s, const char* dir) {
   
   /* DOOR32.SYS format - designed for 32-bit door programs */
   fprintf(f, "2\n");                                  /* 1: Comm type (2=telnet) */
-  fprintf(f, "%d\n", s->fd);                          /* 2: Comm handle (socket fd) */
+  fprintf(f, "0\n");                                  /* 2: Comm handle (stdin) */
   fprintf(f, "38400\n");                              /* 3: Baud rate */
   fprintf(f, "%s %s\n", s->cfg.bbs_name[0] ? s->cfg.bbs_name : "Mutineer BBS", 
           "Mutineer");                                /* 4: BBS software name */
@@ -1015,11 +1025,12 @@ static bool door_launch_native(Session* s, const DbDoor* door) {
 
   log_info("launching native door %s: %s", door->name, argv[0]);
   int timeout = door->timeout_sec > 0 ? door->timeout_sec : s->cfg.door_default_timeout_sec;
+  int caller_fd = (s && s->fd > STDERR_FILENO) ? s->fd : -1;
   BbsProcessResult pres;
   errbuf[0] = '\0';
   bool ok = bbs_exec_argv_cancel(argv, door->name, door->workdir,
-                                 -1, -1, -1, timeout,
-                                 (s && s->fd > STDERR_FILENO) ? s->fd : -1,
+                                 caller_fd, caller_fd, caller_fd, timeout,
+                                 caller_fd,
                                  &pres, errbuf, sizeof(errbuf));
   if (!ok && errbuf[0]) log_error("native door %s: %s", door->name, errbuf);
   if (ok) ingest_leaderboard_result(s, door, dir);

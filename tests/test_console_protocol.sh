@@ -257,10 +257,10 @@ try:
     t.close()
 
     request(s, "unlock1", "node.unlock", node=1)
-    request(s, "shutdown", "system.shutdown")
+    shutdown_resp = request(s, "shutdown", "system.shutdown")
+    assert shutdown_resp["ok"] is False, shutdown_resp
     s.close()
-    proc.wait(timeout=5)
-    proc = None
+    stop_daemon()
     start_daemon()
 
     bad = socket.create_connection(("127.0.0.1", console_port), timeout=3)

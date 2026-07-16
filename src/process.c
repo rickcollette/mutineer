@@ -6,6 +6,7 @@
 #include <signal.h>
 #include <ctype.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -266,6 +267,14 @@ bool bbs_exec_argv_cancel(char** argv, const char* label, const char* workdir,
   if (pid == 0) {
     setpgid(0, 0);
     if (workdir && workdir[0] && chdir(workdir) != 0) _exit(126);
+    /* Native doors receive the caller socket number through DOOR32.SYS.
+     * Accepted sockets are close-on-exec, so preserve the caller/cancellation
+     * descriptor for the child program. */
+    if (cancel_fd > STDERR_FILENO) {
+      int fd_flags = fcntl(cancel_fd, F_GETFD);
+      if (fd_flags < 0 || fcntl(cancel_fd, F_SETFD, fd_flags & ~FD_CLOEXEC) < 0)
+        _exit(126);
+    }
     if (stdin_fd >= 0) dup2(stdin_fd, STDIN_FILENO);
     if (stdout_fd >= 0) dup2(stdout_fd, STDOUT_FILENO);
     if (stderr_fd >= 0) dup2(stderr_fd, STDERR_FILENO);

@@ -11,7 +11,7 @@ JOBS      ?= 2
 BINARY    := $(BUILD_DIR)/mutineer
 BUCC      := $(BUILD_DIR)/bucc
 
-.PHONY: all clean dist dist-mutineer dist-buccaneer configure test bbs-up bbs-down bbs-status tools plank plugins bucc release release-debian release-fedora release-alpine version-bump
+.PHONY: all clean dist-legacy dist-mutineer dist-buccaneer configure test bbs-up bbs-down bbs-status tools plank plugins bucc release release-debian release-fedora release-alpine version-bump
 
 version-bump:
 	@./scripts/bump-build-version.sh
@@ -62,7 +62,10 @@ release: release-debian
 clean:
 	@rm -rf $(BUILD_DIR) $(DIST_DIR) build_debug
 
-dist: dist-mutineer dist-buccaneer
+# The former host-built distribution remains available for compatibility.
+# The canonical `dist` target is provided by packaging/Makefile.fragment and
+# always compiles and packages inside the pinned Docker build environment.
+dist-legacy: dist-mutineer dist-buccaneer
 
 dist-mutineer: all tools plank plugins
 	@VERSION=$(or $(VERSION),dev) PLATFORM=debian OUTPUT_DIR=$(DIST_DIR) BUILD_DIR=$(BUILD_DIR) ./scripts/build-release.sh
@@ -118,3 +121,6 @@ bbs-status:
 	else \
 		echo "BBS not running"; \
 	fi
+
+# Canonical Docker-built, self-extracting distribution targets.
+include packaging/Makefile.fragment

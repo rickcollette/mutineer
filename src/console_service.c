@@ -651,9 +651,8 @@ static void handle_command(ConsoleClient *cc, const char *line) {
     payload_stats(cc, payload, sizeof(payload));
     send_ok(cc, id, payload);
   } else if (!strcmp(cmd, "system.shutdown")) {
-    g_stop = 1;
-    console_broadcast_event("{\"event\":\"system.shutdown\"}");
-    send_ok(cc, id, "\"shutdown\":true");
+    log_audit(cc->user.handle, "console_shutdown_denied", cc->ip);
+    send_error(cc, id, "shutdown disabled; use the service manager");
   } else if (!strcmp(cmd, "shell.run")) {
     run_shell(cc, id);
   } else if (!strcmp(cmd, "menu.session.start")) {

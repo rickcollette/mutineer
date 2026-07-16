@@ -1,27 +1,60 @@
 FROM debian:buster
 
+ARG CMAKE_VERSION=3.28.6
+ARG NOTCURSES_VERSION=3.0.13
+
 RUN set -eux; \
     printf '%s\n' \
       'deb http://archive.debian.org/debian buster main' \
       'deb http://archive.debian.org/debian-security buster/updates main' \
       > /etc/apt/sources.list; \
-    printf 'Acquire::Check-Valid-Until "false";\n' > /etc/apt/apt.conf.d/99archive; \
+    printf '%s\n' \
+      'Acquire::Check-Valid-Until "false";' \
+      'Acquire::Retries "5";' \
+      'Acquire::http::Timeout "30";' \
+      > /etc/apt/apt.conf.d/99archive; \
     apt-get update; \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
       bash \
       ca-certificates \
       build-essential \
-      cmake \
       coreutils \
       file \
+      git \
       gzip \
       libarchive-dev \
       libc6-dev \
+      libdeflate-dev \
+      libncurses-dev \
       libsqlite3-dev \
       libssl-dev \
+      libunistring-dev \
       make \
+      ninja-build \
       pkg-config \
       sqlite3 \
-      tar; \
+      tar \
+      wget \
+      xz-utils; \
+    wget -O /tmp/cmake.tar.gz "https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSION}/cmake-${CMAKE_VERSION}-linux-x86_64.tar.gz"; \
+    mkdir -p /opt/cmake; \
+    tar -C /opt/cmake --strip-components=1 -xzf /tmp/cmake.tar.gz; \
+    ln -sf /opt/cmake/bin/cmake /usr/local/bin/cmake; \
+    ln -sf /opt/cmake/bin/ctest /usr/local/bin/ctest; \
+    ln -sf /opt/cmake/bin/cpack /usr/local/bin/cpack; \
+    wget -O /tmp/notcurses.tar.gz "https://github.com/dankamongmen/notcurses/archive/refs/tags/v${NOTCURSES_VERSION}.tar.gz"; \
+    mkdir -p /tmp/notcurses-src; \
+    tar -C /tmp/notcurses-src --strip-components=1 -xzf /tmp/notcurses.tar.gz; \
+    cmake -S /tmp/notcurses-src -B /tmp/notcurses-build -G Ninja \
+      -DCMAKE_BUILD_TYPE=Release \
+      -DCMAKE_INSTALL_PREFIX=/usr/local \
+      -DUSE_MULTIMEDIA=none \
+      -DUSE_DOCTEST=OFF \
+      -DUSE_PANDOC=OFF; \
+    cmake --build /tmp/notcurses-build --target install --parallel 2; \
+    test -f /usr/local/include/notcurses/notcurses.h; \
+    test -f /usr/local/lib/libnotcurses-core.so; \
+    cmake --version; \
     rm -rf /var/lib/apt/lists/*; \
+    rm -rf /tmp/cmake.tar.gz /tmp/notcurses.tar.gz /tmp/notcurses-src /tmp/notcurses-build; \
     ldd --version | head -1

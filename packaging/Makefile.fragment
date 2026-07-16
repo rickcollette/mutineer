@@ -1,6 +1,4 @@
-# Proposed Mutineer packaging targets.
-# Include or copy these into the root Makefile after reviewing the packaging/
-# scripts. This file is intentionally not wired into the build yet.
+# Canonical Mutineer packaging targets, included by the root Makefile.
 
 DIST_IMAGE ?= mutineer-dist-glibc228
 
@@ -9,12 +7,13 @@ DIST_IMAGE ?= mutineer-dist-glibc228
 docker-image:
 	docker build -f packaging/Dockerfile.dist -t "$(DIST_IMAGE)" .
 
-dist: docker-image
+dist: version-bump docker-image
+	@mkdir -p dist
 	docker run --rm \
 	  -u "$$(id -u):$$(id -g)" \
 	  -v "$$(pwd):/work" \
 	  -w /work \
-	  -e VERSION="$(or $(VERSION),dev)" \
+	  -e VERSION="$$(sed -n 's/^#define BBSLIB_VERSION_STRING "\([0-9][0-9.]*\)"$$/\1/p' include/bbslib/lifecycle.h)" \
 	  -e JOBS="$(or $(JOBS),2)" \
 	  "$(DIST_IMAGE)" \
 	  make -f packaging/Makefile.fragment dist-local
@@ -22,6 +21,7 @@ dist: docker-image
 dist-local:
 	BUILD_DIR=build-dist DIST_ROOT=dist VERSION="$(or $(VERSION),dev)" JOBS="$(or $(JOBS),2)" \
 	  bash packaging/package.sh
+	rm -rf build-dist
 
 dist-clean:
 	rm -rf dist build-dist

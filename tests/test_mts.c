@@ -341,16 +341,17 @@ int main(void) {
         strstr(fs.output, "Room renamed") &&
         strstr(fs.output, "Settings reset") &&
         strstr(fs.output, "Watching all public rooms"));
-  const char *pager_script[] = {"q", NULL};
+  const char *pager_script[] = {"", NULL};
   fake_session_t pager_io = {.lines = pager_script};
   mts_session_t pager_session = {.host_session = (bbs_session_t *)&pager_io,
                                  .term_cols = 20,
                                  .term_rows = 8};
   mts_pager_t pager;
   mts_pager_begin(&pager, &pager_session, "Heading\r\n");
-  for (int i = 0; i < 6; i++)
+  for (int i = 0; i < 8; i++)
     mts_pager_line(&pager, "A long UTF-8 row: \347\225\214 end");
-  CHECK(pager.stopped && strstr(pager_io.output, "-- More --"));
+  CHECK(!pager.stopped && strstr(pager_io.output, "-- More --") &&
+        pager.rows_used == 4);
   bbs_event_t forced = {.type = BBS_EVT_FORCED_DISCONNECT,
                         .session = (bbs_session_t *)&fs};
   vt->on_event(inst, &forced);

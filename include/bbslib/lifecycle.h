@@ -9,10 +9,10 @@
 extern "C" {
 #endif
 
-#define BBSLIB_VERSION_MAJOR 1
+#define BBSLIB_VERSION_MAJOR 2
 #define BBSLIB_VERSION_MINOR 1
-#define BBSLIB_VERSION_PATCH 1
-#define BBSLIB_VERSION_STRING "1.1.1"
+#define BBSLIB_VERSION_PATCH 17
+#define BBSLIB_VERSION_STRING "2.1.17"
 
 typedef enum BbsLibResult
 {

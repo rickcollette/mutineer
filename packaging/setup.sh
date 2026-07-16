@@ -111,21 +111,25 @@ detect_family() {
 packages_for_family() {
   case "$1" in
     alpine)
-      printf '%s\n' bash coreutils sqlite openssl gawk tar gzip libarchive-tools
+      printf '%s\n' bash coreutils sqlite openssl gawk tar gzip libarchive-tools libdeflate libunistring ncurses-libs
       ;;
     debian)
-      printf '%s\n' bash coreutils sqlite3 openssl gawk tar gzip libsqlite3-0 libarchive13
+      printf '%s\n' bash coreutils sqlite3 openssl gawk tar gzip libsqlite3-0
+      first_available_package libarchive13t64 libarchive13
+      printf '%s\n' libdeflate0
+      first_available_package libunistring5 libunistring2
+      printf '%s\n' libncursesw6 libtinfo6
       if apt-cache show libssl1.1 >/dev/null 2>&1; then
         printf '%s\n' libssl1.1
       else
-        printf '%s\n' libssl3
+        first_available_package libssl3t64 libssl3
       fi
       ;;
     rhel)
-      printf '%s\n' bash coreutils sqlite openssl gawk tar gzip sqlite-libs openssl-libs libarchive
+      printf '%s\n' bash coreutils sqlite openssl gawk tar gzip sqlite-libs openssl-libs libarchive libdeflate libunistring ncurses-libs
       ;;
     suse)
-      printf '%s\n' bash coreutils sqlite3 openssl gawk tar gzip libsqlite3-0 libarchive13
+      printf '%s\n' bash coreutils sqlite3 openssl gawk tar gzip libsqlite3-0 libarchive13 libdeflate0 libunistring2 libncurses6
       if zypper --non-interactive search -x libopenssl1_1 >/dev/null 2>&1; then
         printf '%s\n' libopenssl1_1
       else
@@ -136,6 +140,16 @@ packages_for_family() {
       return 1
       ;;
   esac
+}
+
+first_available_package() {
+  for package in "$@"; do
+    if apt-cache show "$package" >/dev/null 2>&1; then
+      printf '%s\n' "$package"
+      return 0
+    fi
+  done
+  die "none of the dependency packages are available: $*"
 }
 
 install_packages() {
@@ -276,11 +290,16 @@ required_plugins=(
   plugins/chat_plugin.so
   plugins/hello.so
 )
+required_libs=(
+  lib/libnotcurses-core.so
+  lib/libssl.so.1.1
+  lib/libcrypto.so.1.1
+)
 required_docs=(LICENSE README.md INSTALL.md VERSION MANIFEST docs/LICENSE)
 
 check_payload() {
   [ -d "$PAYLOAD" ] || die "payload directory does not exist: $PAYLOAD"
-  for path in "${required_bins[@]}" "${required_plank_bins[@]}" "${required_plugins[@]}" "${required_docs[@]}" conf/mutineer.conf sql/schema.sql; do
+  for path in "${required_bins[@]}" "${required_plank_bins[@]}" "${required_plugins[@]}" "${required_libs[@]}" "${required_docs[@]}" conf/mutineer.conf sql/schema.sql; do
     [ -e "$PAYLOAD/$path" ] || die "payload missing required file: $path"
   done
   [ -x "$PAYLOAD/buccaneer/bin/bucc" ] || die "payload missing required file: buccaneer/bin/bucc"
@@ -289,7 +308,7 @@ check_payload() {
 }
 
 check_installed() {
-  for path in "${required_bins[@]}" "${required_plank_bins[@]}" "${required_plugins[@]}" LICENSE README.md INSTALL.md VERSION MANIFEST docs/LICENSE conf/mutineer.conf sql/schema.sql; do
+  for path in "${required_bins[@]}" "${required_plank_bins[@]}" "${required_plugins[@]}" "${required_libs[@]}" LICENSE README.md INSTALL.md VERSION MANIFEST docs/LICENSE conf/mutineer.conf sql/schema.sql; do
     [ -e "$PREFIX/$path" ] || die "installed tree missing required file: $PREFIX/$path"
   done
   [ -x "$PREFIX/buccaneer/bin/bucc" ] || die "installed tree missing required file: $PREFIX/buccaneer/bin/bucc"
@@ -314,7 +333,7 @@ check_payload
 install_tree() {
   config_created=0
   mkdir -p "$PREFIX" "$DATA_DIR" "$LOGS_DIR" "$DOORS_DIR" "$RUNTIME_DIR" "$DROPFILE_DIR"
-  mkdir -p "$PREFIX/bin" "$PREFIX/plank/bin" "$PREFIX/plugins" "$PREFIX/conf" \
+  mkdir -p "$PREFIX/bin" "$PREFIX/plank/bin" "$PREFIX/plugins" "$PREFIX/lib" "$PREFIX/conf" \
     "$PREFIX/art" "$PREFIX/menus" "$PREFIX/sql" "$PREFIX/scripts" "$PREFIX/docs" \
     "$PREFIX/buccaneer"
 
@@ -323,6 +342,7 @@ install_tree() {
   [ ! -d "$PAYLOAD/plank" ] || cp -a "$PAYLOAD/plank" "$PREFIX/"
   [ ! -d "$PAYLOAD/buccaneer" ] || cp -a "$PAYLOAD/buccaneer" "$PREFIX/"
   [ ! -d "$PAYLOAD/plugins" ] || cp -a "$PAYLOAD/plugins/." "$PREFIX/plugins/"
+  [ ! -d "$PAYLOAD/lib" ] || cp -a "$PAYLOAD/lib/." "$PREFIX/lib/"
   cp -a "$PAYLOAD/art/." "$PREFIX/art/"
   cp -a "$PAYLOAD/menus/." "$PREFIX/menus/"
   cp -a "$PAYLOAD/sql/." "$PREFIX/sql/"
@@ -407,7 +427,7 @@ install_tree
 configure_installation
 
 if [ ! -f "$DB_PATH" ]; then
-  "$PREFIX/bin/mutineer-initbbs" -c "$CONFIG" -y
+  (cd "$PREFIX" && ./bin/mutineer-initbbs -c "$CONFIG" -y)
 fi
 
 chown_if_requested
@@ -427,5 +447,5 @@ Database:
   $DB_PATH
 
 Start Mutineer with:
-  $PREFIX/mutineer -c $CONFIG
+  cd $PREFIX && ./mutineer -c $CONFIG
 EOF

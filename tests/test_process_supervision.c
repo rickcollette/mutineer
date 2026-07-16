@@ -1,5 +1,6 @@
 #include "bbs_process.h"
 
+#include <fcntl.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/socket.h>
@@ -25,5 +26,23 @@ int main(void) {
   CHECK(result.signaled || result.exit_code != 0 || result.cancelled,
         "child was terminated after cancellation");
   close(fds[0]);
+
+  int inherited[2];
+  CHECK(socketpair(AF_UNIX, SOCK_STREAM, 0, inherited) == 0,
+        "inheritance socketpair");
+  int fd_flags = fcntl(inherited[1], F_GETFD);
+  CHECK(fd_flags >= 0 &&
+            fcntl(inherited[1], F_SETFD, fd_flags | FD_CLOEXEC) == 0,
+        "mark caller descriptor close-on-exec");
+  char script[128];
+  snprintf(script, sizeof(script), "test -e /proc/self/fd/%d", inherited[1]);
+  char* inherit_argv[] = { "/bin/sh", "-c", script, NULL };
+  BbsProcessResult inherited_result;
+  CHECK(bbs_exec_argv_cancel(inherit_argv, "inherit-test", NULL, -1, -1, -1,
+                             5, inherited[1], &inherited_result, err,
+                             sizeof(err)),
+        "caller descriptor survives exec");
+  close(inherited[0]);
+  close(inherited[1]);
   return 0;
 }

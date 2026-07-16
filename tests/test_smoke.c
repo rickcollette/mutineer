@@ -32,6 +32,13 @@ static int test_db_operations(void) {
   DbMsgArea areas[10];
   int acount = db_msg_area_list(db, areas, 10);
   TEST_ASSERT(acount > 0, "no message areas");
+  TEST_ASSERT(areas[0].password[0] == '\0',
+              "General message area unexpectedly requires a password");
+  DbMsgArea general;
+  TEST_ASSERT(db_msg_area_get(db, areas[0].id, &general),
+              "message area lookup failed");
+  TEST_ASSERT(general.password[0] == '\0',
+              "message area lookup returned a phantom password");
   
   /* Test message posting */
   TEST_ASSERT(db_message_post(db, areas[0].id, user.id, "Test Subject", "Test body", 0), 

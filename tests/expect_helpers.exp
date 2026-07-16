@@ -105,9 +105,7 @@ proc handle_ansi_prompt {} {
     
     expect {
         -re "ANSI.*\\?|graphics.*\\?" {
-            # General behavioral tests use deterministic plain rendering.
-            # ANSI rendering has dedicated golden-fixture coverage.
-            send "N\r"
+            send "Y\r"
             return 1
         }
         "Handle:" {
@@ -128,7 +126,7 @@ proc login_as {handle password} {
     # Handle ANSI prompt first if present
     expect {
         -re "ANSI.*\\?|graphics.*\\?" {
-            send "N\r"
+            send "Y\r"
         }
         "Handle:" { }
         timeout {

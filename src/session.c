@@ -408,7 +408,7 @@ static int readline_echo(Session *s, uint8_t *buf, size_t cap, int timeout_sec,
     uint8_t clean[256];
     int got = recv_clean(s, clean, sizeof(clean));
     if (got == 0)
-      return 0;
+      return -1; /* peer disconnected; an empty submitted line returns 0 */
     if (got < 0)
       continue;
 
@@ -952,8 +952,7 @@ int prompt_line(Session *s, const char *prompt, char *out, size_t cap) {
 }
 
 /* Password prompt - echoes dots instead of characters */
-static int prompt_password(Session *s, const char *prompt, char *out,
-                           size_t cap) {
+int prompt_password(Session *s, const char *prompt, char *out, size_t cap) {
   if (!s || !out || cap == 0)
     return -1;
   if (prompt)
@@ -1583,167 +1582,167 @@ void bbs_handle_action(Session *s, const char *action) {
       send_str(s, "\r\nAccess denied.\r\n");
       return;
     }
+    send_str(s, s->ansi ? "\x1b[2J\x1b[H\x1b[1;36m"
+                          "+------------------------------------------------------------+\r\n"
+                          "|                         USER EDITOR                        |\r\n"
+                          "+------------------------------------------------------------+\x1b[0m\r\n"
+                          "Enter a user handle, or leave it blank to cancel.\r\n\r\n"
+                        : "\r\n=== User Editor ===\r\n"
+                          "Enter a user handle, or leave it blank to cancel.\r\n\r\n");
     char handle[64] = {0};
-    prompt_line(s, "User handle: ", handle, sizeof(handle));
+    if (prompt_line(s, "User handle: ", handle, sizeof(handle)) <= 0 ||
+        !handle[0]) {
+      send_str(s, "\r\nUser editor cancelled.\r\n");
+      return;
+    }
     DbUser u;
     if (!db_user_fetch(s->db, handle, &u)) {
       send_str(s, "\r\nNot found.\r\n");
       return;
     }
 
-    char buf[128] = {0};
-    send_str(s, "\r\n\x1b[1;36mUser Editor\x1b[0m\r\n");
-    send_str(s, "--------------------------------------------------------------"
-                "--------\r\n");
-
-    char line[256];
-    snprintf(line, sizeof(line), "Handle: %s  ID: %d  Level: %d  DSL: %d\r\n",
-             u.handle, u.id, u.level, u.dsl);
-    send_str(s, line);
-    snprintf(line, sizeof(line), "Real Name: %s\r\n", u.real_name);
-    send_str(s, line);
-    snprintf(line, sizeof(line), "Email: %s  Phone: %s\r\n", u.email, u.phone);
-    send_str(s, line);
-    snprintf(line, sizeof(line), "Street: %s  City: %s  ZIP: %s\r\n", u.street,
-             u.city_state, u.zip_code);
-    send_str(s, line);
-    snprintf(line, sizeof(line), "Sex: %c  Birth: %s  First On: %s\r\n",
-             u.sex ? u.sex : '?', u.birth_date, u.first_on);
-    send_str(s, line);
-    snprintf(line, sizeof(line),
-             "Calls: %d  Posts: %d  Email Sent: %d  Feedback: %d\r\n",
-             u.logged_on, u.msg_post, u.email_sent, u.feedback);
-    send_str(s, line);
-    snprintf(line, sizeof(line),
-             "UL: %d (%dK)  DL: %d (%dK)  Credits: %d  FP: %d\r\n", u.uploads,
-             u.uk, u.downloads, u.dk, u.credits, u.file_points);
-    send_str(s, line);
-    snprintf(line, sizeof(line),
-             "Time Limit: %d min  Timebank: %d min  Total Time: %d min\r\n",
-             u.time_limit_min, u.timebank, u.t_time_on);
-    send_str(s, line);
-    snprintf(line, sizeof(line),
-             "AR Flags: 0x%08X  AC Flags: 0x%08X  Status: 0x%08X\r\n", u.flags,
-             u.ac_flags, u.status_flags);
-    send_str(s, line);
-    snprintf(line, sizeof(line), "Last Login: %s  Expires: %s\r\n",
-             u.last_login_at, u.expires_at);
-    send_str(s, line);
-    if (u.note[0]) {
-      snprintf(line, sizeof(line), "Sysop Note: %s\r\n", u.note);
-      send_str(s, line);
-    }
-    send_str(s, "--------------------------------------------------------------"
-                "--------\r\n");
-
-    send_str(s, "\r\nEdit fields (blank to keep current value):\r\n");
-
-    prompt_line(s, "Real Name: ", buf, sizeof(buf));
-    if (buf[0])
-      session_copy(u.real_name, sizeof(u.real_name), buf);
-
-    prompt_line(s, "Email: ", buf, sizeof(buf));
-    if (buf[0])
-      session_copy(u.email, sizeof(u.email), buf);
-
-    prompt_line(s, "Phone: ", buf, sizeof(buf));
-    if (buf[0])
-      session_copy(u.phone, sizeof(u.phone), buf);
-
-    prompt_line(s, "Street: ", buf, sizeof(buf));
-    if (buf[0])
-      session_copy(u.street, sizeof(u.street), buf);
-
-    prompt_line(s, "City/State: ", buf, sizeof(buf));
-    if (buf[0])
-      session_copy(u.city_state, sizeof(u.city_state), buf);
-
-    prompt_line(s, "ZIP: ", buf, sizeof(buf));
-    if (buf[0])
-      session_copy(u.zip_code, sizeof(u.zip_code), buf);
-
-    prompt_line(s, "Sex (M/F): ", buf, sizeof(buf));
-    if (buf[0])
-      u.sex = buf[0];
-
-    prompt_line(s, "Birth Date (YYYY-MM-DD): ", buf, sizeof(buf));
-    if (buf[0])
-      session_copy(u.birth_date, sizeof(u.birth_date), buf);
-
-    prompt_line(s, "Security Level: ", buf, sizeof(buf));
-    if (buf[0])
-      u.level = atoi(buf);
-
-    prompt_line(s, "Download SL: ", buf, sizeof(buf));
-    if (buf[0])
-      u.dsl = atoi(buf);
-
-    prompt_line(s, "Time Limit (min): ", buf, sizeof(buf));
-    if (buf[0])
-      u.time_limit_min = atoi(buf);
-
-    prompt_line(s, "Credits: ", buf, sizeof(buf));
-    if (buf[0])
-      u.credits = atoi(buf);
-
-    prompt_line(s, "File Points: ", buf, sizeof(buf));
-    if (buf[0])
-      u.file_points = atoi(buf);
-
-    prompt_line(s, "Timebank: ", buf, sizeof(buf));
-    if (buf[0])
-      u.timebank = atoi(buf);
-
-    prompt_line(s, "AR Flags (hex): ", buf, sizeof(buf));
-    if (buf[0])
-      u.flags = (unsigned)strtoul(buf, NULL, 16);
-
-    prompt_line(s, "AC Flags (hex): ", buf, sizeof(buf));
-    if (buf[0])
-      u.ac_flags = (unsigned)strtoul(buf, NULL, 16);
-
-    prompt_line(s, "Status Flags (hex): ", buf, sizeof(buf));
-    if (buf[0])
-      u.status_flags = (unsigned)strtoul(buf, NULL, 16);
-
-    prompt_line(s, "Expiration Date (YYYY-MM-DD): ", buf, sizeof(buf));
-    if (buf[0])
-      session_copy(u.expires_at, sizeof(u.expires_at), buf);
-
-    prompt_line(s, "Sysop Note: ", buf, sizeof(buf));
-    if (buf[0])
-      session_copy(u.note, sizeof(u.note), buf);
-
-    send_str(s, "\r\nSave changes? (Y/N): ");
-    uint8_t confirm[8];
-    int r =
-        session_readline(s, confirm, sizeof(confirm), s->cfg.idle_timeout_sec);
-    if (r > 0 && (confirm[0] == 'Y' || confirm[0] == 'y')) {
-      if (db_user_update(s->db, &u)) {
-        send_str(s, "\r\nUser updated successfully.\r\n");
-      } else {
-        send_str(s, "\r\nFailed to update user.\r\n");
+    bool editing = true, changed = false;
+    while (editing) {
+      char screen[2048];
+      snprintf(screen, sizeof(screen),
+               "%s\x1b[1;36m+------------------------------------------------------------+\r\n"
+               "| USER EDITOR: %-46.46s |\r\n"
+               "+------------------------------------------------------------+\x1b[0m\r\n"
+               " ID: %-5d  Level: %-4d  Download SL: %-4d  Status: 0x%08X\r\n"
+               " Name: %-24.24s  Email: %.28s\r\n"
+               " Location: %.48s\r\n"
+               " Credits: %-8d  File points: %-8d  Timebank: %d min\r\n"
+               " Expires: %-20.20s  Unsaved changes: %s\r\n"
+               "+------------------------------------------------------------+\r\n"
+               " [P] Profile & contact       [A] Address & identity\r\n"
+               " [S] Security & flags        [T] Time & account economy\r\n"
+               " [N] Expiration & sysop note [W] Write changes\r\n"
+               " [Q] Cancel and return\r\n"
+               "+------------------------------------------------------------+\r\n",
+               s->ansi ? "\x1b[2J\x1b[H" : "\r\n", u.handle, u.id, u.level,
+               u.dsl, u.status_flags, u.real_name[0] ? u.real_name : "(not set)",
+               u.email[0] ? u.email : "(not set)",
+               u.city_state[0] ? u.city_state : "(not set)", u.credits,
+               u.file_points, u.timebank,
+               u.expires_at[0] ? u.expires_at : "never", changed ? "YES" : "no");
+      send_str(s, screen);
+      char choice[16] = {0}, buf[128] = {0}, prompt[256];
+      if (prompt_line(s, "Editor command: ", choice, sizeof(choice)) <= 0)
+        break;
+      switch (toupper((unsigned char)choice[0])) {
+      case 'P':
+#define EDIT_TEXT(label, field)                                                \
+  do {                                                                         \
+    snprintf(prompt, sizeof(prompt), label " [%s]: ",                         \
+             (field)[0] ? (field) : "not set");                               \
+    prompt_line(s, prompt, buf, sizeof(buf));                                  \
+    if (buf[0]) {                                                               \
+      session_copy((field), sizeof(field), !strcmp(buf, "-") ? "" : buf);     \
+      changed = true;                                                           \
+    }                                                                           \
+  } while (0)
+        EDIT_TEXT("Real name", u.real_name);
+        EDIT_TEXT("Email", u.email);
+        EDIT_TEXT("Phone", u.phone);
+        break;
+      case 'A':
+        EDIT_TEXT("Street", u.street);
+        EDIT_TEXT("City/State", u.city_state);
+        EDIT_TEXT("ZIP/postal code", u.zip_code);
+        snprintf(prompt, sizeof(prompt), "Sex [%c]: ", u.sex ? u.sex : '-');
+        prompt_line(s, prompt, buf, sizeof(buf));
+        if (buf[0]) { u.sex = buf[0]; changed = true; }
+        EDIT_TEXT("Birth date (YYYY-MM-DD)", u.birth_date);
+        break;
+      case 'S':
+#define EDIT_NUM(label, field, base)                                           \
+  do {                                                                         \
+    snprintf(prompt, sizeof(prompt), label " [%d]: ", (int)(field));           \
+    prompt_line(s, prompt, buf, sizeof(buf));                                  \
+    if (buf[0]) { (field) = (__typeof__(field))strtoul(buf, NULL, base); changed = true; } \
+  } while (0)
+        EDIT_NUM("Security level", u.level, 10);
+        EDIT_NUM("Download SL", u.dsl, 10);
+        EDIT_NUM("AR flags (hex)", u.flags, 16);
+        EDIT_NUM("AC flags (hex)", u.ac_flags, 16);
+        EDIT_NUM("Status flags (hex)", u.status_flags, 16);
+        break;
+      case 'T':
+        EDIT_NUM("Time limit (minutes)", u.time_limit_min, 10);
+        EDIT_NUM("Credits", u.credits, 10);
+        EDIT_NUM("File points", u.file_points, 10);
+        EDIT_NUM("Timebank (minutes)", u.timebank, 10);
+        break;
+      case 'N':
+        EDIT_TEXT("Expiration date (YYYY-MM-DD or - to clear)", u.expires_at);
+        EDIT_TEXT("Sysop note (- to clear)", u.note);
+        break;
+      case 'W':
+        if (!changed) {
+          send_str(s, "No changes to save.\r\n");
+        } else if (db_user_update(s->db, &u)) {
+          send_str(s, "\r\nUser changes saved successfully.\r\n");
+          editing = false;
+        } else {
+          send_str(s, "\r\nUnable to save user changes.\r\n");
+        }
+        break;
+      case 'Q':
+        send_str(s, changed ? "\r\nUnsaved changes discarded.\r\n"
+                            : "\r\nUser editor closed.\r\n");
+        editing = false;
+        break;
+      default:
+        send_str(s, "Choose P, A, S, T, N, W, or Q.\r\n");
+        break;
       }
-    } else {
-      send_str(s, "\r\nChanges discarded.\r\n");
+#undef EDIT_TEXT
+#undef EDIT_NUM
     }
     log_audit(s->user.handle, "useredit", handle);
-  } else if (!strcmp(action, "changepassword")) {
-    const bool is_sysop = acs_allows(s, "+A");
+  } else if (!strcmp(action, "changepassword") ||
+             !strcmp(action, "resetpassword")) {
+    const bool resetting_by_sysop = !strcmp(action, "resetpassword");
     DbUser target = s->user;
 
-    if (is_sysop) {
+    if (resetting_by_sysop) {
+      if (!acs_allows(s, "+A")) {
+        send_str(s, "\r\nAccess denied.\r\n");
+        return;
+      }
+      send_str(s, s->ansi ? "\x1b[2J\x1b[H\x1b[1;36m"
+                            "+--------------------------------------------------+\r\n"
+                            "|              RESET USER PASSWORD                 |\r\n"
+                            "+--------------------------------------------------+\x1b[0m\r\n"
+                            "Choose the account that needs a new password.\r\n"
+                            "Leave the handle blank to cancel.\r\n\r\n"
+                          : "\r\n=== Reset User Password ===\r\n"
+                            "Choose the account that needs a new password.\r\n"
+                            "Leave the handle blank to cancel.\r\n\r\n");
       char handle[64] = {0};
-      prompt_line(s, "User handle (blank for yourself): ", handle,
-                  sizeof(handle));
-      if (handle[0] && !db_user_fetch(s->db, handle, &target)) {
+      if (prompt_line(s, "User handle: ", handle, sizeof(handle)) <= 0 ||
+          !handle[0]) {
+        send_str(s, "\r\nPassword reset cancelled.\r\n");
+        return;
+      }
+      if (!db_user_fetch(s->db, handle, &target)) {
         send_str(s, "\r\nUser not found.\r\n");
         log_audit(s->user.handle, "password_reset_failed", "user not found");
         return;
       }
+    } else {
+      send_str(s, s->ansi ? "\x1b[2J\x1b[H\x1b[1;36m"
+                            "+--------------------------------------------------+\r\n"
+                            "|                 CHANGE PASSWORD                  |\r\n"
+                            "+--------------------------------------------------+\x1b[0m\r\n"
+                            "Your new password must be at least 8 characters.\r\n"
+                            "Password entry is hidden for your security.\r\n\r\n"
+                          : "\r\n=== Change Password ===\r\n"
+                            "Your new password must be at least 8 characters.\r\n"
+                            "Password entry is hidden for your security.\r\n\r\n");
     }
 
-    const bool resetting_other_user = target.id != s->user.id;
+    const bool resetting_other_user = resetting_by_sysop;
     if (!resetting_other_user) {
       char current[128] = {0};
       if (prompt_password(s, "Current Password: ", current, sizeof(current)) <=
@@ -1796,10 +1795,13 @@ void bbs_handle_action(Session *s, const char *action) {
       char detail[96];
       snprintf(detail, sizeof(detail), "Password reset for %s", target.handle);
       log_audit(s->user.handle, "password_reset", detail);
-      send_str(s, "\r\nUser password reset successfully.\r\n");
+      char message[160];
+      snprintf(message, sizeof(message),
+               "\r\nPassword for %s was reset successfully.\r\n", target.handle);
+      send_str(s, message);
     } else {
       log_audit(s->user.handle, "password_change", "Password changed by user");
-      send_str(s, "\r\nYour password has been changed.\r\n");
+      send_str(s, "\r\nPassword changed successfully.\r\n");
     }
   } else if (!strcmp(action, "doors")) {
     DbDoor doors[16];
@@ -1811,8 +1813,8 @@ void bbs_handle_action(Session *s, const char *action) {
     send_str(s, "\r\nDoors:\r\n");
     char buf[256];
     for (int i = 0; i < dcount; i++) {
-      snprintf(buf, sizeof(buf), "  [%d] %s (%s)\r\n", doors[i].id,
-               doors[i].name, doors[i].command);
+      snprintf(buf, sizeof(buf), "  [%d] %s\r\n", doors[i].id,
+               doors[i].name);
       send_str(s, buf);
     }
     send_str(s, "Choose door #: ");
@@ -4483,11 +4485,12 @@ void *session_thread_main(void *arg) {
     uint8_t line[64];
     int n = session_readline(s, line, sizeof(line), s->cfg.idle_timeout_sec);
     if (n == 0)
-      break;
+      continue;
     if (n == -2) {
       send_str(s, "\r\nIdle timeout.\r\n");
       break;
     }
+    send_str(s, "\r\n");
 
     /* F-key intercept: ESC sequences from remote sysop */
     if (n > 0 && line[0] == 0x1B) {

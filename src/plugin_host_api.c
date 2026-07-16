@@ -240,10 +240,10 @@ static bbs_rc_t host_io_readline(bbs_session_t *s, char *out, size_t out_sz,
   int rc = session_readline_echo(sess, (uint8_t *)out, out_sz, timeout,
                                  echo ? 1 : 0);
 
-  if (rc < 0)
+  if (rc == -2)
     return BBS_ETIMEOUT;
-  if (rc == 0)
-    return BBS_EIO; /* disconnect */
+  if (rc < 0)
+    return BBS_EIO;
   (void)echo;
   send_str(sess, "\r\n");
   return BBS_OK;
@@ -452,9 +452,9 @@ static bbs_rc_t host_readline_timed(bbs_session_t *s, char *out, size_t out_sz,
     seconds = 1;
   int rc = session_readline_echo(sess, (uint8_t *)out, out_sz, seconds,
                                  echo ? 1 : 0);
-  if (rc < 0)
+  if (rc == -2)
     return BBS_ETIMEOUT;
-  if (rc == 0)
+  if (rc < 0)
     return BBS_EIO;
   send_str(sess, "\r\n");
   return BBS_OK;

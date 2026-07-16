@@ -61,6 +61,7 @@ void send_str(Session* s, const char* str);
 int session_readline(Session* s, uint8_t* buf, size_t cap, int timeout);
 int session_readline_echo(Session* s, uint8_t* buf, size_t cap, int timeout, int echo);
 int prompt_line(Session* s, const char* prompt, char* out, size_t cap);
+int prompt_password(Session* s, const char* prompt, char* out, size_t cap);
 
 /* online registry */
 bool online_add(Session* s);

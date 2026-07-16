@@ -1,0 +1,33 @@
+  Mutineer BBS  ~~  Mutineer BBS
++------------------------------------------------------------------------------+
+|  Main Deck                                                                 |
+| Crew: sysop   Node: 1   Time: 118 min|
++------------------------------------------------------------------------------+
+| [W] Who's Online                                                             |
+| [M] Messages                                                                 |
+| [F] Files                                                                    |
+| [C] Teleconference (MTS)                                                     |
+| [B] Bulletins                                                                |
+| [P] Page Sysop                                                               |
+| [O] Doors                                                                    |
+| [L] Wall Post                                                                |
+| [S] Whisper                                                                  |
+| [E] User Editor                                                              |
+| [V] Vote Booth                                                               |
+| [T] Time Bank                                                                |
+| [Y] Change Password                                                          |
+| [N] Netmail/QWK                                                              |
+| [A] Area Admin                                                               |
+| [R] File Admin                                                               |
+| [X] Batch Queue                                                              |
+| [D] Maintenance                                                              |
+| [1] Hello Plugin                                                             |
+| [3] List Plugins                                                             |
+| [H] Help                                                                     |
+| [Q] Logoff                                                                   |
++------------------------------------------------------------------------------+
+| Selection: yUser handle (blank for yourself): 
+Current Password: ........-----------------------------------------------------+
+New Password: .........
+
+Try it on the live system - which seems to now be down but you can find the deployment code and creds over in ../production/ so you can troubleshoot 

@@ -699,6 +699,10 @@ static void test_door_janitor(void) {
   g_active_node = 0;
   CHECK(door_janitor_run_once(&cfg, NULL) == 1 && access(launch, F_OK) != 0,
         "janitor removes offline launch tree");
+  CHECK(access(cfg.dropfile_path, F_OK) == 0,
+        "janitor preserves configured dropfile base directory");
+  CHECK(access(cfg.door_runtime_path, F_OK) == 0,
+        "janitor preserves configured runtime base directory");
   rm_rf(cfg.dropfile_path);
   rm_rf(cfg.door_runtime_path);
 }
