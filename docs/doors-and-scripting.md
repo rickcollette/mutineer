@@ -84,6 +84,8 @@ door_runtime_path=data/door_runtime
 door_copy_mode=copy
 door_default_timeout_sec=300
 door_cleanup_on_exit=1
+door_janitor_interval_sec=60
+door_stale_age_sec=300
 door_keep_failed_runs=0
 ```
 
@@ -108,6 +110,15 @@ Flat JSON in door directory (see `doors/testdoor/testdoor.json`):
 3. Generate DOSBox config with serial nullmodem on inherited socket
 4. Launch DOSBox; DOS door receives COM port via nullmodem
 5. On exit: cleanup runtime tree (unless failure + `door_keep_failed_runs`)
+
+An independent janitor also scans native dropfile and DOS runtime roots at
+startup and periodically thereafter. It never removes trees belonging to a
+currently connected node. Once a node is offline, launch trees older than
+`door_stale_age_sec` are recursively removed, covering crashes, killed door
+clients, and unclean BBS shutdowns where normal exit cleanup did not run.
+The same pass reconciles `nodes` rows that still claim `online` after their
+in-memory session has disappeared, so public current-player/leaderboard state
+cannot be held open by an orphaned database record.
 
 ### Included Examples
 
@@ -209,6 +220,15 @@ Anavir service as `--bbs-secret` or an equivalent secret-injection mechanism.
 
 `menus/door.mnu` lists available doors. The `doors` action in session.c reads from `doors` table and launches selected door.
 
+## Standard leaderboards
+
+Door leaderboards are opt-in with `LB_ENABLE=1`. Mutineer owns authenticated
+player attribution and best-score storage, and publishes a consistent top 10,
+last 10 personal bests by time, and currently playing list. Native and DOS doors
+return `MUTINEER_LB_RESULT.JSON`; Buccaneer doors use the capability-gated
+`LEADERBOARD` host API. See the [Door Leaderboard Standard](leaderboards.md) for
+the complete configuration, SDK, result, ranking, and REST contracts.
+
 ## Security Considerations
 
 - Native doors run as the BBS user — trust door binaries
@@ -228,6 +248,7 @@ ctest --test-dir build -R doors
 
 ## Related Documentation
 
+- [Door Leaderboard Standard](leaderboards.md) — `LB_ENABLE`, result files, Buccaneer, BBSLIB, and REST
 - [Buccaneer Programmer's Guide](buccaneer/programmers-guide.md)
 - [Plugins](plugins.md)
 - [Configuration](configuration.md) — DOSBox settings

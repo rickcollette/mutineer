@@ -1,46 +1,43 @@
-#include "bbs_session.h"
-#include "bbs_util.h"
-#include "bbs_ansi.h"
-#include "bbs_hash.h"
 #include "bbs_acs.h"
-#include "bbs_mci.h"
-#include "bbs_msg_cmds.h"
-#include "bbs_log.h"
+#include "bbs_ansi.h"
+#include "bbs_auth.h"
+#include "bbs_chat.h"
 #include "bbs_doors.h"
+#include "bbs_file_cmds.h"
 #include "bbs_flags.h"
-#include "bbs_scheduler.h"
-#include "bbs_msg_defs.h"
+#include "bbs_hash.h"
+#include "bbs_log.h"
+#include "bbs_mci.h"
 #include "bbs_menu_template.h"
+#include "bbs_msg_cmds.h"
+#include "bbs_msg_defs.h"
 #include "bbs_plugin_api.h"
 #include "bbs_plugin_loader.h"
 #include "bbs_plugin_registry.h"
-#include "bbs_file_cmds.h"
-#include "bbs_msg_cmds.h"
-#include "bbs_chat.h"
+#include "bbs_scheduler.h"
+#include "bbs_session.h"
 #include "bbs_telnet.h"
-#include "bbs_auth.h"
+#include "bbs_util.h"
+#include <ctype.h>
 #include <openssl/evp.h>
 #include <signal.h>
-#include <ctype.h>
 
 extern volatile sig_atomic_t g_stop;
+#include <dirent.h>
+#include <errno.h>
 #include <signal.h>
-#include <time.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
-#include <errno.h>
-#include <sys/socket.h>
 #include <sys/select.h>
-#include <dirent.h>
+#include <sys/socket.h>
+#include <time.h>
+#include <unistd.h>
 
-static bool valid_menu_basename(const char *name)
-{
+static bool valid_menu_basename(const char *name) {
   if (!name || !name[0])
     return false;
-  for (const char *p = name; *p; p++)
-  {
+  for (const char *p = name; *p; p++) {
     unsigned char c = (unsigned char)*p;
     if (!(isalnum(c) || c == '_' || c == '-'))
       return false;
@@ -54,17 +51,18 @@ static Session *g_online[MAX_ONLINE];
 static int g_node_locked[MAX_ONLINE];
 static pthread_mutex_t g_online_mu = PTHREAD_MUTEX_INITIALIZER;
 
-static void session_copy(char *dst, size_t cap, const char *src)
-{
-  if (!dst || cap == 0) return;
+static void session_copy(char *dst, size_t cap, const char *src) {
+  if (!dst || cap == 0)
+    return;
   size_t n = src ? strlen(src) : 0;
-  if (n >= cap) n = cap - 1;
-  if (n > 0) memcpy(dst, src, n);
+  if (n >= cap)
+    n = cap - 1;
+  if (n > 0)
+    memcpy(dst, src, n);
   dst[n] = '\0';
 }
 
-typedef struct
-{
+typedef struct {
   time_t ts;
   int channel;
   char handle[64];
@@ -76,8 +74,7 @@ static ChatLine g_chat[CHAT_MAX];
 static int g_chat_head = 0;
 static pthread_mutex_t g_chat_mu = PTHREAD_MUTEX_INITIALIZER;
 
-static void chat_post(int channel, const char *handle, const char *text)
-{
+static void chat_post(int channel, const char *handle, const char *text) {
   if (!handle)
     handle = "";
   if (!text)
@@ -86,19 +83,19 @@ static void chat_post(int channel, const char *handle, const char *text)
   g_chat_head = (g_chat_head + 1) % CHAT_MAX;
   g_chat[g_chat_head].ts = time(NULL);
   g_chat[g_chat_head].channel = channel;
-  snprintf(g_chat[g_chat_head].handle, sizeof(g_chat[g_chat_head].handle), "%s", handle);
-  snprintf(g_chat[g_chat_head].text, sizeof(g_chat[g_chat_head].text), "%s", text);
+  snprintf(g_chat[g_chat_head].handle, sizeof(g_chat[g_chat_head].handle), "%s",
+           handle);
+  snprintf(g_chat[g_chat_head].text, sizeof(g_chat[g_chat_head].text), "%s",
+           text);
   pthread_mutex_unlock(&g_chat_mu);
 }
 
-static int chat_dump(int channel, time_t since, char *out, size_t cap)
-{
+static int chat_dump(int channel, time_t since, char *out, size_t cap) {
   if (!out || cap == 0)
     return 0;
   size_t o = 0;
   pthread_mutex_lock(&g_chat_mu);
-  for (int i = 0; i < CHAT_MAX; i++)
-  {
+  for (int i = 0; i < CHAT_MAX; i++) {
     int idx = (g_chat_head - i + CHAT_MAX) % CHAT_MAX;
     if (g_chat[idx].ts == 0)
       break;
@@ -106,7 +103,8 @@ static int chat_dump(int channel, time_t since, char *out, size_t cap)
       continue;
     if (g_chat[idx].ts <= since)
       break;
-    o += (size_t)snprintf(out + o, cap - o, "[%s] %s\r\n", g_chat[idx].handle, g_chat[idx].text);
+    o += (size_t)snprintf(out + o, cap - o, "[%s] %s\r\n", g_chat[idx].handle,
+                          g_chat[idx].text);
     if (o >= cap)
       break;
   }
@@ -115,8 +113,7 @@ static int chat_dump(int channel, time_t since, char *out, size_t cap)
 }
 #define MAX_ATTEMPTS 256
 
-typedef struct
-{
+typedef struct {
   char ip[64];
   char handle[64];
   int attempts;
@@ -126,25 +123,22 @@ typedef struct
 static RecoveryAttempt g_recovery_attempts[MAX_ATTEMPTS];
 static pthread_mutex_t g_recovery_attempts_mu = PTHREAD_MUTEX_INITIALIZER;
 
-static bool recovery_throttled(const BbsConfig *cfg, const char *ip, const char *handle)
-{
+static bool recovery_throttled(const BbsConfig *cfg, const char *ip,
+                               const char *handle) {
   int window = cfg->login_window_sec > 0 ? cfg->login_window_sec : 120;
   time_t now = time(NULL);
   pthread_mutex_lock(&g_recovery_attempts_mu);
-  for (int i = 0; i < MAX_ATTEMPTS; i++)
-  {
+  for (int i = 0; i < MAX_ATTEMPTS; i++) {
     RecoveryAttempt *a = &g_recovery_attempts[i];
     if (a->attempts == 0)
       continue;
-    if (difftime(now, a->window_start) > window)
-    {
+    if (difftime(now, a->window_start) > window) {
       a->attempts = 0;
       continue;
     }
-    if (!strcmp(a->ip, ip) || (handle && handle[0] && !strcmp(a->handle, handle)))
-    {
-      if (a->attempts >= 3)
-      {
+    if (!strcmp(a->ip, ip) ||
+        (handle && handle[0] && !strcmp(a->handle, handle))) {
+      if (a->attempts >= 3) {
         pthread_mutex_unlock(&g_recovery_attempts_mu);
         return true;
       }
@@ -154,39 +148,34 @@ static bool recovery_throttled(const BbsConfig *cfg, const char *ip, const char 
   return false;
 }
 
-static void recovery_record(const BbsConfig *cfg, const char *ip, const char *handle, bool success)
-{
+static void recovery_record(const BbsConfig *cfg, const char *ip,
+                            const char *handle, bool success) {
   if (success)
     return;
   int window = cfg->login_window_sec > 0 ? cfg->login_window_sec : 120;
   time_t now = time(NULL);
   pthread_mutex_lock(&g_recovery_attempts_mu);
   int slot = -1;
-  for (int i = 0; i < MAX_ATTEMPTS; i++)
-  {
+  for (int i = 0; i < MAX_ATTEMPTS; i++) {
     RecoveryAttempt *a = &g_recovery_attempts[i];
-    if (a->attempts == 0)
-    {
-      if (slot < 0) slot = i;
+    if (a->attempts == 0) {
+      if (slot < 0)
+        slot = i;
       continue;
     }
-    if (!strcmp(a->ip, ip) || (handle && handle[0] && !strcmp(a->handle, handle)))
-    {
-      if (difftime(now, a->window_start) > window)
-      {
+    if (!strcmp(a->ip, ip) ||
+        (handle && handle[0] && !strcmp(a->handle, handle))) {
+      if (difftime(now, a->window_start) > window) {
         a->attempts = 0;
         slot = i;
-      }
-      else
-      {
+      } else {
         a->attempts++;
         pthread_mutex_unlock(&g_recovery_attempts_mu);
         return;
       }
     }
   }
-  if (slot >= 0)
-  {
+  if (slot >= 0) {
     RecoveryAttempt *a = &g_recovery_attempts[slot];
     snprintf(a->ip, sizeof(a->ip), "%s", ip ? ip : "");
     snprintf(a->handle, sizeof(a->handle), "%s", handle ? handle : "");
@@ -196,14 +185,11 @@ static void recovery_record(const BbsConfig *cfg, const char *ip, const char *ha
   pthread_mutex_unlock(&g_recovery_attempts_mu);
 }
 
-bool online_add(Session *s)
-{
+bool online_add(Session *s) {
   bool added = false;
   pthread_mutex_lock(&g_online_mu);
-  for (int i = 0; i < MAX_ONLINE; i++)
-  {
-    if (!g_online[i] && !g_node_locked[i])
-    {
+  for (int i = 0; i < MAX_ONLINE; i++) {
+    if (!g_online[i] && !g_node_locked[i]) {
       g_online[i] = s;
       s->node_num = i + 1;
       added = true;
@@ -214,13 +200,10 @@ bool online_add(Session *s)
   return added;
 }
 
-void online_remove(Session *s)
-{
+void online_remove(Session *s) {
   pthread_mutex_lock(&g_online_mu);
-  for (int i = 0; i < MAX_ONLINE; i++)
-  {
-    if (g_online[i] == s)
-    {
+  for (int i = 0; i < MAX_ONLINE; i++) {
+    if (g_online[i] == s) {
       g_online[i] = NULL;
       break;
     }
@@ -228,51 +211,62 @@ void online_remove(Session *s)
   pthread_mutex_unlock(&g_online_mu);
 }
 
-size_t online_list(char *out, size_t cap)
-{
+size_t online_list(char *out, size_t cap) {
   size_t o = 0;
   pthread_mutex_lock(&g_online_mu);
   o += (size_t)snprintf(out + o, cap - o, "\r\nOnline users (nodes):\r\n");
   int n = 0;
-  for (int i = 0; i < MAX_ONLINE; i++)
-  {
-    if (g_online[i])
-    {
+  for (int i = 0; i < MAX_ONLINE; i++) {
+    if (g_online[i]) {
       n++;
-      o += (size_t)snprintf(out + o, cap - o, "  Node %d  IP %s\r\n", i + 1, g_online[i]->ip);
+      o += (size_t)snprintf(out + o, cap - o, "  Node %d  IP %s\r\n", i + 1,
+                            g_online[i]->ip);
       if (o >= cap)
         break;
     }
   }
-  if (n == 0)
-  {
+  if (n == 0) {
     o += (size_t)snprintf(out + o, cap - o, "  (none)\r\n");
   }
   pthread_mutex_unlock(&g_online_mu);
   return o;
 }
 
-void online_broadcast(const char *msg)
-{
+void online_broadcast(const char *msg) {
   pthread_mutex_lock(&g_online_mu);
-  for (int i = 0; i < MAX_ONLINE; i++)
-  {
-    if (g_online[i])
-    {
+  for (int i = 0; i < MAX_ONLINE; i++) {
+    if (g_online[i]) {
       fd_write_all(g_online[i]->fd, msg, strlen(msg));
     }
   }
   pthread_mutex_unlock(&g_online_mu);
 }
 
-static bool online_send_user_id(int user_id, const char *msg)
-{
+void online_shutdown_and_wait(void) {
+  for (;;) {
+    int active = 0;
+    pthread_mutex_lock(&g_online_mu);
+    for (int i = 0; i < MAX_ONLINE; i++) {
+      Session *s = g_online[i];
+      if (!s)
+        continue;
+      active++;
+      s->alive = 0;
+      shutdown(s->fd, SHUT_RDWR);
+    }
+    pthread_mutex_unlock(&g_online_mu);
+    if (!active)
+      return;
+    struct timespec pause = {.tv_sec = 0, .tv_nsec = 10000000};
+    nanosleep(&pause, NULL);
+  }
+}
+
+static bool online_send_user_id(int user_id, const char *msg) {
   bool sent = false;
   pthread_mutex_lock(&g_online_mu);
-  for (int i = 0; i < MAX_ONLINE; i++)
-  {
-    if (g_online[i] && g_online[i]->user.id == user_id)
-    {
+  for (int i = 0; i < MAX_ONLINE; i++) {
+    if (g_online[i] && g_online[i]->user.id == user_id) {
       fd_write_all(g_online[i]->fd, msg, strlen(msg));
       sent = true;
     }
@@ -281,12 +275,10 @@ static bool online_send_user_id(int user_id, const char *msg)
   return sent;
 }
 
-static bool online_send_node(int node_num, const char *msg)
-{
+static bool online_send_node(int node_num, const char *msg) {
   bool sent = false;
   pthread_mutex_lock(&g_online_mu);
-  if (node_num > 0 && node_num <= MAX_ONLINE && g_online[node_num - 1])
-  {
+  if (node_num > 0 && node_num <= MAX_ONLINE && g_online[node_num - 1]) {
     fd_write_all(g_online[node_num - 1]->fd, msg, strlen(msg));
     sent = true;
   }
@@ -294,17 +286,16 @@ static bool online_send_node(int node_num, const char *msg)
   return sent;
 }
 
-bool online_mark_node_dead(int node_num, const Session *except, const char *msg)
-{
+bool online_mark_node_dead(int node_num, const Session *except,
+                           const char *msg) {
   bool marked = false;
   pthread_mutex_lock(&g_online_mu);
-  if (node_num > 0 && node_num <= MAX_ONLINE)
-  {
+  if (node_num > 0 && node_num <= MAX_ONLINE) {
     Session *target = g_online[node_num - 1];
-    if (target && target != except)
-    {
+    if (target && target != except) {
       target->alive = 0;
-      if (msg) fd_write_all(target->fd, msg, strlen(msg));
+      if (msg)
+        fd_write_all(target->fd, msg, strlen(msg));
       marked = true;
     }
   }
@@ -312,16 +303,14 @@ bool online_mark_node_dead(int node_num, const Session *except, const char *msg)
   return marked;
 }
 
-void online_set_node_locked(int node_num, bool locked)
-{
+void online_set_node_locked(int node_num, bool locked) {
   pthread_mutex_lock(&g_online_mu);
   if (node_num > 0 && node_num <= MAX_ONLINE)
     g_node_locked[node_num - 1] = locked ? 1 : 0;
   pthread_mutex_unlock(&g_online_mu);
 }
 
-bool online_node_is_locked(int node_num)
-{
+bool online_node_is_locked(int node_num) {
   bool locked = false;
   pthread_mutex_lock(&g_online_mu);
   if (node_num > 0 && node_num <= MAX_ONLINE)
@@ -330,8 +319,7 @@ bool online_node_is_locked(int node_num)
   return locked;
 }
 
-void broadcast_check(const char *data_path)
-{
+void broadcast_check(const char *data_path) {
   char path[512];
   snprintf(path, sizeof(path), "%s/broadcast.txt", data_path);
 
@@ -340,13 +328,11 @@ void broadcast_check(const char *data_path)
     return;
 
   char line[512];
-  while (fgets(line, sizeof(line), f))
-  {
+  while (fgets(line, sizeof(line), f)) {
     size_t len = strlen(line);
     if (len > 0 && line[len - 1] == '\n')
       line[len - 1] = '\0';
-    if (line[0])
-    {
+    if (line[0]) {
       char msg[600];
       snprintf(msg, sizeof(msg), "\r\n\a%s\r\n", line);
       online_broadcast(msg);
@@ -360,8 +346,7 @@ void broadcast_check(const char *data_path)
     fclose(f);
 }
 
-Session *online_get_node(int node_num)
-{
+Session *online_get_node(int node_num) {
   Session *out = NULL;
   pthread_mutex_lock(&g_online_mu);
   if (node_num > 0 && node_num <= MAX_ONLINE)
@@ -371,17 +356,16 @@ Session *online_get_node(int node_num)
 }
 
 /* Read raw bytes, strip telnet, return clean bytes length.
-   Returns 0 on disconnect, -1 on error, -3 when input was only telnet negotiation. */
-static int recv_clean(Session *s, uint8_t *out, size_t out_cap)
-{
+   Returns 0 on disconnect, -1 on error, -3 when input was only telnet
+   negotiation. */
+static int recv_clean(Session *s, uint8_t *out, size_t out_cap) {
   if (s && s->io_read)
     return s->io_read(s->io_user_data, out, out_cap, 0);
   uint8_t inbuf[512];
   ssize_t r = recv(s->fd, inbuf, sizeof(inbuf), 0);
   if (r == 0)
     return 0;
-  if (r < 0)
-  {
+  if (r < 0) {
     if (errno == EINTR)
       return -1;
     return -1;
@@ -398,16 +382,16 @@ static int recv_clean(Session *s, uint8_t *out, size_t out_cap)
 #define ECHO_DOTS 2 /* echo dots for password */
 
 /* Line reader with echo support */
-static int readline_echo(Session *s, uint8_t *buf, size_t cap, int timeout_sec, int echo_mode)
-{
+static int readline_echo(Session *s, uint8_t *buf, size_t cap, int timeout_sec,
+                         int echo_mode) {
   if (!s || !buf || cap == 0)
     return -1;
   if (s->io_readline)
-    return s->io_readline(s->io_user_data, buf, cap, timeout_sec, echo_mode == ECHO_ON);
+    return s->io_readline(s->io_user_data, buf, cap, timeout_sec,
+                          echo_mode == ECHO_ON);
 
   size_t n = 0;
-  while (n + 1 < cap)
-  {
+  while (n + 1 < cap) {
     fd_set rfds;
     FD_ZERO(&rfds);
     FD_SET(s->fd, &rfds);
@@ -415,8 +399,7 @@ static int readline_echo(Session *s, uint8_t *buf, size_t cap, int timeout_sec, 
     int r = select(s->fd + 1, &rfds, NULL, NULL, timeout_sec > 0 ? &tv : NULL);
     if (r == 0)
       return -2; /* idle timeout */
-    if (r < 0)
-    {
+    if (r < 0) {
       if (errno == EINTR)
         continue;
       return -1;
@@ -429,24 +412,19 @@ static int readline_echo(Session *s, uint8_t *buf, size_t cap, int timeout_sec, 
     if (got < 0)
       continue;
 
-    for (int i = 0; i < got; i++)
-    {
+    for (int i = 0; i < got; i++) {
       uint8_t ch = clean[i];
 
-      if (ch == '\n' || ch == '\r')
-      {
+      if (ch == '\n' || ch == '\r') {
         buf[n] = 0;
         return (int)n;
       }
 
-      if (ch == 0x08 || ch == 0x7F)
-      {
+      if (ch == 0x08 || ch == 0x7F) {
         /* backspace */
-        if (n > 0)
-        {
+        if (n > 0) {
           n--;
-          if (echo_mode != ECHO_OFF)
-          {
+          if (echo_mode != ECHO_OFF) {
             send_str(s, "\x08 \x08"); /* backspace, space, backspace */
           }
         }
@@ -460,13 +438,10 @@ static int readline_echo(Session *s, uint8_t *buf, size_t cap, int timeout_sec, 
       buf[n++] = ch;
 
       /* echo the character */
-      if (echo_mode == ECHO_ON)
-      {
+      if (echo_mode == ECHO_ON) {
         char echo[2] = {(char)ch, 0};
         send_str(s, echo);
-      }
-      else if (echo_mode == ECHO_DOTS)
-      {
+      } else if (echo_mode == ECHO_DOTS) {
         send_str(s, ".");
       }
     }
@@ -476,29 +451,26 @@ static int readline_echo(Session *s, uint8_t *buf, size_t cap, int timeout_sec, 
 }
 
 /* Very small line reader built on recv_clean (handles telnet sequences). */
-int session_readline(Session *s, uint8_t *buf, size_t cap, int timeout_sec)
-{
+int session_readline(Session *s, uint8_t *buf, size_t cap, int timeout_sec) {
   return readline_echo(s, buf, cap, timeout_sec, ECHO_ON);
 }
 
-int session_readline_echo(Session *s, uint8_t *buf, size_t cap, int timeout_sec, int echo)
-{
+int session_readline_echo(Session *s, uint8_t *buf, size_t cap, int timeout_sec,
+                          int echo) {
   return readline_echo(s, buf, cap, timeout_sec, echo ? ECHO_ON : ECHO_DOTS);
 }
 
-void send_str(Session *s, const char *str)
-{
+void send_str(Session *s, const char *str) {
   if (!s || !str)
     return;
-  if (s->io_write)
-  {
+  if (s->io_write) {
     const char *start = str;
-    for (const char *p = str; *p; p++)
-    {
+    for (const char *p = str; *p; p++) {
       if (*p != '\n' || (p > str && p[-1] == '\r'))
         continue;
       if (p > start)
-        s->io_write(s->io_user_data, (const uint8_t *)start, (size_t)(p - start));
+        s->io_write(s->io_user_data, (const uint8_t *)start,
+                    (size_t)(p - start));
       s->io_write(s->io_user_data, (const uint8_t *)"\r\n", 2);
       start = p + 1;
     }
@@ -509,8 +481,7 @@ void send_str(Session *s, const char *str)
     return;
   }
   const char *start = str;
-  for (const char *p = str; *p; p++)
-  {
+  for (const char *p = str; *p; p++) {
     if (*p != '\n' || (p > str && p[-1] == '\r'))
       continue;
     if (p > start)
@@ -522,8 +493,7 @@ void send_str(Session *s, const char *str)
     fd_write_all(s->fd, start, strlen(start));
 }
 
-static void send_motd(Session *s)
-{
+static void send_motd(Session *s) {
   if (!s)
     return;
   char path_try[256];
@@ -533,22 +503,17 @@ static void send_motd(Session *s)
   path_join(s->cfg.art_path, s->cfg.motd, alt, sizeof(alt));
 
   const char *paths[2] = {path_try, alt};
-  for (int i = 0; i < 2; i++)
-  {
+  for (int i = 0; i < 2; i++) {
     size_t len = 0;
     char *raw = file_read_all(paths[i], &len);
-    if (raw)
-    {
+    if (raw) {
       size_t out_cap = len * 2 + 1;
       char *expanded = (char *)malloc(out_cap);
-      if (expanded)
-      {
+      if (expanded) {
         mci_expand(s, raw, expanded, out_cap);
         send_str(s, expanded);
         free(expanded);
-      }
-      else
-      {
+      } else {
         send_str(s, raw);
       }
       free(raw);
@@ -558,8 +523,7 @@ static void send_motd(Session *s)
   send_str(s, "\r\n(MOTD missing)\r\n");
 }
 
-static void send_art(Session *s, const char *path)
-{
+static void send_art(Session *s, const char *path) {
   if (!s || !path)
     return;
   size_t len = 0;
@@ -568,50 +532,52 @@ static void send_art(Session *s, const char *path)
     return;
   size_t cap = len * 2 + 1;
   char *out = (char *)malloc(cap);
-  if (out)
-  {
+  if (out) {
     mci_expand(s, raw, out, cap);
     send_str(s, out);
     free(out);
-  }
-  else
-  {
+  } else {
     send_str(s, raw);
   }
   free(raw);
 }
 
-/* Try art_path/name.ans (if ANSI) then art_path/name.asc; return true if shown. */
-static bool send_named_art(Session *s, const char *name)
-{
-  if (!s || !name) return false;
+/* Try art_path/name.ans (if ANSI) then art_path/name.asc; return true if shown.
+ */
+static bool send_named_art(Session *s, const char *name) {
+  if (!s || !name)
+    return false;
   char path[512];
   if (s->ansi) {
     snprintf(path, sizeof(path), "%s/%s.ans", s->cfg.art_path, name);
-    if (access(path, R_OK) == 0) { send_art(s, path); return true; }
+    if (access(path, R_OK) == 0) {
+      send_art(s, path);
+      return true;
+    }
   }
   snprintf(path, sizeof(path), "%s/%s.asc", s->cfg.art_path, name);
-  if (access(path, R_OK) == 0) { send_art(s, path); return true; }
+  if (access(path, R_OK) == 0) {
+    send_art(s, path);
+    return true;
+  }
   return false;
 }
 
-static bool resolve_start_menu_path(const Session *s, char *out, size_t cap)
-{
+static bool resolve_start_menu_path(const Session *s, char *out, size_t cap) {
   if (!s || !out || cap == 0)
     return false;
   out[0] = '\0';
-  if (s->user.user_start_menu > 0)
-  {
+  if (s->user.user_start_menu > 0) {
     char candidate[256];
-    snprintf(candidate, sizeof(candidate), "menus/menu%d.mnu", s->user.user_start_menu);
-    if (access(candidate, R_OK) == 0)
-    {
+    snprintf(candidate, sizeof(candidate), "menus/menu%d.mnu",
+             s->user.user_start_menu);
+    if (access(candidate, R_OK) == 0) {
       snprintf(out, cap, "%s", candidate);
       return true;
     }
-    snprintf(candidate, sizeof(candidate), "menus/%d.mnu", s->user.user_start_menu);
-    if (access(candidate, R_OK) == 0)
-    {
+    snprintf(candidate, sizeof(candidate), "menus/%d.mnu",
+             s->user.user_start_menu);
+    if (access(candidate, R_OK) == 0) {
       snprintf(out, cap, "%s", candidate);
       return true;
     }
@@ -620,8 +586,8 @@ static bool resolve_start_menu_path(const Session *s, char *out, size_t cap)
   return out[0] != '\0';
 }
 
-static bool parse_strict_int(const char *text, int min_value, int max_value, int *out)
-{
+static bool parse_strict_int(const char *text, int min_value, int max_value,
+                             int *out) {
   if (!text || !text[0] || !out)
     return false;
   char *end = NULL;
@@ -632,8 +598,8 @@ static bool parse_strict_int(const char *text, int min_value, int max_value, int
   return true;
 }
 
-static bool cfg_edit_set_value(BbsConfig *cfg, const char *key, const char *value, char *err, size_t errcap)
-{
+static bool cfg_edit_set_value(BbsConfig *cfg, const char *key,
+                               const char *value, char *err, size_t errcap) {
   int n = 0;
   if (!cfg || !key || !value)
     return false;
@@ -643,169 +609,169 @@ static bool cfg_edit_set_value(BbsConfig *cfg, const char *key, const char *valu
     snprintf(cfg->sysop_name, sizeof(cfg->sysop_name), "%s", value);
   else if (!strcmp(key, "bind"))
     snprintf(cfg->bind, sizeof(cfg->bind), "%s", value);
-  else if (!strcmp(key, "port"))
-  {
-    if (!parse_strict_int(value, 1, 65535, &n)) goto bad_int;
+  else if (!strcmp(key, "port")) {
+    if (!parse_strict_int(value, 1, 65535, &n))
+      goto bad_int;
     cfg->port = n;
-  }
-  else if (!strcmp(key, "menu_main"))
+  } else if (!strcmp(key, "menu_main"))
     snprintf(cfg->menu_main, sizeof(cfg->menu_main), "%s", value);
   else if (!strcmp(key, "data_path"))
     snprintf(cfg->data_path, sizeof(cfg->data_path), "%s", value);
   else if (!strcmp(key, "logs_path"))
     snprintf(cfg->logs_path, sizeof(cfg->logs_path), "%s", value);
-  else if (!strcmp(key, "idle_timeout_sec"))
-  {
-    if (!parse_strict_int(value, 1, 86400, &n)) goto bad_int;
+  else if (!strcmp(key, "idle_timeout_sec")) {
+    if (!parse_strict_int(value, 1, 86400, &n))
+      goto bad_int;
     cfg->idle_timeout_sec = n;
-  }
-  else if (!strcmp(key, "session_time_limit_min"))
-  {
-    if (!parse_strict_int(value, 0, 1440, &n)) goto bad_int;
+  } else if (!strcmp(key, "session_time_limit_min")) {
+    if (!parse_strict_int(value, 0, 1440, &n))
+      goto bad_int;
     cfg->session_time_limit_min = n;
-  }
-  else if (!strcmp(key, "scheduler_enabled"))
-  {
-    if (!parse_strict_int(value, 0, 1, &n)) goto bad_bool;
+  } else if (!strcmp(key, "scheduler_enabled")) {
+    if (!parse_strict_int(value, 0, 1, &n))
+      goto bad_bool;
     cfg->scheduler_enabled = n;
-  }
-  else if (!strcmp(key, "scheduler_tick_sec"))
-  {
-    if (!parse_strict_int(value, 1, 86400, &n)) goto bad_int;
+  } else if (!strcmp(key, "scheduler_tick_sec")) {
+    if (!parse_strict_int(value, 1, 86400, &n))
+      goto bad_int;
     cfg->scheduler_tick_sec = n;
-  }
-  else if (!strcmp(key, "guest_enabled"))
-  {
-    if (!parse_strict_int(value, 0, 1, &n)) goto bad_bool;
+  } else if (!strcmp(key, "guest_enabled")) {
+    if (!parse_strict_int(value, 0, 1, &n))
+      goto bad_bool;
     cfg->guest_enabled = n;
-  }
-  else if (!strcmp(key, "guest_handle"))
+  } else if (!strcmp(key, "guest_handle"))
     snprintf(cfg->guest_handle, sizeof(cfg->guest_handle), "%s", value);
-  else if (!strcmp(key, "wfc_enabled"))
-  {
-    if (!parse_strict_int(value, 0, 1, &n)) goto bad_bool;
+  else if (!strcmp(key, "wfc_enabled")) {
+    if (!parse_strict_int(value, 0, 1, &n))
+      goto bad_bool;
     cfg->wfc_enabled = n;
-  }
-  else if (!strcmp(key, "wfc_shell_enabled"))
-  {
-    if (!parse_strict_int(value, 0, 1, &n)) goto bad_bool;
+  } else if (!strcmp(key, "wfc_shell_enabled")) {
+    if (!parse_strict_int(value, 0, 1, &n))
+      goto bad_bool;
     cfg->wfc_shell_enabled = n;
-  }
-  else if (!strcmp(key, "wfc_shell_command"))
-    snprintf(cfg->wfc_shell_command, sizeof(cfg->wfc_shell_command), "%s", value);
-  else if (!strcmp(key, "console_enabled"))
-  {
-    if (!parse_strict_int(value, 0, 1, &n)) goto bad_bool;
+  } else if (!strcmp(key, "wfc_shell_command"))
+    snprintf(cfg->wfc_shell_command, sizeof(cfg->wfc_shell_command), "%s",
+             value);
+  else if (!strcmp(key, "console_enabled")) {
+    if (!parse_strict_int(value, 0, 1, &n))
+      goto bad_bool;
     cfg->console_enabled = n;
-  }
-  else if (!strcmp(key, "console_bind"))
+  } else if (!strcmp(key, "console_bind"))
     snprintf(cfg->console_bind, sizeof(cfg->console_bind), "%s", value);
-  else if (!strcmp(key, "console_port"))
-  {
-    if (!parse_strict_int(value, 1, 65535, &n)) goto bad_int;
+  else if (!strcmp(key, "console_port")) {
+    if (!parse_strict_int(value, 1, 65535, &n))
+      goto bad_int;
     cfg->console_port = n;
-  }
-  else if (!strcmp(key, "console_idle_timeout_sec"))
-  {
-    if (!parse_strict_int(value, 1, 86400, &n)) goto bad_int;
+  } else if (!strcmp(key, "console_idle_timeout_sec")) {
+    if (!parse_strict_int(value, 1, 86400, &n))
+      goto bad_int;
     cfg->console_idle_timeout_sec = n;
-  }
-  else if (!strcmp(key, "max_calls_per_day"))
-  {
-    if (!parse_strict_int(value, 0, 10000, &n)) goto bad_int;
+  } else if (!strcmp(key, "max_calls_per_day")) {
+    if (!parse_strict_int(value, 0, 10000, &n))
+      goto bad_int;
     cfg->max_calls_per_day = n;
-  }
-  else
-  {
-    if (err) snprintf(err, errcap, "unsupported config key");
+  } else {
+    if (err)
+      snprintf(err, errcap, "unsupported config key");
     return false;
   }
   return true;
 bad_int:
-  if (err) snprintf(err, errcap, "expected numeric value in range");
+  if (err)
+    snprintf(err, errcap, "expected numeric value in range");
   return false;
 bad_bool:
-  if (err) snprintf(err, errcap, "expected 0 or 1");
+  if (err)
+    snprintf(err, errcap, "expected 0 or 1");
   return false;
 }
 
-static void cmd_config_editor(Session *s)
-{
-  if (!acs_allows(s, "+A"))
-  {
+static void cmd_config_editor(Session *s) {
+  if (!acs_allows(s, "+A")) {
     send_str(s, "\r\nAccess denied.\r\n");
     return;
   }
-  if (!s->cfg.source_path[0])
-  {
+  if (!s->cfg.source_path[0]) {
     send_str(s, "\r\nConfig source path is unknown; cannot save.\r\n");
     return;
   }
 
   send_str(s, "\r\n\x1b[1;36mConfig Editor\x1b[0m\r\n");
-  send_str(s, "Editable keys: bbs_name sysop_name bind port menu_main data_path logs_path\r\n");
-  send_str(s, "idle_timeout_sec session_time_limit_min scheduler_enabled scheduler_tick_sec\r\n");
-  send_str(s, "guest_enabled guest_handle console_enabled console_bind console_port console_idle_timeout_sec\r\n");
-  send_str(s, "wfc_enabled wfc_shell_enabled wfc_shell_command max_calls_per_day\r\n");
+  send_str(s, "Editable keys: bbs_name sysop_name bind port menu_main "
+              "data_path logs_path\r\n");
+  send_str(s, "idle_timeout_sec session_time_limit_min scheduler_enabled "
+              "scheduler_tick_sec\r\n");
+  send_str(s, "guest_enabled guest_handle console_enabled console_bind "
+              "console_port console_idle_timeout_sec\r\n");
+  send_str(
+      s,
+      "wfc_enabled wfc_shell_enabled wfc_shell_command max_calls_per_day\r\n");
   char key[64] = {0};
   char value[256] = {0};
-  if (prompt_line(s, "Key (blank to cancel): ", key, sizeof(key)) <= 0 || !key[0])
+  if (prompt_line(s, "Key (blank to cancel): ", key, sizeof(key)) <= 0 ||
+      !key[0])
     return;
   if (prompt_line(s, "New value: ", value, sizeof(value)) < 0)
     return;
 
   BbsConfig next = s->cfg;
   char err[128] = {0};
-  if (!cfg_edit_set_value(&next, key, value, err, sizeof(err)))
-  {
+  if (!cfg_edit_set_value(&next, key, value, err, sizeof(err))) {
     send_str(s, "\r\nInvalid value: ");
     send_str(s, err[0] ? err : "rejected");
     send_str(s, "\r\n");
     log_audit(s->user.handle, "config_edit_rejected", key);
     return;
   }
-  if (!cfg_save(next.source_path, &next))
-  {
+  if (!cfg_save(next.source_path, &next)) {
     send_str(s, "\r\nConfig save failed.\r\n");
     log_audit(s->user.handle, "config_edit_failed", key);
     return;
   }
-  if (cfg_load(next.source_path, &s->cfg))
-  {
+  if (cfg_load(next.source_path, &s->cfg)) {
     send_str(s, "\r\nConfig saved and reloaded.\r\n");
     log_audit(s->user.handle, "config_edit_saved", key);
-  }
-  else
-  {
+  } else {
     s->cfg = next;
-    send_str(s, "\r\nConfig saved, but reload failed; active session kept edited values.\r\n");
+    send_str(s, "\r\nConfig saved, but reload failed; active session kept "
+                "edited values.\r\n");
     log_audit(s->user.handle, "config_edit_reload_failed", key);
   }
 }
 
-/* Parse escape sequence into an F-key number (1-12). Returns 0 if not an F-key. */
-static int parse_fkey(const uint8_t *line, int len)
-{
-  if (len < 2 || line[0] != 0x1B) return 0;
+/* Parse escape sequence into an F-key number (1-12). Returns 0 if not an F-key.
+ */
+static int parse_fkey(const uint8_t *line, int len) {
+  if (len < 2 || line[0] != 0x1B)
+    return 0;
 
   /* VT100 application mode: ESC O P/Q/R/S = F1-F4 */
   if (len >= 3 && line[1] == 'O') {
     switch (line[2]) {
-      case 'P': return 1;
-      case 'Q': return 2;
-      case 'R': return 3;
-      case 'S': return 4;
+    case 'P':
+      return 1;
+    case 'Q':
+      return 2;
+    case 'R':
+      return 3;
+    case 'S':
+      return 4;
     }
   }
 
   /* Linux console: ESC [ [ A/B/C/D/E = F1-F5 */
   if (len >= 4 && line[1] == '[' && line[2] == '[') {
     switch (line[3]) {
-      case 'A': return 1;
-      case 'B': return 2;
-      case 'C': return 3;
-      case 'D': return 4;
-      case 'E': return 5;
+    case 'A':
+      return 1;
+    case 'B':
+      return 2;
+    case 'C':
+      return 3;
+    case 'D':
+      return 4;
+    case 'E':
+      return 5;
     }
   }
 
@@ -814,26 +780,42 @@ static int parse_fkey(const uint8_t *line, int len)
     /* Find '~' */
     int end = -1;
     for (int i = 2; i < len; i++) {
-      if (line[i] == '~') { end = i; break; }
+      if (line[i] == '~') {
+        end = i;
+        break;
+      }
     }
-    if (end < 3) return 0;
+    if (end < 3)
+      return 0;
     char num[8] = {0};
     for (int i = 2; i < end && i - 2 < 7; i++)
       num[i - 2] = (char)line[i];
     int n = atoi(num);
     switch (n) {
-      case 11: return 1;
-      case 12: return 2;
-      case 13: return 3;
-      case 14: return 4;
-      case 15: return 5;
-      case 17: return 6;
-      case 18: return 7;
-      case 19: return 8;
-      case 20: return 9;
-      case 21: return 10;
-      case 23: return 11;
-      case 24: return 12;
+    case 11:
+      return 1;
+    case 12:
+      return 2;
+    case 13:
+      return 3;
+    case 14:
+      return 4;
+    case 15:
+      return 5;
+    case 17:
+      return 6;
+    case 18:
+      return 7;
+    case 19:
+      return 8;
+    case 20:
+      return 9;
+    case 21:
+      return 10;
+    case 23:
+      return 11;
+    case 24:
+      return 12;
     }
   }
   return 0;
@@ -841,132 +823,137 @@ static int parse_fkey(const uint8_t *line, int len)
 
 /* Handle a sysop F-key from the remote session menu loop.
    Returns true if the input was consumed (do not continue to menu dispatch). */
-static bool handle_fkey(Session *s, int fnum)
-{
-  if (!acs_allows(s, "+A")) return false; /* sysop only */
+static bool handle_fkey(Session *s, int fnum) {
+  if (!acs_allows(s, "+A"))
+    return false; /* sysop only */
 
   char buf[256];
   switch (fnum) {
-    case 1: /* F1 - who's online */
-      send_str(s, "\r\n\x1b[1;36m--- Who's Online ---\x1b[0m\r\n");
-      {
-        char who[2048] = {0};
-        online_list(who, sizeof(who));
-        send_str(s, who[0] ? who : "(nobody else online)\r\n");
-      }
-      send_str(s, "\r\n");
-      return true;
+  case 1: /* F1 - who's online */
+    send_str(s, "\r\n\x1b[1;36m--- Who's Online ---\x1b[0m\r\n");
+    {
+      char who[2048] = {0};
+      online_list(who, sizeof(who));
+      send_str(s, who[0] ? who : "(nobody else online)\r\n");
+    }
+    send_str(s, "\r\n");
+    return true;
 
-    case 2: /* F2 - broadcast */
-      send_str(s, "\r\n\x1b[1;33mBroadcast message: \x1b[0m");
-      {
-        char msg[256] = {0};
-        if (prompt_line(s, NULL, msg, sizeof(msg)) > 0 && msg[0]) {
-          char full[300];
-          snprintf(full, sizeof(full), "\r\n[SYSOP] %s\r\n", msg);
-          online_broadcast(full);
-          send_str(s, "Broadcast sent.\r\n");
-        }
+  case 2: /* F2 - broadcast */
+    send_str(s, "\r\n\x1b[1;33mBroadcast message: \x1b[0m");
+    {
+      char msg[256] = {0};
+      if (prompt_line(s, NULL, msg, sizeof(msg)) > 0 && msg[0]) {
+        char full[300];
+        snprintf(full, sizeof(full), "\r\n[SYSOP] %s\r\n", msg);
+        online_broadcast(full);
+        send_str(s, "Broadcast sent.\r\n");
       }
-      return true;
+    }
+    return true;
 
-    case 3: /* F3 - kick node */
-      send_str(s, "\r\nNode to kick: ");
-      {
-        char ns[8] = {0};
-        if (prompt_line(s, NULL, ns, sizeof(ns)) > 0) {
-          int node = atoi(ns);
-          if (node > 0) {
-            snprintf(buf, sizeof(buf),
-                     "\r\nYou have been disconnected by the sysop.\r\n");
-            if (online_mark_node_dead(node, s, buf)) {
-              send_str(s, "Node kicked.\r\n");
-            } else {
-              send_str(s, "Node not found.\r\n");
-            }
+  case 3: /* F3 - kick node */
+    send_str(s, "\r\nNode to kick: ");
+    {
+      char ns[8] = {0};
+      if (prompt_line(s, NULL, ns, sizeof(ns)) > 0) {
+        int node = atoi(ns);
+        if (node > 0) {
+          snprintf(buf, sizeof(buf),
+                   "\r\nYou have been disconnected by the sysop.\r\n");
+          if (online_mark_node_dead(node, s, buf)) {
+            send_str(s, "Node kicked.\r\n");
+          } else {
+            send_str(s, "Node not found.\r\n");
           }
         }
       }
-      return true;
+    }
+    return true;
 
-    case 4: /* F4 - system stats */
-      {
-        int users = 0, files = 0, msgs = 0;
-        char who[2048] = {0};
-        online_list(who, sizeof(who));
-        snprintf(buf, sizeof(buf),
-                 "\r\n\x1b[1;36m--- System Status ---\x1b[0m\r\n"
-                 "BBS: %s  Node: %d\r\n"
-                 "Online: %s\r\n",
-                 s->cfg.bbs_name[0] ? s->cfg.bbs_name : "Mutineer",
-                 s->node_num, who[0] ? who : "(empty)");
-        send_str(s, buf);
-        (void)users; (void)files; (void)msgs;
-      }
-      return true;
+  case 4: /* F4 - system stats */
+  {
+    int users = 0, files = 0, msgs = 0;
+    char who[2048] = {0};
+    online_list(who, sizeof(who));
+    snprintf(buf, sizeof(buf),
+             "\r\n\x1b[1;36m--- System Status ---\x1b[0m\r\n"
+             "BBS: %s  Node: %d\r\n"
+             "Online: %s\r\n",
+             s->cfg.bbs_name[0] ? s->cfg.bbs_name : "Mutineer", s->node_num,
+             who[0] ? who : "(empty)");
+    send_str(s, buf);
+    (void)users;
+    (void)files;
+    (void)msgs;
+  }
+    return true;
 
-    case 8: /* F8 - twit user (kick and mark) */
-      send_str(s, "\r\nNode to twit: ");
-      {
-        char ns[8] = {0};
-        if (prompt_line(s, NULL, ns, sizeof(ns)) > 0) {
-          int node = atoi(ns);
-          if (node > 0) {
-            if (online_mark_node_dead(node, s, "\r\nReturning you to the BBS.\r\n")) {
-              send_str(s, "User twittered.\r\n");
-            } else {
-              send_str(s, "Node not found.\r\n");
-            }
+  case 8: /* F8 - twit user (kick and mark) */
+    send_str(s, "\r\nNode to twit: ");
+    {
+      char ns[8] = {0};
+      if (prompt_line(s, NULL, ns, sizeof(ns)) > 0) {
+        int node = atoi(ns);
+        if (node > 0) {
+          if (online_mark_node_dead(node, s,
+                                    "\r\nReturning you to the BBS.\r\n")) {
+            send_str(s, "User twittered.\r\n");
+          } else {
+            send_str(s, "Node not found.\r\n");
           }
         }
       }
-      return true;
+    }
+    return true;
 
-    case 10: /* F10 - initiate chat with node */
-      send_str(s, "\r\nChat with node: ");
-      {
-        char ns[8] = {0};
-        if (prompt_line(s, NULL, ns, sizeof(ns)) > 0) {
-          int node = atoi(ns);
-          if (node > 0) {
-            Session *target = online_get_node(node);
-            if (target && target != s) {
-              send_str(target, "\r\n[Sysop requests chat. Enter split chat.]\r\n");
-              split_chat_start(s, target);
-            } else {
-              send_str(s, "Node not found.\r\n");
-            }
+  case 10: /* F10 - initiate chat with node */
+    send_str(s, "\r\nChat with node: ");
+    {
+      char ns[8] = {0};
+      if (prompt_line(s, NULL, ns, sizeof(ns)) > 0) {
+        int node = atoi(ns);
+        if (node > 0) {
+          Session *target = online_get_node(node);
+          if (target && target != s) {
+            send_str(target,
+                     "\r\n[Sysop requests chat. Enter split chat.]\r\n");
+            split_chat_start(s, target);
+          } else {
+            send_str(s, "Node not found.\r\n");
           }
         }
       }
-      return true;
+    }
+    return true;
 
-    default:
-      return false; /* unbound F-key — ignore */
+  default:
+    return false; /* unbound F-key — ignore */
   }
 }
 
-int prompt_line(Session *s, const char *prompt, char *out, size_t cap)
-{
+int prompt_line(Session *s, const char *prompt, char *out, size_t cap) {
   if (!s || !out || cap == 0)
     return -1;
   if (prompt)
     send_str(s, prompt);
   uint8_t line[256];
-  int n = readline_echo(s, line, sizeof(line), s->cfg.idle_timeout_sec, ECHO_ON);
+  int n =
+      readline_echo(s, line, sizeof(line), s->cfg.idle_timeout_sec, ECHO_ON);
   if (n < 0)
     return n;
   send_str(s, "\r\n"); /* newline after user input */
   size_t copy_n = (size_t)n;
-  if (copy_n >= cap) copy_n = cap - 1;
+  if (copy_n >= cap)
+    copy_n = cap - 1;
   memcpy(out, line, copy_n);
   out[copy_n] = '\0';
   return n;
 }
 
 /* Password prompt - echoes dots instead of characters */
-static int prompt_password(Session *s, const char *prompt, char *out, size_t cap)
-{
+static int prompt_password(Session *s, const char *prompt, char *out,
+                           size_t cap) {
   if (!s || !out || cap == 0)
     return -1;
   if (prompt)
@@ -974,27 +961,27 @@ static int prompt_password(Session *s, const char *prompt, char *out, size_t cap
   if (!s->io_readline)
     telnet_password_begin(s->fd);
   uint8_t line[256];
-  int n = readline_echo(s, line, sizeof(line), s->cfg.idle_timeout_sec, ECHO_DOTS);
+  int n =
+      readline_echo(s, line, sizeof(line), s->cfg.idle_timeout_sec, ECHO_DOTS);
   if (!s->io_readline)
     telnet_password_end(s->fd);
   if (n < 0)
     return n;
   send_str(s, "\r\n"); /* newline after user input */
   size_t copy_n = (size_t)n;
-  if (copy_n >= cap) copy_n = cap - 1;
+  if (copy_n >= cap)
+    copy_n = cap - 1;
   memcpy(out, line, copy_n);
   out[copy_n] = '\0';
   return n;
 }
 
 /* Drain any pending telnet negotiation data (non-blocking) */
-static void drain_telnet_negotiation(Session *s)
-{
+static void drain_telnet_negotiation(Session *s) {
   fd_set rfds;
   struct timeval tv = {.tv_sec = 0, .tv_usec = 100000}; /* 100ms */
 
-  for (int i = 0; i < 10; i++)
-  {
+  for (int i = 0; i < 10; i++) {
     FD_ZERO(&rfds);
     FD_SET(s->fd, &rfds);
     int r = select(s->fd + 1, &rfds, NULL, NULL, &tv);
@@ -1013,8 +1000,7 @@ static void drain_telnet_negotiation(Session *s)
   }
 }
 
-static void send_welcome_letter(Session *s, int user_id, const char *handle)
-{
+static void send_welcome_letter(Session *s, int user_id, const char *handle) {
   if (!s->cfg.welcome_letter_enabled || !s->cfg.welcome_letter_file[0])
     return;
 
@@ -1025,79 +1011,77 @@ static void send_welcome_letter(Session *s, int user_id, const char *handle)
   char body[4096] = {0};
   size_t total = 0;
   char line[256];
-  while (fgets(line, sizeof(line), f) && total < sizeof(body) - 256)
-  {
+  while (fgets(line, sizeof(line), f) && total < sizeof(body) - 256) {
     size_t len = strlen(line);
     memcpy(body + total, line, len);
     total += len;
   }
   fclose(f);
 
-  if (body[0])
-  {
+  if (body[0]) {
     /* Post as private email to the new user */
     db_message_post(s->db, 0, 1, "Welcome to the BBS!", body, 0);
 
     /* Also send as SMW notification */
     char smw_msg[256];
-    snprintf(smw_msg, sizeof(smw_msg), "Welcome! Check your email for a welcome message from %s.",
+    snprintf(smw_msg, sizeof(smw_msg),
+             "Welcome! Check your email for a welcome message from %s.",
              s->cfg.welcome_letter_from);
     db_smw_send(s->db, 1, s->cfg.welcome_letter_from, user_id, handle, smw_msg);
   }
 }
 
-static int authenticate(Session *s, DbUser *user_out)
-{
+static int authenticate(Session *s, DbUser *user_out) {
   char handle[64] = {0};
 
   /* Prompt for handle */
-  if (s->ansi)
-  {
+  if (s->ansi) {
     send_str(s, "\x1b[32mHandle: \x1b[0m");
-  }
-  else
-  {
+  } else {
     send_str(s, "Handle: ");
   }
 
   int n = prompt_line(s, NULL, handle, sizeof(handle));
-  if (n <= 0 || handle[0] == 0)
-  {
+  if (n <= 0 || handle[0] == 0) {
     log_warn("auth: handle read failed n=%d", n);
     return n;
   }
   log_info("auth: handle=%s", handle);
 
-  if (bbs_login_throttled(&s->cfg, s->ip, handle))
-  {
+  if (bbs_login_throttled(&s->cfg, s->ip, handle)) {
     send_str(s, "\r\nToo many attempts. Please wait and try again.\r\n");
     return -1;
   }
 
   /* Check for guest login */
-  if (s->cfg.guest_enabled && strcasecmp(handle, s->cfg.guest_handle) == 0)
-  {
+  if (s->cfg.guest_enabled && strcasecmp(handle, s->cfg.guest_handle) == 0) {
     send_str(s, "\r\n\x1b[1;33mGuest Login\x1b[0m\r\n");
     send_str(s, "Please provide some information:\r\n\r\n");
 
-    char guest_name[64] = {0}, guest_location[64] = {0}, guest_referral[64] = {0};
+    char guest_name[64] = {0}, guest_location[64] = {0},
+         guest_referral[64] = {0};
     prompt_line(s, "Your Name: ", guest_name, sizeof(guest_name));
-    prompt_line(s, "Location (City, State): ", guest_location, sizeof(guest_location));
-    prompt_line(s, "How did you hear about us? ", guest_referral, sizeof(guest_referral));
+    prompt_line(s, "Location (City, State): ", guest_location,
+                sizeof(guest_location));
+    prompt_line(s, "How did you hear about us? ", guest_referral,
+                sizeof(guest_referral));
 
     DbUser guest = {0};
-    const char *guest_handle = s->cfg.guest_handle[0] ? s->cfg.guest_handle : "GUEST";
-    if (!db_user_fetch(s->db, guest_handle, &guest))
-    {
-      if (!db_user_create(s->db, guest_handle, "!", s->cfg.guest_level_id > 0 ? s->cfg.guest_level_id : 1) ||
-          !db_user_fetch(s->db, guest_handle, &guest))
-      {
+    const char *guest_handle =
+        s->cfg.guest_handle[0] ? s->cfg.guest_handle : "GUEST";
+    if (!db_user_fetch(s->db, guest_handle, &guest)) {
+      if (!db_user_create(s->db, guest_handle, "!",
+                          s->cfg.guest_level_id > 0 ? s->cfg.guest_level_id
+                                                    : 1) ||
+          !db_user_fetch(s->db, guest_handle, &guest)) {
         send_str(s, "\r\nGuest account is unavailable.\r\n");
-        log_audit(guest_handle, "guest_login_failed", "persistent user create failed");
+        log_audit(guest_handle, "guest_login_failed",
+                  "persistent user create failed");
         return -1;
       }
     }
-    snprintf(guest.real_name, sizeof(guest.real_name), "%s", guest_name[0] ? guest_name : guest.handle);
+    snprintf(guest.real_name, sizeof(guest.real_name), "%s",
+             guest_name[0] ? guest_name : guest.handle);
     snprintf(guest.city_state, sizeof(guest.city_state), "%s", guest_location);
     if (guest.time_limit_min <= 0)
       guest.time_limit_min = 30;
@@ -1105,49 +1089,44 @@ static int authenticate(Session *s, DbUser *user_out)
     if (user_out)
       *user_out = guest;
     log_info("auth: guest login from %s (%s)", guest_name, guest_location);
-    log_audit(guest.handle, "guest_login", guest_referral[0] ? guest_referral : "no referral");
+    log_audit(guest.handle, "guest_login",
+              guest_referral[0] ? guest_referral : "no referral");
     bbs_login_record(&s->cfg, s->ip, handle, true);
     send_str(s, "\r\nWelcome, guest! Your access is limited.\r\n");
     return 1;
   }
 
   DbUser user;
-  if (db_user_fetch(s->db, handle, &user))
-  {
+  if (db_user_fetch(s->db, handle, &user)) {
     char pw[64] = {0};
 
     /* Prompt for password (echoes dots) */
-    if (s->ansi)
-    {
+    if (s->ansi) {
       n = prompt_password(s, "\x1b[32mPassword: \x1b[0m", pw, sizeof(pw));
-    }
-    else
-    {
+    } else {
       n = prompt_password(s, "Password: ", pw, sizeof(pw));
     }
-    if (n <= 0)
-    {
+    if (n <= 0) {
       log_warn("auth: pw read failed n=%d", n);
       return n;
     }
-    if (!pw_hash_verify(pw, user.pw_hash))
-    {
+    if (!pw_hash_verify(pw, user.pw_hash)) {
       send_str(s, "\r\nInvalid password.\r\n");
       bbs_login_record(&s->cfg, s->ip, handle, false);
       log_warn("auth: invalid password for %s", handle);
 
       /* Offer password recovery if security question is set */
       char question[128], answer_hash[128];
-      if (db_user_get_security_question(s->db, handle, question, sizeof(question), answer_hash, sizeof(answer_hash)))
-      {
+      if (db_user_get_security_question(s->db, handle, question,
+                                        sizeof(question), answer_hash,
+                                        sizeof(answer_hash))) {
         send_str(s, "Forgot your password? (Y/N): ");
         uint8_t line[8];
         int r = session_readline(s, line, sizeof(line), 30);
-        if (r > 0 && (line[0] == 'Y' || line[0] == 'y'))
-        {
-          if (recovery_throttled(&s->cfg, s->ip, handle))
-          {
-            send_str(s, "\r\nToo many recovery attempts. Please wait and try again.\r\n");
+        if (r > 0 && (line[0] == 'Y' || line[0] == 'y')) {
+          if (recovery_throttled(&s->cfg, s->ip, handle)) {
+            send_str(s, "\r\nToo many recovery attempts. Please wait and try "
+                        "again.\r\n");
             log_audit(user.handle, "password_recovery_failed", "throttled");
             return -1;
           }
@@ -1156,97 +1135,96 @@ static int authenticate(Session *s, DbUser *user_out)
           send_str(s, "\r\nAnswer: ");
           char answer[64] = {0};
           r = session_readline(s, (uint8_t *)answer, sizeof(answer), 60);
-          if (r > 0 && answer[0])
-          {
-            if (pw_hash_verify(answer, answer_hash))
-            {
+          if (r > 0 && answer[0]) {
+            if (pw_hash_verify(answer, answer_hash)) {
               /* Correct answer - allow password reset */
               char newpw[64] = {0}, confirm[64] = {0};
-              r = prompt_password(s, "\r\nCorrect! Enter new password: ", newpw, sizeof(newpw));
-              if (r <= 0 || strlen(newpw) < 8)
-              {
-                send_str(s, "\r\nPassword must be at least 8 characters. Please log in again.\r\n");
+              r = prompt_password(s, "\r\nCorrect! Enter new password: ", newpw,
+                                  sizeof(newpw));
+              if (r <= 0 || strlen(newpw) < 8) {
+                send_str(s, "\r\nPassword must be at least 8 characters. "
+                            "Please log in again.\r\n");
                 recovery_record(&s->cfg, s->ip, handle, false);
-                log_audit(user.handle, "password_recovery_failed", "password too short");
+                log_audit(user.handle, "password_recovery_failed",
+                          "password too short");
                 return -1;
               }
-              r = prompt_password(s, "Confirm new password: ", confirm, sizeof(confirm));
-              if (r <= 0 || strcmp(newpw, confirm) != 0)
-              {
-                send_str(s, "\r\nPasswords do not match. Please log in again.\r\n");
+              r = prompt_password(s, "Confirm new password: ", confirm,
+                                  sizeof(confirm));
+              if (r <= 0 || strcmp(newpw, confirm) != 0) {
+                send_str(
+                    s, "\r\nPasswords do not match. Please log in again.\r\n");
                 recovery_record(&s->cfg, s->ip, handle, false);
-                log_audit(user.handle, "password_recovery_failed", "confirmation mismatch");
+                log_audit(user.handle, "password_recovery_failed",
+                          "confirmation mismatch");
                 return -1;
               }
 
               char newhash[256];
               if (pw_hash_make(newpw, newhash, sizeof(newhash)) &&
-                  db_user_set_pw_with_timestamp(s->db, user.id, newhash))
-              {
+                  db_user_set_pw_with_timestamp(s->db, user.id, newhash)) {
                 send_str(s, "\r\nPassword changed. Please log in again.\r\n");
-                log_audit(user.handle, "password_recovery", "Password reset via security question");
+                log_audit(user.handle, "password_recovery",
+                          "Password reset via security question");
                 return -1;
               }
-              send_str(s, "\r\nPassword reset failed. Please contact the sysop.\r\n");
+              send_str(
+                  s,
+                  "\r\nPassword reset failed. Please contact the sysop.\r\n");
               recovery_record(&s->cfg, s->ip, handle, false);
-              log_audit(user.handle, "password_recovery_failed", "password update failed");
-            }
-            else
-            {
+              log_audit(user.handle, "password_recovery_failed",
+                        "password update failed");
+            } else {
               send_str(s, "\r\nIncorrect answer.\r\n");
               recovery_record(&s->cfg, s->ip, handle, false);
-              log_audit(user.handle, "password_recovery_failed", "incorrect answer");
+              log_audit(user.handle, "password_recovery_failed",
+                        "incorrect answer");
             }
-          }
-          else
-          {
+          } else {
             recovery_record(&s->cfg, s->ip, handle, false);
-            log_audit(user.handle, "password_recovery_failed", "answer read failed");
+            log_audit(user.handle, "password_recovery_failed",
+                      "answer read failed");
           }
         }
       }
       return -1;
     }
-    if (pw_hash_needs_upgrade(user.pw_hash) && s->cfg.password_upgrade)
-    {
+    if (pw_hash_needs_upgrade(user.pw_hash) && s->cfg.password_upgrade) {
       char nhash[256];
-      if (pw_hash_make(pw, nhash, sizeof(nhash)))
-      {
+      if (pw_hash_make(pw, nhash, sizeof(nhash))) {
         db_user_set_pw(s->db, user.id, nhash);
       }
     }
     db_user_touch_login(s->db, user.id);
 
     /* Check password expiration */
-    if (s->cfg.password_expire_days > 0)
-    {
+    if (s->cfg.password_expire_days > 0) {
       int pw_age = db_user_pw_age_days(s->db, user.id);
-      if (pw_age >= s->cfg.password_expire_days)
-      {
+      if (pw_age >= s->cfg.password_expire_days) {
         if (!send_named_art(s, "PWCHANGE")) {
           char buf[128];
-          snprintf(buf, sizeof(buf), "\r\n\x1b[1;33mYour password has expired (%d days old).\x1b[0m\r\n", pw_age);
+          snprintf(buf, sizeof(buf),
+                   "\r\n\x1b[1;33mYour password has expired (%d days "
+                   "old).\x1b[0m\r\n",
+                   pw_age);
           send_str(s, buf);
           send_str(s, "You must change your password to continue.\r\n\r\n");
         }
 
         char newpw[64] = {0}, confirm[64] = {0};
         n = prompt_password(s, "New Password: ", newpw, sizeof(newpw));
-        if (n <= 0 || !newpw[0])
-        {
+        if (n <= 0 || !newpw[0]) {
           send_str(s, "\r\nPassword change required. Goodbye.\r\n");
           return -1;
         }
         n = prompt_password(s, "Confirm Password: ", confirm, sizeof(confirm));
-        if (n <= 0 || strcmp(newpw, confirm) != 0)
-        {
+        if (n <= 0 || strcmp(newpw, confirm) != 0) {
           send_str(s, "\r\nPasswords do not match. Goodbye.\r\n");
           return -1;
         }
 
         char newhash[256];
-        if (pw_hash_make(newpw, newhash, sizeof(newhash)))
-        {
+        if (pw_hash_make(newpw, newhash, sizeof(newhash))) {
           db_user_set_pw_with_timestamp(s->db, user.id, newhash);
           send_str(s, "\r\nPassword changed successfully.\r\n");
         }
@@ -1257,9 +1235,7 @@ static int authenticate(Session *s, DbUser *user_out)
       *user_out = user;
     bbs_login_record(&s->cfg, s->ip, handle, true);
     return 1;
-  }
-  else
-  {
+  } else {
     char ans[8] = {0};
     send_str(s, "\r\nNew user? (Y/n): ");
     n = prompt_line(s, NULL, ans, sizeof(ans));
@@ -1282,14 +1258,12 @@ static int authenticate(Session *s, DbUser *user_out)
     if (n < 0)
       return n;
 
-    if (strcmp(pw, pw2) != 0)
-    {
+    if (strcmp(pw, pw2) != 0) {
       send_str(s, "\r\nPasswords do not match.\r\n");
       return -1;
     }
 
-    if (strlen(pw) < 4)
-    {
+    if (strlen(pw) < 4) {
       send_str(s, "\r\nPassword must be at least 4 characters.\r\n");
       return -1;
     }
@@ -1300,8 +1274,7 @@ static int authenticate(Session *s, DbUser *user_out)
     n = prompt_line(s, "City, State/Region: ", city_state, sizeof(city_state));
     if (n < 0)
       return n;
-    if (strlen(city_state) < 2)
-    {
+    if (strlen(city_state) < 2) {
       send_str(s, "\r\nCity/State is required.\r\n");
       return -1;
     }
@@ -1311,27 +1284,27 @@ static int authenticate(Session *s, DbUser *user_out)
     n = prompt_line(s, "Email address: ", email, sizeof(email));
     if (n < 0)
       return n;
-    if (strlen(email) < 5 || !strchr(email, '@'))
-    {
+    if (strlen(email) < 5 || !strchr(email, '@')) {
       send_str(s, "\r\nValid email address is required.\r\n");
       return -1;
     }
 
     /* Optional: Social media link */
     char social[128] = {0};
-    n = prompt_line(s, "Social media link (optional): ", social, sizeof(social));
+    n = prompt_line(s, "Social media link (optional): ", social,
+                    sizeof(social));
     if (n < 0)
       return n;
 
     /* Optional: Message to SysOp */
     char sysop_msg[256] = {0};
-    n = prompt_line(s, "Message to SysOp (optional): ", sysop_msg, sizeof(sysop_msg));
+    n = prompt_line(s, "Message to SysOp (optional): ", sysop_msg,
+                    sizeof(sysop_msg));
     if (n < 0)
       return n;
 
     char hash[128];
-    if (!pw_hash_make(pw, hash, sizeof(hash)))
-    {
+    if (!pw_hash_make(pw, hash, sizeof(hash))) {
       send_str(s, "\r\nFailed to hash password.\r\n");
       return -1;
     }
@@ -1345,17 +1318,17 @@ static int authenticate(Session *s, DbUser *user_out)
     reg.sysop_msg = sysop_msg[0] ? sysop_msg : NULL;
     reg.security_level_id = 1;
 
-    if (!db_user_create_ex(s->db, &reg))
-    {
+    if (!db_user_create_ex(s->db, &reg)) {
       send_str(s, "\r\nFailed to create user.\r\n");
       return -1;
     }
-    if (db_user_fetch(s->db, handle, &user))
-    {
+    if (db_user_fetch(s->db, handle, &user)) {
       if (user_out)
         *user_out = user;
       /* seed credits */
-      db_user_update_time_credit(s->db, user.id, s->cfg.session_time_limit_min, s->cfg.default_credits, s->cfg.default_file_points);
+      db_user_update_time_credit(s->db, user.id, s->cfg.session_time_limit_min,
+                                 s->cfg.default_credits,
+                                 s->cfg.default_file_points);
       db_user_fetch(s->db, handle, &user); /* reload after updates */
       if (user_out)
         *user_out = user;
@@ -1368,13 +1341,11 @@ static int authenticate(Session *s, DbUser *user_out)
   }
 }
 
-void bbs_handle_action(Session *s, const char *action)
-{
-  if (!strcmp(action, "who"))
-  {
-    if (HAS_AC_FLAG(&s->user, AC_RUSERLIST))
-    {
-      send_str(s, "\r\n\x1b[1;31mYou are restricted from viewing user list.\x1b[0m\r\n");
+void bbs_handle_action(Session *s, const char *action) {
+  if (!strcmp(action, "who")) {
+    if (HAS_AC_FLAG(&s->user, AC_RUSERLIST)) {
+      send_str(s, "\r\n\x1b[1;31mYou are restricted from viewing user "
+                  "list.\x1b[0m\r\n");
       return;
     }
     char tmp[2048];
@@ -1382,19 +1353,14 @@ void bbs_handle_action(Session *s, const char *action)
     int n = db_node_list(s->db, nodes, 64);
     int o = 0;
     o += snprintf(tmp + o, sizeof(tmp) - o, "\r\nOnline users (nodes):\r\n");
-    if (n == 0)
-    {
+    if (n == 0) {
       o += snprintf(tmp + o, sizeof(tmp) - o, "  (none)\r\n");
-    }
-    else
-    {
-      for (int i = 0; i < n; i++)
-      {
-        o += snprintf(tmp + o, sizeof(tmp) - o, "  Node %d  %-12s IP %-15s  %s\r\n",
-                      nodes[i].node_num,
+    } else {
+      for (int i = 0; i < n; i++) {
+        o += snprintf(tmp + o, sizeof(tmp) - o,
+                      "  Node %d  %-12s IP %-15s  %s\r\n", nodes[i].node_num,
                       nodes[i].handle[0] ? nodes[i].handle : "(unknown)",
-                      nodes[i].ip,
-                      nodes[i].status);
+                      nodes[i].ip, nodes[i].status);
         if (o >= (int)sizeof(tmp))
           break;
       }
@@ -1403,54 +1369,40 @@ void bbs_handle_action(Session *s, const char *action)
     send_str(s, "\r\n(press ENTER)\r\n");
     uint8_t line[64];
     session_readline(s, line, sizeof(line), s->cfg.idle_timeout_sec);
-  }
-  else if (!strcmp(action, "wall"))
-  {
+  } else if (!strcmp(action, "wall")) {
     char msg[256] = {0};
     prompt_line(s, "Wall message: ", msg, sizeof(msg));
     char out[320];
     snprintf(out, sizeof(out), "\r\n[Wall] %s: %s\r\n", s->user.handle, msg);
     online_broadcast(out);
-  }
-  else if (!strcmp(action, "whisper"))
-  {
+  } else if (!strcmp(action, "whisper")) {
     char nodebuf[16] = {0}, msg[256] = {0};
     prompt_line(s, "Node #: ", nodebuf, sizeof(nodebuf));
     prompt_line(s, "Message: ", msg, sizeof(msg));
     int node = atoi(nodebuf);
-    if (node > 0)
-    {
+    if (node > 0) {
       char out[320];
-      snprintf(out, sizeof(out), "\r\n[Whisper from %s] %s\r\n", s->user.handle, msg);
+      snprintf(out, sizeof(out), "\r\n[Whisper from %s] %s\r\n", s->user.handle,
+               msg);
       if (!online_send_node(node, out))
         send_str(s, "\r\nNode not online.\r\n");
-    }
-    else
-    {
+    } else {
       send_str(s, "\r\nNode not online.\r\n");
     }
-  }
-  else if (!strcmp(action, "messages"))
-  {
-    if (HAS_AC_FLAG(&s->user, AC_RMSG))
-    {
+  } else if (!strcmp(action, "messages")) {
+    if (HAS_AC_FLAG(&s->user, AC_RMSG)) {
       send_str(s, "\r\n\x1b[1;31mYou are restricted from messages.\x1b[0m\r\n");
       return;
     }
     handle_msg_command(s, "MG", NULL);
     handle_msg_command(s, "MA", NULL);
     handle_msg_command(s, "MR", NULL);
-  }
-  else if (!strcmp(action, "files"))
-  {
+  } else if (!strcmp(action, "files")) {
     handle_file_command(s, "FG", NULL);
     handle_file_command(s, "FA", NULL);
     handle_file_command(s, "FL", NULL);
-  }
-  else if (!strcmp(action, "chat"))
-  {
-    if (HAS_AC_FLAG(&s->user, AC_RCHAT))
-    {
+  } else if (!strcmp(action, "chat")) {
+    if (HAS_AC_FLAG(&s->user, AC_RCHAT)) {
       send_str(s, "\r\n\x1b[1;31mYou are restricted from chat.\x1b[0m\r\n");
       return;
     }
@@ -1463,34 +1415,28 @@ void bbs_handle_action(Session *s, const char *action)
       ch = 1;
     s->chat_channel = ch;
     time_t last = 0;
-    while (s->alive && !g_stop)
-    {
+    while (s->alive && !g_stop) {
       db_node_upsert(s->db, s->node_num, s->user.id, "chat", "chat", s->ip);
       char buf[1024];
       int n = chat_dump(s->chat_channel, last, buf, sizeof(buf));
-      if (n > 0)
-      {
+      if (n > 0) {
         send_str(s, buf);
       }
       last = time(NULL);
       send_str(s, "> ");
       uint8_t line[256];
       int r = session_readline(s, line, sizeof(line), 60);
-      if (r <= 0)
-      {
+      if (r <= 0) {
         send_str(s, "\r\nLeaving chat.\r\n");
         break;
       }
-      if (!strcmp((char *)line, "/quit"))
-      {
+      if (!strcmp((char *)line, "/quit")) {
         send_str(s, "\r\nLeaving chat.\r\n");
         break;
       }
       chat_post(s->chat_channel, s->user.handle, (char *)line);
     }
-  }
-  else if (!strcmp(action, "linechat"))
-  {
+  } else if (!strcmp(action, "linechat")) {
     char nodebuf[8] = {0};
     prompt_line(s, "Node to chat with: ", nodebuf, sizeof(nodebuf));
     int node = atoi(nodebuf);
@@ -1500,8 +1446,7 @@ void bbs_handle_action(Session *s, const char *action)
     s->chat_channel = chan;
     send_str(s, "\r\nLine chat started (/quit to end).\r\n");
     time_t last = 0;
-    while (s->alive && !g_stop)
-    {
+    while (s->alive && !g_stop) {
       char buf[512];
       int n = chat_dump(chan, last, buf, sizeof(buf));
       if (n > 0)
@@ -1517,48 +1462,41 @@ void bbs_handle_action(Session *s, const char *action)
       chat_post(chan, s->user.handle, (char *)line);
       db_node_upsert(s->db, s->node_num, s->user.id, "chat", "linechat", s->ip);
     }
-  }
-  else if (!strcmp(action, "splitchat"))
-  {
+  } else if (!strcmp(action, "splitchat")) {
     char nodebuf[8] = {0};
     prompt_line(s, "Node to split-chat with: ", nodebuf, sizeof(nodebuf));
     int node = atoi(nodebuf);
     if (node <= 0)
       return;
     Session *target = online_get_node(node);
-    if (!target || target == s)
-    {
+    if (!target || target == s) {
       send_str(s, "\r\nNode not online.\r\n");
       return;
     }
     db_node_upsert(s->db, s->node_num, s->user.id, "chat", "splitchat", s->ip);
     split_chat_start(s, target);
     db_node_upsert(s->db, s->node_num, s->user.id, "online", "menu", s->ip);
-  }
-  else if (!strcmp(action, "bulletins"))
-  {
+  } else if (!strcmp(action, "bulletins")) {
     DbBulletin bulls[16];
     int n = db_bulletin_list(s->db, bulls, 16);
     send_str(s, "\r\nBulletins:\r\n");
     char linebuf[512];
-    for (int i = 0; i < n; i++)
-    {
+    for (int i = 0; i < n; i++) {
       if (!acs_allows(s, bulls[i].acs))
         continue;
       char title[256];
       mci_expand(s, bulls[i].title, title, sizeof(title));
-      snprintf(linebuf, sizeof(linebuf), " [%d] %s by %s at %s\r\n", bulls[i].id, title, bulls[i].posted_by, bulls[i].posted_at);
+      snprintf(linebuf, sizeof(linebuf), " [%d] %s by %s at %s\r\n",
+               bulls[i].id, title, bulls[i].posted_by, bulls[i].posted_at);
       send_str(s, linebuf);
     }
     send_str(s, "Read which # (blank to skip)? ");
     uint8_t line[32];
     int r = session_readline(s, line, sizeof(line), s->cfg.idle_timeout_sec);
-    if (r > 0)
-    {
+    if (r > 0) {
       int id = atoi((char *)line);
       for (int i = 0; i < n; i++)
-        if (bulls[i].id == id)
-        {
+        if (bulls[i].id == id) {
           send_str(s, "\r\n");
           char body[1024];
           mci_expand(s, bulls[i].body, body, sizeof(body));
@@ -1566,69 +1504,59 @@ void bbs_handle_action(Session *s, const char *action)
           send_str(s, "\r\n");
         }
     }
-    if (acs_allows(s, "+A"))
-    {
+    if (acs_allows(s, "+A")) {
       send_str(s, "\r\nPost new bulletin? (Y/N): ");
       r = session_readline(s, line, sizeof(line), s->cfg.idle_timeout_sec);
-      if (r > 0 && (line[0] == 'Y' || line[0] == 'y'))
-      {
+      if (r > 0 && (line[0] == 'Y' || line[0] == 'y')) {
         char title[128] = {0}, body[512] = {0};
         prompt_line(s, "Title: ", title, sizeof(title));
         prompt_line(s, "Body: ", body, sizeof(body));
         db_bulletin_add(s->db, title, body, s->user.id, "");
       }
     }
-  }
-  else if (!strcmp(action, "oneliners"))
-  {
+  } else if (!strcmp(action, "oneliners")) {
     DbOneliner oneliners[20];
     int n = db_oneliner_list(s->db, oneliners, 20);
     send_str(s, "\r\n\x1b[1;36mOne-Liners:\x1b[0m\r\n");
-    send_str(s, "\x1b[1;33m----------------------------------------------------------------------\x1b[0m\r\n");
+    send_str(s, "\x1b[1;33m----------------------------------------------------"
+                "------------------\x1b[0m\r\n");
     char linebuf[256];
-    for (int i = n - 1; i >= 0; i--)
-    {
+    for (int i = n - 1; i >= 0; i--) {
       snprintf(linebuf, sizeof(linebuf), "\x1b[1;32m%s\x1b[0m: %s\r\n",
                oneliners[i].user_handle, oneliners[i].text);
       send_str(s, linebuf);
     }
-    send_str(s, "\x1b[1;33m----------------------------------------------------------------------\x1b[0m\r\n");
+    send_str(s, "\x1b[1;33m----------------------------------------------------"
+                "------------------\x1b[0m\r\n");
     send_str(s, "\r\nAdd a one-liner? (Y/N): ");
     uint8_t line[8];
     int r = session_readline(s, line, sizeof(line), s->cfg.idle_timeout_sec);
-    if (r > 0 && (line[0] == 'Y' || line[0] == 'y'))
-    {
+    if (r > 0 && (line[0] == 'Y' || line[0] == 'y')) {
       char text[80] = {0};
       prompt_line(s, "Your one-liner (max 75 chars): ", text, sizeof(text));
-      if (text[0])
-      {
-        if (db_oneliner_add(s->db, s->user.id, s->user.handle, text))
-        {
+      if (text[0]) {
+        if (db_oneliner_add(s->db, s->user.id, s->user.handle, text)) {
           send_str(s, "\r\nOne-liner added!\r\n");
-        }
-        else
-        {
+        } else {
           send_str(s, "\r\nFailed to add one-liner.\r\n");
         }
       }
     }
-  }
-  else if (!strcmp(action, "page"))
-  {
-    if (HAS_AC_FLAG(&s->user, AC_RCHAT))
-    {
+  } else if (!strcmp(action, "page")) {
+    if (HAS_AC_FLAG(&s->user, AC_RCHAT)) {
       send_str(s, "\r\n\x1b[1;31mYou are restricted from paging.\x1b[0m\r\n");
       return;
     }
 
     int page_limit = s->cfg.max_page_sysop;
-    if (page_limit > 0 && s->pages_this_session >= page_limit)
-    {
-      send_str(s, "\r\nYou have reached the maximum number of sysop pages for this session.\r\n");
+    if (page_limit > 0 && s->pages_this_session >= page_limit) {
+      send_str(s, "\r\nYou have reached the maximum number of sysop pages for "
+                  "this session.\r\n");
       /* Offer email fallback */
       send_str(s, "Leave a feedback message for the sysop? (Y/N): ");
       uint8_t yn[4] = {0};
-      if (session_readline(s, yn, sizeof(yn), 30) > 0 && (yn[0] == 'Y' || yn[0] == 'y'))
+      if (session_readline(s, yn, sizeof(yn), 30) > 0 &&
+          (yn[0] == 'Y' || yn[0] == 'y'))
         cmd_msg_write_email(s, s->cfg.sysop_name);
       return;
     }
@@ -1647,28 +1575,26 @@ void bbs_handle_action(Session *s, const char *action)
     /* After the page wait, offer email fallback */
     send_str(s, "Leave a feedback message for the sysop? (Y/N): ");
     uint8_t yn[4] = {0};
-    if (session_readline(s, yn, sizeof(yn), 30) > 0 && (yn[0] == 'Y' || yn[0] == 'y'))
+    if (session_readline(s, yn, sizeof(yn), 30) > 0 &&
+        (yn[0] == 'Y' || yn[0] == 'y'))
       cmd_msg_write_email(s, s->cfg.sysop_name);
-  }
-  else if (!strcmp(action, "useredit"))
-  {
-    if (!acs_allows(s, "+A"))
-    {
+  } else if (!strcmp(action, "useredit")) {
+    if (!acs_allows(s, "+A")) {
       send_str(s, "\r\nAccess denied.\r\n");
       return;
     }
     char handle[64] = {0};
     prompt_line(s, "User handle: ", handle, sizeof(handle));
     DbUser u;
-    if (!db_user_fetch(s->db, handle, &u))
-    {
+    if (!db_user_fetch(s->db, handle, &u)) {
       send_str(s, "\r\nNot found.\r\n");
       return;
     }
 
     char buf[128] = {0};
     send_str(s, "\r\n\x1b[1;36mUser Editor\x1b[0m\r\n");
-    send_str(s, "----------------------------------------------------------------------\r\n");
+    send_str(s, "--------------------------------------------------------------"
+                "--------\r\n");
 
     char line[256];
     snprintf(line, sizeof(line), "Handle: %s  ID: %d  Level: %d  DSL: %d\r\n",
@@ -1678,32 +1604,37 @@ void bbs_handle_action(Session *s, const char *action)
     send_str(s, line);
     snprintf(line, sizeof(line), "Email: %s  Phone: %s\r\n", u.email, u.phone);
     send_str(s, line);
-    snprintf(line, sizeof(line), "Street: %s  City: %s  ZIP: %s\r\n",
-             u.street, u.city_state, u.zip_code);
+    snprintf(line, sizeof(line), "Street: %s  City: %s  ZIP: %s\r\n", u.street,
+             u.city_state, u.zip_code);
     send_str(s, line);
     snprintf(line, sizeof(line), "Sex: %c  Birth: %s  First On: %s\r\n",
              u.sex ? u.sex : '?', u.birth_date, u.first_on);
     send_str(s, line);
-    snprintf(line, sizeof(line), "Calls: %d  Posts: %d  Email Sent: %d  Feedback: %d\r\n",
+    snprintf(line, sizeof(line),
+             "Calls: %d  Posts: %d  Email Sent: %d  Feedback: %d\r\n",
              u.logged_on, u.msg_post, u.email_sent, u.feedback);
     send_str(s, line);
-    snprintf(line, sizeof(line), "UL: %d (%dK)  DL: %d (%dK)  Credits: %d  FP: %d\r\n",
-             u.uploads, u.uk, u.downloads, u.dk, u.credits, u.file_points);
+    snprintf(line, sizeof(line),
+             "UL: %d (%dK)  DL: %d (%dK)  Credits: %d  FP: %d\r\n", u.uploads,
+             u.uk, u.downloads, u.dk, u.credits, u.file_points);
     send_str(s, line);
-    snprintf(line, sizeof(line), "Time Limit: %d min  Timebank: %d min  Total Time: %d min\r\n",
+    snprintf(line, sizeof(line),
+             "Time Limit: %d min  Timebank: %d min  Total Time: %d min\r\n",
              u.time_limit_min, u.timebank, u.t_time_on);
     send_str(s, line);
-    snprintf(line, sizeof(line), "AR Flags: 0x%08X  AC Flags: 0x%08X  Status: 0x%08X\r\n",
-             u.flags, u.ac_flags, u.status_flags);
+    snprintf(line, sizeof(line),
+             "AR Flags: 0x%08X  AC Flags: 0x%08X  Status: 0x%08X\r\n", u.flags,
+             u.ac_flags, u.status_flags);
     send_str(s, line);
-    snprintf(line, sizeof(line), "Last Login: %s  Expires: %s\r\n", u.last_login_at, u.expires_at);
+    snprintf(line, sizeof(line), "Last Login: %s  Expires: %s\r\n",
+             u.last_login_at, u.expires_at);
     send_str(s, line);
-    if (u.note[0])
-    {
+    if (u.note[0]) {
       snprintf(line, sizeof(line), "Sysop Note: %s\r\n", u.note);
       send_str(s, line);
     }
-    send_str(s, "----------------------------------------------------------------------\r\n");
+    send_str(s, "--------------------------------------------------------------"
+                "--------\r\n");
 
     send_str(s, "\r\nEdit fields (blank to keep current value):\r\n");
 
@@ -1785,38 +1716,103 @@ void bbs_handle_action(Session *s, const char *action)
 
     send_str(s, "\r\nSave changes? (Y/N): ");
     uint8_t confirm[8];
-    int r = session_readline(s, confirm, sizeof(confirm), s->cfg.idle_timeout_sec);
-    if (r > 0 && (confirm[0] == 'Y' || confirm[0] == 'y'))
-    {
-      if (db_user_update(s->db, &u))
-      {
+    int r =
+        session_readline(s, confirm, sizeof(confirm), s->cfg.idle_timeout_sec);
+    if (r > 0 && (confirm[0] == 'Y' || confirm[0] == 'y')) {
+      if (db_user_update(s->db, &u)) {
         send_str(s, "\r\nUser updated successfully.\r\n");
-      }
-      else
-      {
+      } else {
         send_str(s, "\r\nFailed to update user.\r\n");
       }
-    }
-    else
-    {
+    } else {
       send_str(s, "\r\nChanges discarded.\r\n");
     }
     log_audit(s->user.handle, "useredit", handle);
-  }
-  else if (!strcmp(action, "doors"))
-  {
+  } else if (!strcmp(action, "changepassword")) {
+    const bool is_sysop = acs_allows(s, "+A");
+    DbUser target = s->user;
+
+    if (is_sysop) {
+      char handle[64] = {0};
+      prompt_line(s, "User handle (blank for yourself): ", handle,
+                  sizeof(handle));
+      if (handle[0] && !db_user_fetch(s->db, handle, &target)) {
+        send_str(s, "\r\nUser not found.\r\n");
+        log_audit(s->user.handle, "password_reset_failed", "user not found");
+        return;
+      }
+    }
+
+    const bool resetting_other_user = target.id != s->user.id;
+    if (!resetting_other_user) {
+      char current[128] = {0};
+      if (prompt_password(s, "Current Password: ", current, sizeof(current)) <=
+              0 ||
+          !pw_hash_verify(current, s->user.pw_hash)) {
+        send_str(s, "\r\nCurrent password is incorrect.\r\n");
+        log_audit(s->user.handle, "password_change_failed",
+                  "incorrect current password");
+        return;
+      }
+    }
+
+    char newpw[128] = {0};
+    char confirm[128] = {0};
+    if (prompt_password(s, "New Password: ", newpw, sizeof(newpw)) <= 0 ||
+        strlen(newpw) < 8) {
+      send_str(s, "\r\nPassword must be at least 8 characters.\r\n");
+      log_audit(s->user.handle,
+                resetting_other_user ? "password_reset_failed"
+                                     : "password_change_failed",
+                "password too short");
+      return;
+    }
+    if (prompt_password(s, "Confirm New Password: ", confirm,
+                        sizeof(confirm)) <= 0 ||
+        strcmp(newpw, confirm) != 0) {
+      send_str(s, "\r\nPasswords do not match.\r\n");
+      log_audit(s->user.handle,
+                resetting_other_user ? "password_reset_failed"
+                                     : "password_change_failed",
+                "confirmation mismatch");
+      return;
+    }
+
+    char newhash[256] = {0};
+    if (!pw_hash_make(newpw, newhash, sizeof(newhash)) ||
+        !db_user_set_pw_with_timestamp(s->db, target.id, newhash)) {
+      send_str(s, "\r\nPassword change failed.\r\n");
+      log_audit(s->user.handle,
+                resetting_other_user ? "password_reset_failed"
+                                     : "password_change_failed",
+                "password update failed");
+      return;
+    }
+
+    if (!resetting_other_user)
+      session_copy(s->user.pw_hash, sizeof(s->user.pw_hash), newhash);
+
+    if (resetting_other_user) {
+      char detail[96];
+      snprintf(detail, sizeof(detail), "Password reset for %s", target.handle);
+      log_audit(s->user.handle, "password_reset", detail);
+      send_str(s, "\r\nUser password reset successfully.\r\n");
+    } else {
+      log_audit(s->user.handle, "password_change", "Password changed by user");
+      send_str(s, "\r\nYour password has been changed.\r\n");
+    }
+  } else if (!strcmp(action, "doors")) {
     DbDoor doors[16];
     int dcount = db_doors_list(s->db, doors, 16);
-    if (dcount == 0)
-    {
+    if (dcount == 0) {
       send_str(s, "\r\nNo doors.\r\n");
       return;
     }
     send_str(s, "\r\nDoors:\r\n");
     char buf[256];
-    for (int i = 0; i < dcount; i++)
-    {
-      snprintf(buf, sizeof(buf), "  [%d] %s (%s)\r\n", doors[i].id, doors[i].name, doors[i].command);
+    for (int i = 0; i < dcount; i++) {
+      snprintf(buf, sizeof(buf), "  [%d] %s (%s)\r\n", doors[i].id,
+               doors[i].name, doors[i].command);
       send_str(s, buf);
     }
     send_str(s, "Choose door #: ");
@@ -1826,41 +1822,37 @@ void bbs_handle_action(Session *s, const char *action)
       return;
     int id = atoi((char *)line);
     for (int i = 0; i < dcount; i++)
-      if (doors[i].id == id)
-      {
-        if (!acs_allows(s, doors[i].acs))
-        {
+      if (doors[i].id == id) {
+        if (!acs_allows(s, doors[i].acs)) {
           send_str(s, "\r\nAccess denied.\r\n");
           return;
         }
         snprintf(buf, sizeof(buf), "\r\nEntering door: %s\r\n", doors[i].name);
         send_str(s, buf);
-        db_node_upsert(s->db, s->node_num, s->user.id, "online", doors[i].name, s->ip);
+        db_node_upsert(s->db, s->node_num, s->user.id, "online", doors[i].name,
+                       s->ip);
         bool ok = door_launch(s, &doors[i]);
         db_node_upsert(s->db, s->node_num, s->user.id, "online", "menu", s->ip);
-        send_str(s, ok ? "\r\nReturned from door.\r\n" : "\r\nDoor exited with an error.\r\n");
+        send_str(s, ok ? "\r\nReturned from door.\r\n"
+                       : "\r\nDoor exited with an error.\r\n");
         return;
       }
-  }
-  else if (!strcmp(action, "vote"))
-  {
-    if (HAS_AC_FLAG(&s->user, AC_RVOTING))
-    {
+  } else if (!strcmp(action, "vote")) {
+    if (HAS_AC_FLAG(&s->user, AC_RVOTING)) {
       send_str(s, "\r\n\x1b[1;31mYou are restricted from voting.\x1b[0m\r\n");
       return;
     }
     DbVote votes[16];
     int vcount = db_vote_list(s->db, votes, 16);
-    if (vcount == 0)
-    {
+    if (vcount == 0) {
       send_str(s, "\r\nNo open votes.\r\n");
       return;
     }
     send_str(s, "\r\nVote Booth:\r\n");
     char buf[256];
-    for (int i = 0; i < vcount; i++)
-    {
-      snprintf(buf, sizeof(buf), " [%d] %s (closes %s)\r\n", votes[i].id, votes[i].title, votes[i].closes_at);
+    for (int i = 0; i < vcount; i++) {
+      snprintf(buf, sizeof(buf), " [%d] %s (closes %s)\r\n", votes[i].id,
+               votes[i].title, votes[i].closes_at);
       send_str(s, buf);
     }
     send_str(s, "Choose vote #: ");
@@ -1871,9 +1863,9 @@ void bbs_handle_action(Session *s, const char *action)
     int vid = atoi((char *)line);
     DbVoteChoice choices[16];
     int cc = db_vote_choices(s->db, vid, choices, 16);
-    for (int i = 0; i < cc; i++)
-    {
-      snprintf(buf, sizeof(buf), "  (%d) %s\r\n", choices[i].id, choices[i].label);
+    for (int i = 0; i < cc; i++) {
+      snprintf(buf, sizeof(buf), "  (%d) %s\r\n", choices[i].id,
+               choices[i].label);
       send_str(s, buf);
     }
     send_str(s, "Pick choice #: ");
@@ -1885,23 +1877,20 @@ void bbs_handle_action(Session *s, const char *action)
       send_str(s, "\r\nVote recorded.\r\n");
     else
       send_str(s, "\r\nVote failed.\r\n");
-  }
-  else if (!strcmp(action, "voteresults"))
-  {
+  } else if (!strcmp(action, "voteresults")) {
     /* VR - View vote results */
     DbVote votes[16];
     int vcount = db_vote_list(s->db, votes, 16);
-    if (vcount == 0)
-    {
+    if (vcount == 0) {
       send_str(s, "\r\nNo votes available.\r\n");
       return;
     }
 
     send_str(s, "\r\n\x1b[1;36mVote Results\x1b[0m\r\n");
-    send_str(s, "----------------------------------------------------------------------\r\n");
+    send_str(s, "--------------------------------------------------------------"
+                "--------\r\n");
     char buf[256];
-    for (int i = 0; i < vcount; i++)
-    {
+    for (int i = 0; i < vcount; i++) {
       snprintf(buf, sizeof(buf), " [%d] %s\r\n", votes[i].id, votes[i].title);
       send_str(s, buf);
     }
@@ -1915,16 +1904,13 @@ void bbs_handle_action(Session *s, const char *action)
 
     /* Find the vote */
     DbVote *selected = NULL;
-    for (int i = 0; i < vcount; i++)
-    {
-      if (votes[i].id == vid)
-      {
+    for (int i = 0; i < vcount; i++) {
+      if (votes[i].id == vid) {
         selected = &votes[i];
         break;
       }
     }
-    if (!selected)
-    {
+    if (!selected) {
       send_str(s, "\r\nInvalid vote number.\r\n");
       return;
     }
@@ -1932,7 +1918,8 @@ void bbs_handle_action(Session *s, const char *action)
     send_str(s, "\r\n\x1b[1;33m");
     send_str(s, selected->title);
     send_str(s, "\x1b[0m\r\n");
-    send_str(s, "----------------------------------------------------------------------\r\n");
+    send_str(s, "--------------------------------------------------------------"
+                "--------\r\n");
 
     /* Get choices */
     DbVoteChoice choices[16];
@@ -1944,13 +1931,10 @@ void bbs_handle_action(Session *s, const char *action)
     int total = db_vote_total(s->db, vid);
 
     /* Display results with bar graph */
-    for (int i = 0; i < cc; i++)
-    {
+    for (int i = 0; i < cc; i++) {
       int cnt = 0;
-      for (int j = 0; j < rc; j++)
-      {
-        if (choice_ids[j] == choices[i].id)
-        {
+      for (int j = 0; j < rc; j++) {
+        if (choice_ids[j] == choices[i].id) {
           cnt = counts[j];
           break;
         }
@@ -1963,21 +1947,18 @@ void bbs_handle_action(Session *s, const char *action)
       for (int b = 0; b < bars && b < 20; b++)
         bar[b] = '#';
 
-      snprintf(buf, sizeof(buf), "  %-30s %3d (%3d%%) %s\r\n",
-               choices[i].label, cnt, pct, bar);
+      snprintf(buf, sizeof(buf), "  %-30s %3d (%3d%%) %s\r\n", choices[i].label,
+               cnt, pct, bar);
       send_str(s, buf);
     }
 
     snprintf(buf, sizeof(buf), "\r\nTotal votes: %d\r\n", total);
     send_str(s, buf);
-    if (selected->closes_at[0])
-    {
+    if (selected->closes_at[0]) {
       snprintf(buf, sizeof(buf), "Closes: %s\r\n", selected->closes_at);
       send_str(s, buf);
     }
-  }
-  else if (!strcmp(action, "timebank"))
-  {
+  } else if (!strcmp(action, "timebank")) {
     char buf[64];
     int bal = 0;
     db_timebank_get(s->db, s->user.id, &bal);
@@ -1988,69 +1969,57 @@ void bbs_handle_action(Session *s, const char *action)
     int n = session_readline(s, line, sizeof(line), s->cfg.idle_timeout_sec);
     if (n <= 0)
       return;
-    if (line[0] == 'D' || line[0] == 'd')
-    {
+    if (line[0] == 'D' || line[0] == 'd') {
       char amt[16] = {0};
       prompt_line(s, "Minutes to deposit: ", amt, sizeof(amt));
       int m = atoi(amt);
-      if (m > 0 && s->time_left_min > m)
-      {
+      if (m > 0 && s->time_left_min > m) {
         s->time_left_min -= m;
         db_timebank_add(s->db, s->user.id, m, &bal);
       }
-    }
-    else if (line[0] == 'W' || line[0] == 'w')
-    {
+    } else if (line[0] == 'W' || line[0] == 'w') {
       char amt[16] = {0};
       prompt_line(s, "Minutes to withdraw: ", amt, sizeof(amt));
       int m = atoi(amt);
-      if (db_timebank_add(s->db, s->user.id, -m, &bal))
-      {
+      if (db_timebank_add(s->db, s->user.id, -m, &bal)) {
         s->time_left_min += m;
       }
     }
     db_timebank_get(s->db, s->user.id, &bal);
     snprintf(buf, sizeof(buf), "\r\nNew balance: %d minutes\r\n", bal);
     send_str(s, buf);
-  }
-  else if (!strcmp(action, "smw"))
-  {
+  } else if (!strcmp(action, "smw")) {
     /* Short Message Waiting - read and send short messages */
     send_str(s, "\r\n\x1b[1;36mShort Messages\x1b[0m\r\n");
-    send_str(s, "----------------------------------------------------------------------\r\n");
+    send_str(s, "--------------------------------------------------------------"
+                "--------\r\n");
 
     DbShortMessage msgs[20];
     int count = db_smw_list(s->db, s->user.id, msgs, 20);
 
-    if (count == 0)
-    {
+    if (count == 0) {
       send_str(s, "No short messages.\r\n");
-    }
-    else
-    {
+    } else {
       char linebuf[512];
-      for (int i = 0; i < count; i++)
-      {
-        snprintf(linebuf, sizeof(linebuf), "[%d] %sFrom: \x1b[1;32m%s\x1b[0m at %s\r\n     %s\r\n",
-                 msgs[i].id,
-                 msgs[i].read_flag ? "" : "\x1b[1;33m*NEW* \x1b[0m",
-                 msgs[i].from_handle,
-                 msgs[i].sent_at,
-                 msgs[i].message);
+      for (int i = 0; i < count; i++) {
+        snprintf(linebuf, sizeof(linebuf),
+                 "[%d] %sFrom: \x1b[1;32m%s\x1b[0m at %s\r\n     %s\r\n",
+                 msgs[i].id, msgs[i].read_flag ? "" : "\x1b[1;33m*NEW* \x1b[0m",
+                 msgs[i].from_handle, msgs[i].sent_at, msgs[i].message);
         send_str(s, linebuf);
         db_smw_mark_read(s->db, msgs[i].id);
       }
     }
 
-    send_str(s, "----------------------------------------------------------------------\r\n");
+    send_str(s, "--------------------------------------------------------------"
+                "--------\r\n");
     send_str(s, "(S)end message, (D)elete message, or ENTER to exit: ");
     uint8_t line[16];
     int n = session_readline(s, line, sizeof(line), s->cfg.idle_timeout_sec);
     if (n <= 0)
       return;
 
-    if (line[0] == 'S' || line[0] == 's')
-    {
+    if (line[0] == 'S' || line[0] == 's') {
       char to_handle[64] = {0};
       char message[256] = {0};
 
@@ -2059,8 +2028,7 @@ void bbs_handle_action(Session *s, const char *action)
         return;
 
       DbUser to_user;
-      if (!db_user_fetch(s->db, to_handle, &to_user))
-      {
+      if (!db_user_fetch(s->db, to_handle, &to_user)) {
         send_str(s, "\r\nUser not found.\r\n");
         return;
       }
@@ -2069,42 +2037,33 @@ void bbs_handle_action(Session *s, const char *action)
       if (!message[0])
         return;
 
-      if (db_smw_send(s->db, s->user.id, s->user.handle, to_user.id, to_user.handle, message))
-      {
+      if (db_smw_send(s->db, s->user.id, s->user.handle, to_user.id,
+                      to_user.handle, message)) {
         send_str(s, "\r\nMessage sent!\r\n");
         char notify[256];
-        snprintf(notify, sizeof(notify), "\r\n\a\x1b[1;33m*** Short message from %s ***\x1b[0m\r\n", s->user.handle);
+        snprintf(notify, sizeof(notify),
+                 "\r\n\a\x1b[1;33m*** Short message from %s ***\x1b[0m\r\n",
+                 s->user.handle);
         online_send_user_id(to_user.id, notify);
-      }
-      else
-      {
+      } else {
         send_str(s, "\r\nFailed to send message.\r\n");
       }
-    }
-    else if (line[0] == 'D' || line[0] == 'd')
-    {
+    } else if (line[0] == 'D' || line[0] == 'd') {
       char id_str[16] = {0};
       prompt_line(s, "\r\nDelete message ID: ", id_str, sizeof(id_str));
       int msg_id = atoi(id_str);
-      if (msg_id > 0)
-      {
-        if (db_smw_delete(s->db, msg_id))
-        {
+      if (msg_id > 0) {
+        if (db_smw_delete(s->db, msg_id)) {
           send_str(s, "\r\nMessage deleted.\r\n");
-        }
-        else
-        {
+        } else {
           send_str(s, "\r\nFailed to delete message.\r\n");
         }
       }
     }
     /* Clear the user's SMW count after reading */
     db_user_clear_smw(s->db, s->user.id);
-  }
-  else if (!strcmp(action, "areaadmin"))
-  {
-    if (!acs_allows(s, "+A"))
-    {
+  } else if (!strcmp(action, "areaadmin")) {
+    if (!acs_allows(s, "+A")) {
       send_str(s, "\r\nAccess denied.\r\n");
       return;
     }
@@ -2113,31 +2072,23 @@ void bbs_handle_action(Session *s, const char *action)
     int n = session_readline(s, line, sizeof(line), s->cfg.idle_timeout_sec);
     if (n <= 0)
       return;
-    if (line[0] == '1')
-    {
+    if (line[0] == '1') {
       char name[64] = {0}, acs[64] = {0};
       prompt_line(s, "Name: ", name, sizeof(name));
       prompt_line(s, "ACS: ", acs, sizeof(acs));
       db_message_area_manage(s->db, name, acs, NULL, false);
-    }
-    else if (line[0] == '2')
-    {
+    } else if (line[0] == '2') {
       char name[64] = {0};
       prompt_line(s, "Name to delete: ", name, sizeof(name));
       db_message_area_manage(s->db, name, "", NULL, true);
-    }
-    else if (line[0] == '3')
-    {
+    } else if (line[0] == '3') {
       char name[64] = {0}, acs[64] = {0};
       prompt_line(s, "Name: ", name, sizeof(name));
       prompt_line(s, "ACS: ", acs, sizeof(acs));
       db_message_area_manage(s->db, name, acs, NULL, false);
     }
-  }
-  else if (!strcmp(action, "fileadmin"))
-  {
-    if (!acs_allows(s, "+A"))
-    {
+  } else if (!strcmp(action, "fileadmin")) {
+    if (!acs_allows(s, "+A")) {
       send_str(s, "\r\nAccess denied.\r\n");
       return;
     }
@@ -2146,53 +2097,46 @@ void bbs_handle_action(Session *s, const char *action)
     int n = session_readline(s, line, sizeof(line), s->cfg.idle_timeout_sec);
     if (n <= 0)
       return;
-    if (line[0] == '1')
-    {
+    if (line[0] == '1') {
       char name[64] = {0}, path[256] = {0}, acs[64] = {0};
       prompt_line(s, "Name: ", name, sizeof(name));
       prompt_line(s, "Path: ", path, sizeof(path));
       prompt_line(s, "ACS: ", acs, sizeof(acs));
       db_file_area_manage(s->db, name, path, acs, NULL, false);
-    }
-    else if (line[0] == '2')
-    {
+    } else if (line[0] == '2') {
       char name[64] = {0};
       prompt_line(s, "Name to delete: ", name, sizeof(name));
       db_file_area_manage(s->db, name, "", "", NULL, true);
-    }
-    else if (line[0] == '3')
-    {
+    } else if (line[0] == '3') {
       char name[64] = {0}, acs[64] = {0};
       prompt_line(s, "Name: ", name, sizeof(name));
       prompt_line(s, "ACS: ", acs, sizeof(acs));
       db_file_area_manage(s->db, name, "", acs, NULL, false);
     }
-  }
-  else if (!strcmp(action, "subscriptioneditor"))
-  {
+  } else if (!strcmp(action, "subscriptioneditor")) {
     /* Subscription type editor (sysop only) */
-    if (!acs_allows(s, "+A"))
-    {
+    if (!acs_allows(s, "+A")) {
       send_str(s, "\r\nAccess denied.\r\n");
       return;
     }
 
-    while (1)
-    {
+    while (1) {
       send_str(s, "\r\n\x1b[1;36mSubscription Type Editor\x1b[0m\r\n");
-      send_str(s, "----------------------------------------------------------------------\r\n");
+      send_str(s, "------------------------------------------------------------"
+                  "----------\r\n");
 
       DbSubscriptionType types[16];
       int cnt = db_subscription_type_list(s->db, types, 16);
 
       char buf[256];
       send_str(s, " ID  Name                 Days  Level  Expired  Price\r\n");
-      send_str(s, "----------------------------------------------------------------------\r\n");
-      for (int i = 0; i < cnt; i++)
-      {
+      send_str(s, "------------------------------------------------------------"
+                  "----------\r\n");
+      for (int i = 0; i < cnt; i++) {
         snprintf(buf, sizeof(buf), "%3d  %-20s %4d  %5d  %7d  %5d\r\n",
                  types[i].id, types[i].name, types[i].days,
-                 types[i].security_level_id, types[i].expired_level_id, types[i].price);
+                 types[i].security_level_id, types[i].expired_level_id,
+                 types[i].price);
         send_str(s, buf);
       }
 
@@ -2202,8 +2146,7 @@ void bbs_handle_action(Session *s, const char *action)
       if (n <= 0 || line[0] == 'Q' || line[0] == 'q')
         break;
 
-      if (line[0] == 'A' || line[0] == 'a')
-      {
+      if (line[0] == 'A' || line[0] == 'a') {
         char name[64] = {0}, days_str[16] = {0}, level_str[16] = {0};
         char expired_str[16] = {0}, price_str[16] = {0}, desc[256] = {0};
 
@@ -2211,8 +2154,10 @@ void bbs_handle_action(Session *s, const char *action)
         if (!name[0])
           continue;
         prompt_line(s, "Duration (days): ", days_str, sizeof(days_str));
-        prompt_line(s, "Security level ID while active: ", level_str, sizeof(level_str));
-        prompt_line(s, "Security level ID after expiry: ", expired_str, sizeof(expired_str));
+        prompt_line(s, "Security level ID while active: ", level_str,
+                    sizeof(level_str));
+        prompt_line(s, "Security level ID after expiry: ", expired_str,
+                    sizeof(expired_str));
         prompt_line(s, "Price (credits): ", price_str, sizeof(price_str));
         prompt_line(s, "Description: ", desc, sizeof(desc));
 
@@ -2221,39 +2166,35 @@ void bbs_handle_action(Session *s, const char *action)
         int expired = atoi(expired_str);
         int price = atoi(price_str);
 
-        if (days > 0 && level > 0)
-        {
-          if (db_subscription_type_add(s->db, name, days, level, expired > 0 ? expired : 1, price, desc))
-          {
+        if (days > 0 && level > 0) {
+          if (db_subscription_type_add(s->db, name, days, level,
+                                       expired > 0 ? expired : 1, price,
+                                       desc)) {
             send_str(s, "\r\nSubscription type added.\r\n");
-          }
-          else
-          {
+          } else {
             send_str(s, "\r\nFailed to add subscription type.\r\n");
           }
         }
       }
     }
-  }
-  else if (!strcmp(action, "subscribe"))
-  {
+  } else if (!strcmp(action, "subscribe")) {
     /* User subscription purchase */
     send_str(s, "\r\n\x1b[1;36mSubscription Plans\x1b[0m\r\n");
-    send_str(s, "----------------------------------------------------------------------\r\n");
+    send_str(s, "--------------------------------------------------------------"
+                "--------\r\n");
 
     DbSubscriptionType types[16];
     int cnt = db_subscription_type_list(s->db, types, 16);
-    if (cnt == 0)
-    {
+    if (cnt == 0) {
       send_str(s, "No subscription plans available.\r\n");
       return;
     }
 
     char buf[256];
-    for (int i = 0; i < cnt; i++)
-    {
+    for (int i = 0; i < cnt; i++) {
       snprintf(buf, sizeof(buf), "[%d] %s - %d days - %d credits\r\n    %s\r\n",
-               types[i].id, types[i].name, types[i].days, types[i].price, types[i].description);
+               types[i].id, types[i].name, types[i].days, types[i].price,
+               types[i].description);
       send_str(s, buf);
     }
 
@@ -2270,84 +2211,74 @@ void bbs_handle_action(Session *s, const char *action)
       return;
 
     DbSubscriptionType selected;
-    if (!db_subscription_type_get(s->db, type_id, &selected))
-    {
+    if (!db_subscription_type_get(s->db, type_id, &selected)) {
       send_str(s, "\r\nInvalid plan.\r\n");
       return;
     }
 
-    if (s->credits < selected.price)
-    {
+    if (s->credits < selected.price) {
       send_str(s, "\r\nInsufficient credits.\r\n");
       return;
     }
 
-    snprintf(buf, sizeof(buf), "\r\nSubscribe to '%s' for %d credits? (Y/N): ", selected.name, selected.price);
+    snprintf(buf, sizeof(buf),
+             "\r\nSubscribe to '%s' for %d credits? (Y/N): ", selected.name,
+             selected.price);
     send_str(s, buf);
     n = session_readline(s, line, sizeof(line), 30);
-    if (n > 0 && (line[0] == 'Y' || line[0] == 'y'))
-    {
+    if (n > 0 && (line[0] == 'Y' || line[0] == 'y')) {
       s->credits -= selected.price;
       s->user.credits = s->credits;
-      db_user_update_time_credit(s->db, s->user.id, s->user.time_limit_min, s->credits, s->file_points);
+      db_user_update_time_credit(s->db, s->user.id, s->user.time_limit_min,
+                                 s->credits, s->file_points);
 
-      if (db_user_subscribe(s->db, s->user.id, type_id))
-      {
+      if (db_user_subscribe(s->db, s->user.id, type_id)) {
         s->user.security_level_id = selected.security_level_id;
-        send_str(s, "\r\nSubscription activated! Your access level has been upgraded.\r\n");
-      }
-      else
-      {
+        send_str(s, "\r\nSubscription activated! Your access level has been "
+                    "upgraded.\r\n");
+      } else {
         send_str(s, "\r\nFailed to activate subscription.\r\n");
       }
     }
-  }
-  else if (!strcmp(action, "setsecurityq"))
-  {
+  } else if (!strcmp(action, "setsecurityq")) {
     /* Set security question for password recovery */
     send_str(s, "\r\n\x1b[1;36mSet Security Question\x1b[0m\r\n");
-    send_str(s, "----------------------------------------------------------------------\r\n");
-    send_str(s, "This question will be used to recover your password if you forget it.\r\n\r\n");
+    send_str(s, "--------------------------------------------------------------"
+                "--------\r\n");
+    send_str(s, "This question will be used to recover your password if you "
+                "forget it.\r\n\r\n");
 
     char question[128] = {0};
     prompt_line(s, "Security Question: ", question, sizeof(question));
-    if (!question[0])
-    {
+    if (!question[0]) {
       send_str(s, "\r\nCancelled.\r\n");
       return;
     }
 
     char answer[64] = {0};
     prompt_line(s, "Answer: ", answer, sizeof(answer));
-    if (!answer[0])
-    {
+    if (!answer[0]) {
       send_str(s, "\r\nCancelled.\r\n");
       return;
     }
 
     char confirm[64] = {0};
     prompt_line(s, "Confirm Answer: ", confirm, sizeof(confirm));
-    if (strcmp(answer, confirm) != 0)
-    {
+    if (strcmp(answer, confirm) != 0) {
       send_str(s, "\r\nAnswers do not match.\r\n");
       return;
     }
 
     char answer_hash[256];
-    if (pw_hash_make(answer, answer_hash, sizeof(answer_hash)))
-    {
-      if (db_user_set_security_question(s->db, s->user.id, question, answer_hash))
-      {
+    if (pw_hash_make(answer, answer_hash, sizeof(answer_hash))) {
+      if (db_user_set_security_question(s->db, s->user.id, question,
+                                        answer_hash)) {
         send_str(s, "\r\nSecurity question set successfully.\r\n");
-      }
-      else
-      {
+      } else {
         send_str(s, "\r\nFailed to set security question.\r\n");
       }
     }
-  }
-  else if (!strcmp(action, "setsignature"))
-  {
+  } else if (!strcmp(action, "setsignature")) {
     send_str(s, "\r\n\x1b[1;36mSet Message Signature\x1b[0m\r\n");
     if (s->user.signature[0]) {
       char buf[512];
@@ -2360,13 +2291,12 @@ void bbs_handle_action(Session *s, const char *action)
     if (db_user_set_signature(s->db, s->user.id, sig, use_sig)) {
       snprintf(s->user.signature, sizeof(s->user.signature), "%s", sig);
       s->user.use_signature = use_sig;
-      send_str(s, use_sig ? "\r\nSignature set.\r\n" : "\r\nSignature cleared.\r\n");
+      send_str(s, use_sig ? "\r\nSignature set.\r\n"
+                          : "\r\nSignature cleared.\r\n");
     } else {
       send_str(s, "\r\nFailed to save signature.\r\n");
     }
-  }
-  else if (!strcmp(action, "settagline"))
-  {
+  } else if (!strcmp(action, "settagline")) {
     send_str(s, "\r\n\x1b[1;36mSet Tagline\x1b[0m\r\n");
     if (s->user.tagline[0]) {
       char buf[256];
@@ -2379,75 +2309,66 @@ void bbs_handle_action(Session *s, const char *action)
     if (db_user_set_tagline(s->db, s->user.id, tag, use_tag)) {
       snprintf(s->user.tagline, sizeof(s->user.tagline), "%s", tag);
       s->user.use_tagline = use_tag;
-      send_str(s, use_tag ? "\r\nTagline set.\r\n" : "\r\nTagline cleared.\r\n");
+      send_str(s,
+               use_tag ? "\r\nTagline set.\r\n" : "\r\nTagline cleared.\r\n");
     } else {
       send_str(s, "\r\nFailed to save tagline.\r\n");
     }
-  }
-  else if (!strcmp(action, "togglefse"))
-  {
+  } else if (!strcmp(action, "togglefse")) {
     s->user.use_fse = s->user.use_fse ? 0 : 1;
     if (db_user_set_use_fse(s->db, s->user.id, s->user.use_fse))
       send_str(s, s->user.use_fse ? "\r\nFull-screen editor enabled.\r\n"
-                                   : "\r\nFull-screen editor disabled.\r\n");
+                                  : "\r\nFull-screen editor disabled.\r\n");
     else
       send_str(s, "\r\nFailed to save preference.\r\n");
-  }
-  else if (!strcmp(action, "pickscheme"))
-  {
+  } else if (!strcmp(action, "pickscheme")) {
     send_str(s, "\r\n\x1b[1;32mColor Scheme Selection\x1b[0m\r\n");
-    send_str(s, "----------------------------------------------------------------------\r\n");
+    send_str(s, "--------------------------------------------------------------"
+                "--------\r\n");
     char preview[256];
-    for (int i = 0; i < MCI_NUM_COLOR_SCHEMES; i++)
-    {
-      mci_scheme_preview(i == s->user.color_scheme ? "* " : "  ", i, preview, sizeof(preview));
+    for (int i = 0; i < MCI_NUM_COLOR_SCHEMES; i++) {
+      mci_scheme_preview(i == s->user.color_scheme ? "* " : "  ", i, preview,
+                         sizeof(preview));
       send_str(s, preview);
       send_str(s, "\r\n");
     }
     send_str(s, "\r\nEnter scheme number (0-7, ENTER to cancel): ");
     uint8_t line[8] = {0};
     int n = session_readline(s, line, sizeof(line), 30);
-    if (n > 0 && line[0] >= '0' && line[0] <= '7')
-    {
+    if (n > 0 && line[0] >= '0' && line[0] <= '7') {
       int new_scheme = line[0] - '0';
       s->user.color_scheme = new_scheme;
-      if (db_user_update(s->db, &s->user))
-      {
+      if (db_user_update(s->db, &s->user)) {
         char buf[64];
         snprintf(buf, sizeof(buf), "\r\nScheme set to %s.\r\n",
                  mci_scheme_name(new_scheme));
         send_str(s, buf);
-      }
-      else
-      {
+      } else {
         send_str(s, "\r\nFailed to save scheme.\r\n");
       }
     }
-  }
-  else if (!strcmp(action, "confeditor"))
-  {
+  } else if (!strcmp(action, "confeditor")) {
     /* *R - Conference Editor */
-    if (!acs_allows(s, "+A"))
-    {
+    if (!acs_allows(s, "+A")) {
       send_str(s, "\r\nAccess denied.\r\n");
       return;
     }
 
-    while (1)
-    {
+    while (1) {
       send_str(s, "\r\n\x1b[1;36mConference Editor\x1b[0m\r\n");
-      send_str(s, "----------------------------------------------------------------------\r\n");
+      send_str(s, "------------------------------------------------------------"
+                  "----------\r\n");
 
       DbConference confs[32];
       int cnt = db_conference_list(s->db, confs, 32);
 
       char buf[256];
       send_str(s, " ID  Key        Name                           ACS\r\n");
-      send_str(s, "----------------------------------------------------------------------\r\n");
-      for (int i = 0; i < cnt; i++)
-      {
-        snprintf(buf, sizeof(buf), "%3d  %-10s %-30s %s\r\n",
-                 confs[i].id, confs[i].key, confs[i].name, confs[i].acs);
+      send_str(s, "------------------------------------------------------------"
+                  "----------\r\n");
+      for (int i = 0; i < cnt; i++) {
+        snprintf(buf, sizeof(buf), "%3d  %-10s %-30s %s\r\n", confs[i].id,
+                 confs[i].key, confs[i].name, confs[i].acs);
         send_str(s, buf);
       }
 
@@ -2457,8 +2378,7 @@ void bbs_handle_action(Session *s, const char *action)
       if (n <= 0 || line[0] == 'Q' || line[0] == 'q')
         break;
 
-      if (line[0] == 'A' || line[0] == 'a')
-      {
+      if (line[0] == 'A' || line[0] == 'a') {
         char key[32] = {0}, name[64] = {0}, desc[256] = {0}, acs[64] = {0};
         prompt_line(s, "Conference key (short): ", key, sizeof(key));
         if (!key[0])
@@ -2469,17 +2389,12 @@ void bbs_handle_action(Session *s, const char *action)
         prompt_line(s, "Description: ", desc, sizeof(desc));
         prompt_line(s, "ACS (blank for all): ", acs, sizeof(acs));
 
-        if (db_conference_add(s->db, key, name, desc, acs))
-        {
+        if (db_conference_add(s->db, key, name, desc, acs)) {
           send_str(s, "\r\nConference added.\r\n");
-        }
-        else
-        {
+        } else {
           send_str(s, "\r\nFailed to add conference.\r\n");
         }
-      }
-      else if (line[0] == 'E' || line[0] == 'e')
-      {
+      } else if (line[0] == 'E' || line[0] == 'e') {
         char id_str[16] = {0};
         prompt_line(s, "Conference ID to edit: ", id_str, sizeof(id_str));
         int id = atoi(id_str);
@@ -2487,8 +2402,7 @@ void bbs_handle_action(Session *s, const char *action)
           continue;
 
         DbConference conf;
-        if (!db_conference_get(s->db, id, &conf))
-        {
+        if (!db_conference_get(s->db, id, &conf)) {
           send_str(s, "\r\nConference not found.\r\n");
           continue;
         }
@@ -2512,17 +2426,12 @@ void bbs_handle_action(Session *s, const char *action)
         if (!acs[0])
           snprintf(acs, sizeof(acs), "%s", conf.acs);
 
-        if (db_conference_update(s->db, id, name, desc, acs, conf.flags))
-        {
+        if (db_conference_update(s->db, id, name, desc, acs, conf.flags)) {
           send_str(s, "\r\nConference updated.\r\n");
-        }
-        else
-        {
+        } else {
           send_str(s, "\r\nFailed to update conference.\r\n");
         }
-      }
-      else if (line[0] == 'D' || line[0] == 'd')
-      {
+      } else if (line[0] == 'D' || line[0] == 'd') {
         char id_str[16] = {0};
         prompt_line(s, "Conference ID to delete: ", id_str, sizeof(id_str));
         int id = atoi(id_str);
@@ -2531,42 +2440,35 @@ void bbs_handle_action(Session *s, const char *action)
 
         send_str(s, "Are you sure? This will remove all memberships. (Y/N): ");
         n = session_readline(s, line, sizeof(line), 30);
-        if (n > 0 && (line[0] == 'Y' || line[0] == 'y'))
-        {
-          if (db_conference_delete(s->db, id))
-          {
+        if (n > 0 && (line[0] == 'Y' || line[0] == 'y')) {
+          if (db_conference_delete(s->db, id)) {
             send_str(s, "\r\nConference deleted.\r\n");
-          }
-          else
-          {
+          } else {
             send_str(s, "\r\nFailed to delete conference.\r\n");
           }
         }
       }
     }
-  }
-  else if (!strcmp(action, "protocoleditor"))
-  {
+  } else if (!strcmp(action, "protocoleditor")) {
     /* *X - Protocol Editor */
-    if (!acs_allows(s, "+A"))
-    {
+    if (!acs_allows(s, "+A")) {
       send_str(s, "\r\nAccess denied.\r\n");
       return;
     }
 
-    while (1)
-    {
+    while (1) {
       send_str(s, "\r\n\x1b[1;36mProtocol Editor\x1b[0m\r\n");
-      send_str(s, "----------------------------------------------------------------------\r\n");
+      send_str(s, "------------------------------------------------------------"
+                  "----------\r\n");
 
       DbProtocol protos[32];
       int cnt = db_protocols_list(s->db, protos, 32, NULL);
 
       char buf[256];
       send_str(s, " ID  Name              Direction  Active  Command\r\n");
-      send_str(s, "----------------------------------------------------------------------\r\n");
-      for (int i = 0; i < cnt; i++)
-      {
+      send_str(s, "------------------------------------------------------------"
+                  "----------\r\n");
+      for (int i = 0; i < cnt; i++) {
         snprintf(buf, sizeof(buf), "%3d  %-16s  %-9s  %-6s  %.40s\r\n",
                  protos[i].id, protos[i].name, protos[i].direction,
                  protos[i].active ? "Yes" : "No", protos[i].command);
@@ -2579,8 +2481,7 @@ void bbs_handle_action(Session *s, const char *action)
       if (n <= 0 || line[0] == 'Q' || line[0] == 'q')
         break;
 
-      if (line[0] == 'A' || line[0] == 'a')
-      {
+      if (line[0] == 'A' || line[0] == 'a') {
         char name[32] = {0}, dir[16] = {0}, cmd[256] = {0};
         prompt_line(s, "Protocol name: ", name, sizeof(name));
         if (!name[0])
@@ -2592,17 +2493,12 @@ void bbs_handle_action(Session *s, const char *action)
         if (!cmd[0])
           continue;
 
-        if (db_protocol_add(s->db, name, dir, cmd))
-        {
+        if (db_protocol_add(s->db, name, dir, cmd)) {
           send_str(s, "\r\nProtocol added.\r\n");
-        }
-        else
-        {
+        } else {
           send_str(s, "\r\nFailed to add protocol.\r\n");
         }
-      }
-      else if (line[0] == 'E' || line[0] == 'e')
-      {
+      } else if (line[0] == 'E' || line[0] == 'e') {
         char id_str[16] = {0};
         prompt_line(s, "Protocol ID to edit: ", id_str, sizeof(id_str));
         int id = atoi(id_str);
@@ -2610,8 +2506,7 @@ void bbs_handle_action(Session *s, const char *action)
           continue;
 
         DbProtocol proto;
-        if (!db_protocol_get(s->db, id, &proto))
-        {
+        if (!db_protocol_get(s->db, id, &proto)) {
           send_str(s, "\r\nProtocol not found.\r\n");
           continue;
         }
@@ -2635,7 +2530,8 @@ void bbs_handle_action(Session *s, const char *action)
         if (!cmd[0])
           snprintf(cmd, sizeof(cmd), "%s", proto.command);
 
-        snprintf(buf, sizeof(buf), "Active (Y/N) [%s]: ", proto.active ? "Y" : "N");
+        snprintf(buf, sizeof(buf),
+                 "Active (Y/N) [%s]: ", proto.active ? "Y" : "N");
         prompt_line(s, buf, active, sizeof(active));
         int act = proto.active;
         if (active[0] == 'Y' || active[0] == 'y')
@@ -2643,17 +2539,12 @@ void bbs_handle_action(Session *s, const char *action)
         else if (active[0] == 'N' || active[0] == 'n')
           act = 0;
 
-        if (db_protocol_update(s->db, id, name, dir, cmd, act))
-        {
+        if (db_protocol_update(s->db, id, name, dir, cmd, act)) {
           send_str(s, "\r\nProtocol updated.\r\n");
-        }
-        else
-        {
+        } else {
           send_str(s, "\r\nFailed to update protocol.\r\n");
         }
-      }
-      else if (line[0] == 'D' || line[0] == 'd')
-      {
+      } else if (line[0] == 'D' || line[0] == 'd') {
         char id_str[16] = {0};
         prompt_line(s, "Protocol ID to delete: ", id_str, sizeof(id_str));
         int id = atoi(id_str);
@@ -2662,35 +2553,28 @@ void bbs_handle_action(Session *s, const char *action)
 
         send_str(s, "Are you sure? (Y/N): ");
         n = session_readline(s, line, sizeof(line), 30);
-        if (n > 0 && (line[0] == 'Y' || line[0] == 'y'))
-        {
-          if (db_protocol_delete(s->db, id))
-          {
+        if (n > 0 && (line[0] == 'Y' || line[0] == 'y')) {
+          if (db_protocol_delete(s->db, id)) {
             send_str(s, "\r\nProtocol deleted.\r\n");
-          }
-          else
-          {
+          } else {
             send_str(s, "\r\nFailed to delete protocol.\r\n");
           }
         }
       }
     }
-  }
-  else if (!strcmp(action, "menueditor"))
-  {
-    if (!acs_allows(s, "+A"))
-    {
+  } else if (!strcmp(action, "menueditor")) {
+    if (!acs_allows(s, "+A")) {
       send_str(s, "\r\nAccess denied.\r\n");
       return;
     }
 
     send_str(s, "\r\n\x1b[1;36mMenu Editor\x1b[0m\r\n");
-    send_str(s, "----------------------------------------------------------------------\r\n");
+    send_str(s, "--------------------------------------------------------------"
+                "--------\r\n");
 
     /* List menu files */
     DIR *dir = opendir("menus");
-    if (!dir)
-    {
+    if (!dir) {
       send_str(s, "Cannot open menus directory.\r\n");
       return;
     }
@@ -2698,19 +2582,17 @@ void bbs_handle_action(Session *s, const char *action)
     char menu_files[32][64];
     int menu_count = 0;
     struct dirent *ent;
-    while ((ent = readdir(dir)) != NULL && menu_count < 32)
-    {
-      if (strstr(ent->d_name, ".mnu"))
-      {
-        session_copy(menu_files[menu_count], sizeof(menu_files[0]), ent->d_name);
+    while ((ent = readdir(dir)) != NULL && menu_count < 32) {
+      if (strstr(ent->d_name, ".mnu")) {
+        session_copy(menu_files[menu_count], sizeof(menu_files[0]),
+                     ent->d_name);
         menu_count++;
       }
     }
     closedir(dir);
 
     char buf[256];
-    for (int i = 0; i < menu_count; i++)
-    {
+    for (int i = 0; i < menu_count; i++) {
       snprintf(buf, sizeof(buf), "  [%2d] %.63s\r\n", i + 1, menu_files[i]);
       send_str(s, buf);
     }
@@ -2721,23 +2603,22 @@ void bbs_handle_action(Session *s, const char *action)
     if (n <= 0 || line[0] == 'Q' || line[0] == 'q')
       return;
 
-    if (line[0] == 'N' || line[0] == 'n')
-    {
+    if (line[0] == 'N' || line[0] == 'n') {
       /* Create new menu */
       char name[64] = {0};
-      prompt_line(s, "\r\nNew menu filename (without .mnu): ", name, sizeof(name));
+      prompt_line(s, "\r\nNew menu filename (without .mnu): ", name,
+                  sizeof(name));
       if (!name[0])
         return;
-      if (!valid_menu_basename(name))
-      {
-        send_str(s, "\r\nMenu names may contain only letters, numbers, underscores, and dashes.\r\n");
+      if (!valid_menu_basename(name)) {
+        send_str(s, "\r\nMenu names may contain only letters, numbers, "
+                    "underscores, and dashes.\r\n");
         return;
       }
 
       char filepath[256];
       snprintf(filepath, sizeof(filepath), "menus/%s.mnu", name);
-      if (access(filepath, F_OK) == 0)
-      {
+      if (access(filepath, F_OK) == 0) {
         send_str(s, "\r\nMenu file already exists.\r\n");
         return;
       }
@@ -2750,8 +2631,7 @@ void bbs_handle_action(Session *s, const char *action)
       menu.flags = MENU_FLAG_HOTKEYS;
       menu.count = 1;
       menu.items = calloc(1, sizeof(MenuItem));
-      if (!menu.items)
-      {
+      if (!menu.items) {
         send_str(s, "\r\nFailed to create menu file.\r\n");
         return;
       }
@@ -2762,8 +2642,7 @@ void bbs_handle_action(Session *s, const char *action)
 
       bool saved = menu_save(filepath, &menu);
       menu_free(&menu);
-      if (!saved)
-      {
+      if (!saved) {
         send_str(s, "\r\nFailed to create menu file.\r\n");
         return;
       }
@@ -2773,13 +2652,11 @@ void bbs_handle_action(Session *s, const char *action)
       return;
     }
 
-    if (line[0] == 'D' || line[0] == 'd')
-    {
+    if (line[0] == 'D' || line[0] == 'd') {
       char sel[8] = {0};
       prompt_line(s, "\r\nMenu number to delete: ", sel, sizeof(sel));
       int idx = atoi(sel) - 1;
-      if (idx < 0 || idx >= menu_count)
-      {
+      if (idx < 0 || idx >= menu_count) {
         send_str(s, "\r\nInvalid selection.\r\n");
         return;
       }
@@ -2787,30 +2664,25 @@ void bbs_handle_action(Session *s, const char *action)
       char filepath[256];
       snprintf(filepath, sizeof(filepath), "menus/%s", menu_files[idx]);
       char confirm[8] = {0};
-      prompt_line(s, "Type YES to delete this menu: ", confirm, sizeof(confirm));
-      if (strcmp(confirm, "YES") != 0)
-      {
+      prompt_line(s, "Type YES to delete this menu: ", confirm,
+                  sizeof(confirm));
+      if (strcmp(confirm, "YES") != 0) {
         send_str(s, "\r\nDelete cancelled.\r\n");
         return;
       }
-      if (menu_delete_file(filepath))
-      {
+      if (menu_delete_file(filepath)) {
         send_str(s, "\r\nMenu deleted.\r\n");
-      }
-      else
-      {
+      } else {
         send_str(s, "\r\nFailed to delete menu.\r\n");
       }
       return;
     }
 
-    if (line[0] == 'E' || line[0] == 'e')
-    {
+    if (line[0] == 'E' || line[0] == 'e') {
       char sel[8] = {0};
       prompt_line(s, "\r\nMenu number to edit: ", sel, sizeof(sel));
       int idx = atoi(sel) - 1;
-      if (idx < 0 || idx >= menu_count)
-      {
+      if (idx < 0 || idx >= menu_count) {
         send_str(s, "\r\nInvalid selection.\r\n");
         return;
       }
@@ -2820,8 +2692,7 @@ void bbs_handle_action(Session *s, const char *action)
 
       /* Load and display menu */
       Menu menu;
-      if (!menu_load(filepath, &menu))
-      {
+      if (!menu_load(filepath, &menu)) {
         send_str(s, "\r\nFailed to load menu.\r\n");
         return;
       }
@@ -2838,79 +2709,66 @@ void bbs_handle_action(Session *s, const char *action)
       send_str(s, buf);
 
       send_str(s, "\r\nMenu Items:\r\n");
-      for (size_t i = 0; i < menu.count && i < 30; i++)
-      {
+      for (size_t i = 0; i < menu.count && i < 30; i++) {
         char key_disp[16];
-        if (menu.items[i].key != '\0')
-        {
+        if (menu.items[i].key != '\0') {
           snprintf(key_disp, sizeof(key_disp), "%c", menu.items[i].key);
-        }
-        else
-        {
+        } else {
           session_copy(key_disp, sizeof(key_disp), menu.items[i].key_str);
         }
         snprintf(buf, sizeof(buf), "  [%2zu] %.15s | %.80s | %.48s | %.48s\r\n",
-                 i + 1, key_disp, menu.items[i].label, menu.items[i].action, menu.items[i].acs);
+                 i + 1, key_disp, menu.items[i].label, menu.items[i].action,
+                 menu.items[i].acs);
         send_str(s, buf);
       }
 
       bool dirty = false;
       bool done = false;
-      while (!done)
-      {
-        send_str(s, "\r\n(T)itle, (P)rompt, (A)dd item, (D)elete item, (S)ave, (Q)uit: ");
+      while (!done) {
+        send_str(s, "\r\n(T)itle, (P)rompt, (A)dd item, (D)elete item, (S)ave, "
+                    "(Q)uit: ");
         n = session_readline(s, line, sizeof(line), s->cfg.idle_timeout_sec);
         if (n <= 0)
           break;
 
-        if (line[0] == 'T' || line[0] == 't')
-        {
+        if (line[0] == 'T' || line[0] == 't') {
           char new_title[120] = {0};
           prompt_line(s, "New title: ", new_title, sizeof(new_title));
-          if (new_title[0])
-          {
+          if (new_title[0]) {
             snprintf(menu.title, sizeof(menu.title), "%s", new_title);
             dirty = true;
           }
-        }
-        else if (line[0] == 'P' || line[0] == 'p')
-        {
+        } else if (line[0] == 'P' || line[0] == 'p') {
           char new_prompt[120] = {0};
           prompt_line(s, "New prompt: ", new_prompt, sizeof(new_prompt));
-          if (new_prompt[0])
-          {
+          if (new_prompt[0]) {
             snprintf(menu.prompt, sizeof(menu.prompt), "%s", new_prompt);
             dirty = true;
           }
-        }
-        else if (line[0] == 'A' || line[0] == 'a')
-        {
-          char key[16] = {0}, label[64] = {0}, action_name[64] = {0}, data[128] = {0}, acs[64] = {0};
+        } else if (line[0] == 'A' || line[0] == 'a') {
+          char key[16] = {0}, label[64] = {0}, action_name[64] = {0},
+               data[128] = {0}, acs[64] = {0};
           prompt_line(s, "Key: ", key, sizeof(key));
           prompt_line(s, "Label: ", label, sizeof(label));
           prompt_line(s, "Action: ", action_name, sizeof(action_name));
           prompt_line(s, "Data: ", data, sizeof(data));
           prompt_line(s, "ACS: ", acs, sizeof(acs));
 
-          if (key[0] && label[0] && action_name[0])
-          {
-            MenuItem *items = realloc(menu.items, (menu.count + 1) * sizeof(MenuItem));
-            if (!items)
-            {
+          if (key[0] && label[0] && action_name[0]) {
+            MenuItem *items =
+                realloc(menu.items, (menu.count + 1) * sizeof(MenuItem));
+            if (!items) {
               send_str(s, "\r\nFailed to add item.\r\n");
               continue;
             }
             menu.items = items;
             MenuItem *it = &menu.items[menu.count];
             memset(it, 0, sizeof(*it));
-            if (strlen(key) > 1)
-            {
+            if (strlen(key) > 1) {
               session_copy(it->key_str, sizeof(it->key_str), key);
               for (char *p = it->key_str; *p; p++)
                 *p = (char)toupper((unsigned char)*p);
-            }
-            else
-            {
+            } else {
               it->key = (char)toupper((unsigned char)key[0]);
             }
             snprintf(it->label, sizeof(it->label), "%s", label);
@@ -2921,36 +2779,26 @@ void bbs_handle_action(Session *s, const char *action)
             dirty = true;
             send_str(s, "\r\nItem added.\r\n");
           }
-        }
-        else if (line[0] == 'D' || line[0] == 'd')
-        {
+        } else if (line[0] == 'D' || line[0] == 'd') {
           char key[16] = {0};
           prompt_line(s, "Delete item key: ", key, sizeof(key));
-          if (key[0] == '\0')
-          {
+          if (key[0] == '\0') {
             send_str(s, "\r\nDelete cancelled.\r\n");
-          }
-          else
-          {
+          } else {
             bool found = false;
             size_t remove_index = 0;
             bool multi = strlen(key) > 1;
-            for (size_t i = 0; i < menu.count; i++)
-            {
-              if (multi)
-              {
-                if (menu.items[i].key_str[0] && strcasecmp(menu.items[i].key_str, key) == 0)
-                {
+            for (size_t i = 0; i < menu.count; i++) {
+              if (multi) {
+                if (menu.items[i].key_str[0] &&
+                    strcasecmp(menu.items[i].key_str, key) == 0) {
                   found = true;
                   remove_index = i;
                   break;
                 }
-              }
-              else
-              {
+              } else {
                 char k = (char)toupper((unsigned char)key[0]);
-                if (menu.items[i].key == k)
-                {
+                if (menu.items[i].key == k) {
                   found = true;
                   remove_index = i;
                   break;
@@ -2958,36 +2806,25 @@ void bbs_handle_action(Session *s, const char *action)
               }
             }
 
-            if (found)
-            {
-              for (size_t j = remove_index + 1; j < menu.count; j++)
-              {
+            if (found) {
+              for (size_t j = remove_index + 1; j < menu.count; j++) {
                 menu.items[j - 1] = menu.items[j];
               }
               menu.count--;
               dirty = true;
               send_str(s, "\r\nItem deleted.\r\n");
-            }
-            else
-            {
+            } else {
               send_str(s, "\r\nItem not found.\r\n");
             }
           }
-        }
-        else if (line[0] == 'S' || line[0] == 's')
-        {
-          if (menu_save(filepath, &menu))
-          {
+        } else if (line[0] == 'S' || line[0] == 's') {
+          if (menu_save(filepath, &menu)) {
             dirty = false;
             send_str(s, "\r\nMenu saved.\r\n");
-          }
-          else
-          {
+          } else {
             send_str(s, "\r\nFailed to save menu.\r\n");
           }
-        }
-        else if (line[0] == 'Q' || line[0] == 'q')
-        {
+        } else if (line[0] == 'Q' || line[0] == 'q') {
           if (dirty)
             send_str(s, "\r\nUnsaved changes discarded.\r\n");
           done = true;
@@ -2996,12 +2833,9 @@ void bbs_handle_action(Session *s, const char *action)
 
       menu_free(&menu);
     }
-  }
-  else if (!strcmp(action, "validatefiles"))
-  {
+  } else if (!strcmp(action, "validatefiles")) {
     /* *7 - Validate Files: approve/reject files with FILE_FLAG_NOTVAL */
-    if (!acs_allows(s, "+A"))
-    {
+    if (!acs_allows(s, "+A")) {
       send_str(s, "\r\nAccess denied.\r\n");
       return;
     }
@@ -3012,102 +2846,94 @@ void bbs_handle_action(Session *s, const char *action)
     int area_cnt = db_file_area_list(s->db, areas, 32);
     int pending = 0;
 
-    for (int ai = 0; ai < area_cnt; ai++)
-    {
+    for (int ai = 0; ai < area_cnt; ai++) {
       DbFileRec area_files[64];
       int cnt = db_file_list(&areas[ai], s->db, area_files, 64);
-      for (int i = 0; i < cnt && pending < 64; i++)
-      {
+      for (int i = 0; i < cnt && pending < 64; i++) {
         if (area_files[i].flags & FILE_FLAG_NOTVAL)
           files[pending++] = area_files[i];
       }
     }
 
-    if (pending == 0)
-    {
+    if (pending == 0) {
       send_str(s, "\r\nNo unvalidated files.\r\n");
       return;
     }
 
     char buf[256];
-    snprintf(buf, sizeof(buf), "\r\n\x1b[1;36mValidate Files\x1b[0m — %d pending\r\n", pending);
+    snprintf(buf, sizeof(buf),
+             "\r\n\x1b[1;36mValidate Files\x1b[0m — %d pending\r\n", pending);
     send_str(s, buf);
-    send_str(s, "----------------------------------------------------------------------\r\n");
+    send_str(s, "--------------------------------------------------------------"
+                "--------\r\n");
 
-    for (int i = 0; i < pending; i++)
-    {
-      snprintf(buf, sizeof(buf), "\r\n[%d/%d] %s (%d bytes)\r\n  Desc: %s\r\n  Uploader: %s\r\n",
-               i + 1, pending,
-               files[i].filename, files[i].size_bytes,
+    for (int i = 0; i < pending; i++) {
+      snprintf(buf, sizeof(buf),
+               "\r\n[%d/%d] %s (%d bytes)\r\n  Desc: %s\r\n  Uploader: %s\r\n",
+               i + 1, pending, files[i].filename, files[i].size_bytes,
                files[i].desc, files[i].uploader);
       send_str(s, buf);
       send_str(s, "(A)pprove, (R)eject/delete, (S)kip: ");
 
       uint8_t ch[4] = {0};
       int n = session_readline(s, ch, sizeof(ch), 30);
-      if (n <= 0) break;
+      if (n <= 0)
+        break;
 
-      if (ch[0] == 'A' || ch[0] == 'a')
-      {
+      if (ch[0] == 'A' || ch[0] == 'a') {
         files[i].flags &= ~FILE_FLAG_NOTVAL;
         if (db_file_update(s->db, &files[i]))
           send_str(s, "Approved.\r\n");
         else
           send_str(s, "Update failed.\r\n");
-      }
-      else if (ch[0] == 'R' || ch[0] == 'r')
-      {
+      } else if (ch[0] == 'R' || ch[0] == 'r') {
         if (db_file_delete(s->db, files[i].id))
           send_str(s, "Rejected and deleted.\r\n");
         else
           send_str(s, "Delete failed.\r\n");
-      }
-      else
-      {
+      } else {
         send_str(s, "Skipped.\r\n");
       }
     }
     send_str(s, "\r\nFile validation complete.\r\n");
-  }
-  else if (!strcmp(action, "voteeditor"))
-  {
+  } else if (!strcmp(action, "voteeditor")) {
     /* *V - Vote Editor */
-    if (!acs_allows(s, "+A"))
-    {
+    if (!acs_allows(s, "+A")) {
       send_str(s, "\r\nAccess denied.\r\n");
       return;
     }
 
-    while (1)
-    {
+    while (1) {
       send_str(s, "\r\n\x1b[1;36mVote Editor\x1b[0m\r\n");
-      send_str(s, "----------------------------------------------------------------------\r\n");
+      send_str(s, "------------------------------------------------------------"
+                  "----------\r\n");
 
       DbVote votes[32];
       int cnt = db_vote_list(s->db, votes, 32);
       char buf[256];
       send_str(s, " ID  Title                          Closes\r\n");
-      send_str(s, "----------------------------------------------------------------------\r\n");
-      for (int i = 0; i < cnt; i++)
-      {
-        snprintf(buf, sizeof(buf), "%3d  %-30.30s  %s\r\n",
-                 votes[i].id, votes[i].title, votes[i].closes_at);
+      send_str(s, "------------------------------------------------------------"
+                  "----------\r\n");
+      for (int i = 0; i < cnt; i++) {
+        snprintf(buf, sizeof(buf), "%3d  %-30.30s  %s\r\n", votes[i].id,
+                 votes[i].title, votes[i].closes_at);
         send_str(s, buf);
       }
 
       send_str(s, "\r\n(A)dd vote, (D)elete, (C)hoices, (Q)uit: ");
       uint8_t line[64];
       int n = session_readline(s, line, sizeof(line), 30);
-      if (n <= 0 || line[0] == 'Q' || line[0] == 'q') break;
+      if (n <= 0 || line[0] == 'Q' || line[0] == 'q')
+        break;
 
-      if (line[0] == 'A' || line[0] == 'a')
-      {
+      if (line[0] == 'A' || line[0] == 'a') {
         char title[128] = {0}, closes[32] = {0};
         prompt_line(s, "Vote question: ", title, sizeof(title));
-        if (!title[0]) continue;
-        prompt_line(s, "Closes at (YYYY-MM-DD, blank=never): ", closes, sizeof(closes));
-        if (!db_vote_add(s->db, title, closes[0] ? closes : NULL))
-        {
+        if (!title[0])
+          continue;
+        prompt_line(s, "Closes at (YYYY-MM-DD, blank=never): ", closes,
+                    sizeof(closes));
+        if (!db_vote_add(s->db, title, closes[0] ? closes : NULL)) {
           send_str(s, "\r\nFailed to add vote.\r\n");
           continue;
         }
@@ -3115,53 +2941,48 @@ void bbs_handle_action(Session *s, const char *action)
         DbVote new_votes[32];
         int new_cnt = db_vote_list(s->db, new_votes, 32);
         int new_id = new_cnt > 0 ? new_votes[new_cnt - 1].id : -1;
-        if (new_id > 0)
-        {
+        if (new_id > 0) {
           send_str(s, "Add choices (blank line to stop):\r\n");
-          for (int ci = 0; ci < 16; ci++)
-          {
+          for (int ci = 0; ci < 16; ci++) {
             char choice[128] = {0};
             snprintf(buf, sizeof(buf), "Choice %d: ", ci + 1);
             prompt_line(s, buf, choice, sizeof(choice));
-            if (!choice[0]) break;
+            if (!choice[0])
+              break;
             db_vote_choice_add(s->db, new_id, choice);
           }
         }
         send_str(s, "Vote added.\r\n");
-      }
-      else if (line[0] == 'D' || line[0] == 'd')
-      {
+      } else if (line[0] == 'D' || line[0] == 'd') {
         char id_str[16] = {0};
         prompt_line(s, "Vote ID to delete: ", id_str, sizeof(id_str));
         int id = atoi(id_str);
-        if (id <= 0) continue;
+        if (id <= 0)
+          continue;
         send_str(s, "Delete vote and all choices/ballots? (Y/N): ");
         n = session_readline(s, line, sizeof(line), 30);
-        if (n > 0 && (line[0] == 'Y' || line[0] == 'y'))
-        {
+        if (n > 0 && (line[0] == 'Y' || line[0] == 'y')) {
           if (db_vote_delete(s->db, id))
             send_str(s, "Vote deleted.\r\n");
           else
             send_str(s, "Delete failed.\r\n");
         }
-      }
-      else if (line[0] == 'C' || line[0] == 'c')
-      {
+      } else if (line[0] == 'C' || line[0] == 'c') {
         char id_str[16] = {0};
         prompt_line(s, "Vote ID to view choices: ", id_str, sizeof(id_str));
         int id = atoi(id_str);
-        if (id <= 0) continue;
+        if (id <= 0)
+          continue;
         DbVoteChoice choices[32];
         int cc = db_vote_choices(s->db, id, choices, 32);
-        for (int i = 0; i < cc; i++)
-        {
-          snprintf(buf, sizeof(buf), "  %3d  %s\r\n", choices[i].id, choices[i].label);
+        for (int i = 0; i < cc; i++) {
+          snprintf(buf, sizeof(buf), "  %3d  %s\r\n", choices[i].id,
+                   choices[i].label);
           send_str(s, buf);
         }
         send_str(s, "(A)dd choice, any other key to continue: ");
         n = session_readline(s, line, sizeof(line), 30);
-        if (line[0] == 'A' || line[0] == 'a')
-        {
+        if (line[0] == 'A' || line[0] == 'a') {
           char choice[128] = {0};
           prompt_line(s, "New choice label: ", choice, sizeof(choice));
           if (choice[0] && db_vote_choice_add(s->db, id, choice))
@@ -3169,109 +2990,104 @@ void bbs_handle_action(Session *s, const char *action)
         }
       }
     }
-  }
-  else if (!strcmp(action, "eventeditor"))
-  {
+  } else if (!strcmp(action, "eventeditor")) {
     /* *E - Event Editor */
-    if (!acs_allows(s, "+A"))
-    {
+    if (!acs_allows(s, "+A")) {
       send_str(s, "\r\nAccess denied.\r\n");
       return;
     }
 
-    while (1)
-    {
+    while (1) {
       send_str(s, "\r\n\x1b[1;36mEvent Editor\x1b[0m\r\n");
-      send_str(s, "----------------------------------------------------------------------\r\n");
+      send_str(s, "------------------------------------------------------------"
+                  "----------\r\n");
 
       DbEvent events[32];
       int cnt = db_events_list(s->db, events, 32);
       char buf[256];
       send_str(s, " ID  En  Type       Schedule              Name\r\n");
-      send_str(s, "----------------------------------------------------------------------\r\n");
-      for (int i = 0; i < cnt; i++)
-      {
-        snprintf(buf, sizeof(buf), "%3d  %-3s %-10s %-22s %s\r\n",
-                 events[i].id,
-                 events[i].enabled ? "Yes" : "No",
-                 events[i].event_type,
-                 events[i].schedule,
-                 events[i].name);
+      send_str(s, "------------------------------------------------------------"
+                  "----------\r\n");
+      for (int i = 0; i < cnt; i++) {
+        snprintf(buf, sizeof(buf), "%3d  %-3s %-10s %-22s %s\r\n", events[i].id,
+                 events[i].enabled ? "Yes" : "No", events[i].event_type,
+                 events[i].schedule, events[i].name);
         send_str(s, buf);
       }
 
       send_str(s, "\r\n(A)dd, (D)elete, (T)oggle enable, (Q)uit: ");
       uint8_t line[64];
       int n = session_readline(s, line, sizeof(line), 30);
-      if (n <= 0 || line[0] == 'Q' || line[0] == 'q') break;
+      if (n <= 0 || line[0] == 'Q' || line[0] == 'q')
+        break;
 
-      if (line[0] == 'A' || line[0] == 'a')
-      {
+      if (line[0] == 'A' || line[0] == 'a') {
         char name[64] = {0}, sched[64] = {0}, cmd[256] = {0};
         char etype[32] = {0}, acs[64] = {0};
         prompt_line(s, "Event name: ", name, sizeof(name));
-        if (!name[0]) continue;
-        prompt_line(s, "Schedule (e.g. daily, weekly, logon): ", sched, sizeof(sched));
-        if (!sched[0]) continue;
+        if (!name[0])
+          continue;
+        prompt_line(s, "Schedule (e.g. daily, weekly, logon): ", sched,
+                    sizeof(sched));
+        if (!sched[0])
+          continue;
         prompt_line(s, "Command: ", cmd, sizeof(cmd));
-        if (!cmd[0]) continue;
-        prompt_line(s, "Type (scheduled/logon/permission): ", etype, sizeof(etype));
-        if (!etype[0]) snprintf(etype, sizeof(etype), "scheduled");
+        if (!cmd[0])
+          continue;
+        prompt_line(s, "Type (scheduled/logon/permission): ", etype,
+                    sizeof(etype));
+        if (!etype[0])
+          snprintf(etype, sizeof(etype), "scheduled");
         prompt_line(s, "ACS (blank for all): ", acs, sizeof(acs));
         if (db_event_add(s->db, name, sched, cmd, etype, acs))
           send_str(s, "Event added.\r\n");
         else
           send_str(s, "Failed to add event.\r\n");
-      }
-      else if (line[0] == 'D' || line[0] == 'd')
-      {
+      } else if (line[0] == 'D' || line[0] == 'd') {
         char id_str[16] = {0};
         prompt_line(s, "Event ID to delete: ", id_str, sizeof(id_str));
         int id = atoi(id_str);
-        if (id <= 0) continue;
+        if (id <= 0)
+          continue;
         if (db_event_delete(s->db, id))
           send_str(s, "Event deleted.\r\n");
         else
           send_str(s, "Delete failed.\r\n");
-      }
-      else if (line[0] == 'T' || line[0] == 't')
-      {
+      } else if (line[0] == 'T' || line[0] == 't') {
         char id_str[16] = {0};
         prompt_line(s, "Event ID to toggle: ", id_str, sizeof(id_str));
         int id = atoi(id_str);
-        if (id <= 0) continue;
+        if (id <= 0)
+          continue;
         /* Find current state */
         int current = 0;
-        for (int i = 0; i < cnt; i++)
-        {
-          if (events[i].id == id) { current = events[i].enabled; break; }
+        for (int i = 0; i < cnt; i++) {
+          if (events[i].id == id) {
+            current = events[i].enabled;
+            break;
+          }
         }
-        if (db_event_toggle(s->db, id, !current))
-        {
-          snprintf(buf, sizeof(buf), "Event %s.\r\n", current ? "disabled" : "enabled");
+        if (db_event_toggle(s->db, id, !current)) {
+          snprintf(buf, sizeof(buf), "Event %s.\r\n",
+                   current ? "disabled" : "enabled");
           send_str(s, buf);
-        }
-        else
-        {
+        } else {
           send_str(s, "Toggle failed.\r\n");
         }
       }
     }
-  }
-  else if (!strcmp(action, "netmail"))
-  {
-    if (HAS_AC_FLAG(&s->user, AC_REMAIL))
-    {
+  } else if (!strcmp(action, "netmail")) {
+    if (HAS_AC_FLAG(&s->user, AC_REMAIL)) {
       send_str(s, "\r\n\x1b[1;31mYou are restricted from email.\x1b[0m\r\n");
       return;
     }
 
     send_str(s, "\r\n\x1b[1;36mSend FidoNet Netmail\x1b[0m\r\n");
-    send_str(s, "----------------------------------------------------------------------\r\n");
+    send_str(s, "--------------------------------------------------------------"
+                "--------\r\n");
 
     DbFidoAka primary;
-    if (!db_fido_aka_get_primary(s->db, &primary))
-    {
+    if (!db_fido_aka_get_primary(s->db, &primary)) {
       send_str(s, "No FidoNet AKA configured. Contact sysop.\r\n");
       return;
     }
@@ -3282,8 +3098,7 @@ void bbs_handle_action(Session *s, const char *action)
       return;
 
     int to_zone, to_net, to_node, to_point;
-    if (!fido_parse_address(addr, &to_zone, &to_net, &to_node, &to_point))
-    {
+    if (!fido_parse_address(addr, &to_zone, &to_net, &to_node, &to_point)) {
       send_str(s, "\r\nInvalid address format.\r\n");
       return;
     }
@@ -3301,17 +3116,16 @@ void bbs_handle_action(Session *s, const char *action)
     send_str(s, "\r\nEnter message (blank line to end):\r\n");
     char body[2048] = {0};
     size_t body_len = 0;
-    while (body_len < sizeof(body) - 128)
-    {
+    while (body_len < sizeof(body) - 128) {
       uint8_t msg_line[256];
-      int rn = session_readline(s, msg_line, sizeof(msg_line), s->cfg.idle_timeout_sec);
+      int rn = session_readline(s, msg_line, sizeof(msg_line),
+                                s->cfg.idle_timeout_sec);
       if (rn <= 0)
         break;
       if (msg_line[0] == '\0')
         break;
       size_t llen = strlen((char *)msg_line);
-      if (body_len + llen + 2 < sizeof(body))
-      {
+      if (body_len + llen + 2 < sizeof(body)) {
         memcpy(body + body_len, msg_line, llen);
         body_len += llen;
         body[body_len++] = '\r';
@@ -3335,49 +3149,31 @@ void bbs_handle_action(Session *s, const char *action)
     snprintf(nm.body, sizeof(nm.body), "%s", body);
     nm.attr = NET_ATTR_LOCAL;
 
-    if (db_fido_netmail_add(s->db, &nm))
-    {
+    if (db_fido_netmail_add(s->db, &nm)) {
       send_str(s, "\r\nNetmail queued for delivery.\r\n");
-    }
-    else
-    {
+    } else {
       send_str(s, "\r\nFailed to queue netmail.\r\n");
     }
-  }
-  else if (!strcmp(action, "batchrun"))
-  {
+  } else if (!strcmp(action, "batchrun")) {
     cmd_file_batch_download(s, NULL);
-  }
-  else if (!strcmp(action, "setfilescandate"))
-  {
+  } else if (!strcmp(action, "setfilescandate")) {
     cmd_file_set_scan_date(s, NULL);
-  }
-  else if (!strcmp(action, "archivetest"))
-  {
+  } else if (!strcmp(action, "archivetest")) {
     cmd_file_archive_test(s, NULL);
-  }
-  else if (!strcmp(action, "archiveextract"))
-  {
+  } else if (!strcmp(action, "archiveextract")) {
     cmd_file_archive_extract(s, NULL);
-  }
-  else if (!strcmp(action, "batchremove"))
-  {
+  } else if (!strcmp(action, "batchremove")) {
     cmd_file_batch_remove(s, NULL);
-  }
-  else if (!strcmp(action, "batchupload"))
-  {
+  } else if (!strcmp(action, "batchupload")) {
     cmd_file_batch_upload(s, NULL);
-  }
-  else if (!strcmp(action, "fsedit"))
-  {
+  } else if (!strcmp(action, "fsedit")) {
     /* Full-screen editor for message composition */
     send_str(s, "\r\nEntering full-screen editor...\r\n");
 
     char text[4096] = "";
     int result = fsedit_edit(s, text, sizeof(text));
 
-    if (result == 1 && text[0])
-    {
+    if (result == 1 && text[0]) {
       send_str(s, "\r\n\x1b[1;32mText saved.\x1b[0m\r\n");
       send_str(s, "Preview:\r\n");
       send_str(s, text);
@@ -3387,105 +3183,82 @@ void bbs_handle_action(Session *s, const char *action)
       send_str(s, "(P)ost as message, (D)iscard? ");
       uint8_t line[8];
       int n = session_readline(s, line, sizeof(line), 30);
-      if (n > 0 && (line[0] == 'P' || line[0] == 'p'))
-      {
-        if (s->current_msg_area > 0)
-        {
+      if (n > 0 && (line[0] == 'P' || line[0] == 'p')) {
+        if (s->current_msg_area > 0) {
           char subject[80] = {0};
           prompt_line(s, "Subject: ", subject, sizeof(subject));
-          if (subject[0])
-          {
-            if (db_message_post(s->db, s->current_msg_area, s->user.id, subject, text, 0))
-            {
+          if (subject[0]) {
+            if (db_message_post(s->db, s->current_msg_area, s->user.id, subject,
+                                text, 0)) {
               send_str(s, "\r\nMessage posted.\r\n");
               s->user.msg_post++;
               db_stats_inc(s->db, "posts");
-            }
-            else
-            {
+            } else {
               send_str(s, "\r\nFailed to post message.\r\n");
             }
           }
-        }
-        else
-        {
+        } else {
           send_str(s, "\r\nNo message area selected.\r\n");
         }
-      }
-      else
-      {
+      } else {
         send_str(s, "\r\nDiscarded.\r\n");
       }
-    }
-    else
-    {
+    } else {
       send_str(s, "\r\n\x1b[1;33mAborted.\x1b[0m\r\n");
     }
-  }
-  else if (!strcmp(action, "joinconf"))
-  {
+  } else if (!strcmp(action, "joinconf")) {
     /* Join a conference */
     send_str(s, "\r\n\x1b[1;36mJoin Conference\x1b[0m\r\n");
-    send_str(s, "----------------------------------------------------------------------\r\n");
+    send_str(s, "--------------------------------------------------------------"
+                "--------\r\n");
 
     /* List available conferences */
     DbConference confs[32];
     int cnt = db_conference_list(s->db, confs, 32);
-    if (cnt == 0)
-    {
+    if (cnt == 0) {
       send_str(s, "No conferences available.\r\n");
       return;
     }
 
     char buf[256];
-    for (int i = 0; i < cnt; i++)
-    {
+    for (int i = 0; i < cnt; i++) {
       bool member = db_conf_is_member(s->db, s->user.id, confs[i].id);
-      snprintf(buf, sizeof(buf), "%2d. %-30s %s\r\n",
-               confs[i].id, confs[i].name, member ? "[JOINED]" : "");
+      snprintf(buf, sizeof(buf), "%2d. %-30s %s\r\n", confs[i].id,
+               confs[i].name, member ? "[JOINED]" : "");
       send_str(s, buf);
     }
 
     send_str(s, "\r\nEnter conference number to join (0 to cancel): ");
     uint8_t line[16];
     int n = session_readline(s, line, sizeof(line), 30);
-    if (n > 0)
-    {
+    if (n > 0) {
       int conf_id = atoi((char *)line);
-      if (conf_id > 0)
-      {
-        if (db_conf_join(s->db, s->user.id, conf_id))
-        {
+      if (conf_id > 0) {
+        if (db_conf_join(s->db, s->user.id, conf_id)) {
           send_str(s, "\r\nJoined conference.\r\n");
-        }
-        else
-        {
+        } else {
           send_str(s, "\r\nFailed to join conference.\r\n");
         }
       }
     }
-  }
-  else if (!strcmp(action, "leaveconf"))
-  {
+  } else if (!strcmp(action, "leaveconf")) {
     /* Leave a conference */
     send_str(s, "\r\n\x1b[1;36mLeave Conference\x1b[0m\r\n");
-    send_str(s, "----------------------------------------------------------------------\r\n");
+    send_str(s, "--------------------------------------------------------------"
+                "--------\r\n");
 
     /* List user's conferences */
     int conf_ids[32];
     int cnt = db_conf_list_user(s->db, s->user.id, conf_ids, 32);
-    if (cnt == 0)
-    {
+    if (cnt == 0) {
       send_str(s, "You are not a member of any conferences.\r\n");
       return;
     }
 
     char buf[256];
-    for (int i = 0; i < cnt; i++)
-    {
+    for (int i = 0; i < cnt; i++) {
       DbConference conf;
-      if (db_conference_get(s->db, conf_ids[i], &conf))
-      {
+      if (db_conference_get(s->db, conf_ids[i], &conf)) {
         snprintf(buf, sizeof(buf), "%2d. %s\r\n", conf.id, conf.name);
         send_str(s, buf);
       }
@@ -3494,86 +3267,71 @@ void bbs_handle_action(Session *s, const char *action)
     send_str(s, "\r\nEnter conference number to leave (0 to cancel): ");
     uint8_t line[16];
     int n = session_readline(s, line, sizeof(line), 30);
-    if (n > 0)
-    {
+    if (n > 0) {
       int conf_id = atoi((char *)line);
-      if (conf_id > 0)
-      {
-        if (db_conf_leave(s->db, s->user.id, conf_id))
-        {
+      if (conf_id > 0) {
+        if (db_conf_leave(s->db, s->user.id, conf_id)) {
           send_str(s, "\r\nLeft conference.\r\n");
-        }
-        else
-        {
+        } else {
           send_str(s, "\r\nFailed to leave conference.\r\n");
         }
       }
     }
-  }
-  else if (!strcmp(action, "conflist"))
-  {
+  } else if (!strcmp(action, "conflist")) {
     /* List conferences user belongs to */
     send_str(s, "\r\n\x1b[1;36mYour Conferences\x1b[0m\r\n");
-    send_str(s, "----------------------------------------------------------------------\r\n");
+    send_str(s, "--------------------------------------------------------------"
+                "--------\r\n");
 
     int conf_ids[32];
     int cnt = db_conf_list_user(s->db, s->user.id, conf_ids, 32);
-    if (cnt == 0)
-    {
+    if (cnt == 0) {
       send_str(s, "You are not a member of any conferences.\r\n");
       return;
     }
 
     char buf[256];
-    for (int i = 0; i < cnt; i++)
-    {
+    for (int i = 0; i < cnt; i++) {
       DbConference conf;
-      if (db_conference_get(s->db, conf_ids[i], &conf))
-      {
-        snprintf(buf, sizeof(buf), "%2d. %-30.30s - %.180s\r\n", conf.id, conf.name, conf.description);
+      if (db_conference_get(s->db, conf_ids[i], &conf)) {
+        snprintf(buf, sizeof(buf), "%2d. %-30.30s - %.180s\r\n", conf.id,
+                 conf.name, conf.description);
         send_str(s, buf);
       }
     }
-  }
-  else if (!strcmp(action, "lastcallers"))
-  {
+  } else if (!strcmp(action, "lastcallers")) {
     /* Display last callers (OH command) */
     send_str(s, "\r\n\x1b[1;36mLast Callers\x1b[0m\r\n");
-    send_str(s, "----------------------------------------------------------------------\r\n");
-    send_str(s, " #  Handle                 Node  Login Time           Duration\r\n");
-    send_str(s, "----------------------------------------------------------------------\r\n");
+    send_str(s, "--------------------------------------------------------------"
+                "--------\r\n");
+    send_str(
+        s,
+        " #  Handle                 Node  Login Time           Duration\r\n");
+    send_str(s, "--------------------------------------------------------------"
+                "--------\r\n");
 
     DbCallHistory calls[20];
     int cnt = db_call_history_list(s->db, calls, 20);
-    if (cnt == 0)
-    {
+    if (cnt == 0) {
       send_str(s, "No call history available.\r\n");
-    }
-    else
-    {
+    } else {
       char buf[256];
-      for (int i = 0; i < cnt; i++)
-      {
+      for (int i = 0; i < cnt; i++) {
         char dur[16];
-        if (calls[i].duration_min > 0)
-        {
+        if (calls[i].duration_min > 0) {
           snprintf(dur, sizeof(dur), "%d min", calls[i].duration_min);
-        }
-        else
-        {
+        } else {
           snprintf(dur, sizeof(dur), "Online");
         }
-        snprintf(buf, sizeof(buf), "%2d. %-20s  %3d   %-19s  %s\r\n",
-                 i + 1, calls[i].handle, calls[i].node_num, calls[i].login_at, dur);
+        snprintf(buf, sizeof(buf), "%2d. %-20s  %3d   %-19s  %s\r\n", i + 1,
+                 calls[i].handle, calls[i].node_num, calls[i].login_at, dur);
         send_str(s, buf);
       }
     }
-    send_str(s, "----------------------------------------------------------------------\r\n");
-  }
-  else if (!strcmp(action, "maintenance"))
-  {
-    if (!acs_allows(s, "+A"))
-    {
+    send_str(s, "--------------------------------------------------------------"
+                "--------\r\n");
+  } else if (!strcmp(action, "maintenance")) {
+    if (!acs_allows(s, "+A")) {
       send_str(s, "\r\nAccess denied.\r\n");
       return;
     }
@@ -3584,34 +3342,29 @@ void bbs_handle_action(Session *s, const char *action)
     send_str(s, "Purge messages older than days: ");
     uint8_t line[16];
     int n = session_readline(s, line, sizeof(line), s->cfg.idle_timeout_sec);
-    if (n > 0 && line[0])
-    {
+    if (n > 0 && line[0]) {
       int days = 0;
-      if (!parse_strict_int((char *)line, 1, 36500, &days))
-      {
+      if (!parse_strict_int((char *)line, 1, 36500, &days)) {
         send_str(s, "\r\nInvalid day count; message purge skipped.\r\n");
-      }
-      else
-      {
+      } else {
         char prompt[160];
         snprintf(prompt, sizeof(prompt),
-                 "Preview: messages older than %d day(s) will be removed. Type DELETE to confirm: ",
+                 "Preview: messages older than %d day(s) will be removed. Type "
+                 "DELETE to confirm: ",
                  days);
         char confirm[16] = {0};
         prompt_line(s, prompt, confirm, sizeof(confirm));
-        if (!strcmp(confirm, "DELETE"))
-        {
+        if (!strcmp(confirm, "DELETE")) {
           char sql[160];
           snprintf(sql, sizeof(sql),
-                   "DELETE FROM messages WHERE created_at < datetime('now','-%d days')",
+                   "DELETE FROM messages WHERE created_at < "
+                   "datetime('now','-%d days')",
                    days);
-          if (db_exec(s->db, "BEGIN IMMEDIATE") && db_exec(s->db, sql) && db_exec(s->db, "COMMIT"))
-          {
+          if (db_exec(s->db, "BEGIN IMMEDIATE") && db_exec(s->db, sql) &&
+              db_exec(s->db, "COMMIT")) {
             send_str(s, "\r\nMessage purge complete.\r\n");
             log_audit(s->user.handle, "maintenance_purge_messages", prompt);
-          }
-          else
-          {
+          } else {
             db_exec(s->db, "ROLLBACK");
             send_str(s, "\r\nMessage purge failed and was rolled back.\r\n");
           }
@@ -3620,103 +3373,92 @@ void bbs_handle_action(Session *s, const char *action)
     }
     send_str(s, "Purge files older than days (0 skip): ");
     n = session_readline(s, line, sizeof(line), s->cfg.idle_timeout_sec);
-    if (n > 0)
-    {
+    if (n > 0) {
       int days = 0;
-      if (!parse_strict_int((char *)line, 0, 36500, &days))
-      {
+      if (!parse_strict_int((char *)line, 0, 36500, &days)) {
         send_str(s, "\r\nInvalid day count; file purge skipped.\r\n");
         days = 0;
       }
-      if (days > 0)
-      {
+      if (days > 0) {
         char confirm[16] = {0};
         char prompt[160];
         snprintf(prompt, sizeof(prompt),
-                 "Preview: file records older than %d day(s) will be removed. Type DELETE to confirm: ",
+                 "Preview: file records older than %d day(s) will be removed. "
+                 "Type DELETE to confirm: ",
                  days);
         prompt_line(s, prompt, confirm, sizeof(confirm));
-        if (!strcmp(confirm, "DELETE"))
-        {
+        if (!strcmp(confirm, "DELETE")) {
           char buf[256];
           DbFileRec old_files[512];
           int old_count = db_file_list_older(s->db, days, old_files, 512);
           bool safe = true;
           char paths[512][512];
           memset(paths, 0, sizeof(paths));
-          for (int i = 0; i < old_count; i++)
-          {
+          for (int i = 0; i < old_count; i++) {
             DbFileArea area;
             if (!db_file_area_get(s->db, old_files[i].area_id, &area) ||
-                !file_area_resolve(area.path, old_files[i].filename, paths[i], sizeof(paths[i])))
-            {
+                !file_area_resolve(area.path, old_files[i].filename, paths[i],
+                                   sizeof(paths[i]))) {
               safe = false;
               break;
             }
           }
-          snprintf(buf, sizeof(buf), "\r\nPreview matched %d file record(s).\r\n", old_count);
+          snprintf(buf, sizeof(buf),
+                   "\r\nPreview matched %d file record(s).\r\n", old_count);
           send_str(s, buf);
-          if (!safe)
-          {
-            send_str(s, "\r\nFile purge aborted: unsafe file path detected.\r\n");
-            log_audit(s->user.handle, "maintenance_purge_files_abort", "unsafe path");
-          }
-          else if (db_exec(s->db, "BEGIN IMMEDIATE"))
-          {
+          if (!safe) {
+            send_str(s,
+                     "\r\nFile purge aborted: unsafe file path detected.\r\n");
+            log_audit(s->user.handle, "maintenance_purge_files_abort",
+                      "unsafe path");
+          } else if (db_exec(s->db, "BEGIN IMMEDIATE")) {
             int files_deleted = 0;
             int records_deleted = 0;
             bool ok = true;
-            for (int i = 0; i < old_count; i++)
-            {
-              if (paths[i][0] && unlink(paths[i]) != 0 && errno != ENOENT)
-              {
+            for (int i = 0; i < old_count; i++) {
+              if (paths[i][0] && unlink(paths[i]) != 0 && errno != ENOENT) {
                 ok = false;
                 break;
               }
               if (paths[i][0])
                 files_deleted++;
-              if (!db_file_delete(s->db, old_files[i].id))
-              {
+              if (!db_file_delete(s->db, old_files[i].id)) {
                 ok = false;
                 break;
               }
               records_deleted++;
             }
-            if (ok && db_exec(s->db, "COMMIT"))
-            {
-              snprintf(buf, sizeof(buf), "\r\nFile purge complete: %d record(s), %d file(s).\r\n",
+            if (ok && db_exec(s->db, "COMMIT")) {
+              snprintf(buf, sizeof(buf),
+                       "\r\nFile purge complete: %d record(s), %d file(s).\r\n",
                        records_deleted, files_deleted);
               send_str(s, buf);
-              snprintf(buf, sizeof(buf), "records=%d files=%d days=%d", records_deleted, files_deleted, days);
+              snprintf(buf, sizeof(buf), "records=%d files=%d days=%d",
+                       records_deleted, files_deleted, days);
               log_audit(s->user.handle, "maintenance_purge_files", buf);
-            }
-            else
-            {
+            } else {
               db_exec(s->db, "ROLLBACK");
               send_str(s, "\r\nFile purge failed and was rolled back.\r\n");
-              log_audit(s->user.handle, "maintenance_purge_files_abort", "delete failure");
+              log_audit(s->user.handle, "maintenance_purge_files_abort",
+                        "delete failure");
             }
-          }
-          else
-          {
-            send_str(s, "\r\nFile purge failed: could not start transaction.\r\n");
+          } else {
+            send_str(s,
+                     "\r\nFile purge failed: could not start transaction.\r\n");
           }
         }
       }
     }
     send_str(s, "Pack users (reset SMW/timebank)? (Y/N): ");
     n = session_readline(s, line, sizeof(line), s->cfg.idle_timeout_sec);
-    if (n > 0 && (line[0] == 'Y' || line[0] == 'y'))
-    {
+    if (n > 0 && (line[0] == 'Y' || line[0] == 'y')) {
       if (db_exec(s->db, "BEGIN IMMEDIATE") &&
           db_exec(s->db, "UPDATE users SET smw=0") &&
           db_exec(s->db, "DELETE FROM meta WHERE k LIKE 'tb_%'") &&
-          db_exec(s->db, "COMMIT"))
-      {
-        log_audit(s->user.handle, "maintenance_pack_users", "smw/timebank reset");
-      }
-      else
-      {
+          db_exec(s->db, "COMMIT")) {
+        log_audit(s->user.handle, "maintenance_pack_users",
+                  "smw/timebank reset");
+      } else {
         db_exec(s->db, "ROLLBACK");
         send_str(s, "\r\nUser pack failed and was rolled back.\r\n");
       }
@@ -3725,20 +3467,17 @@ void bbs_handle_action(Session *s, const char *action)
 #else
     send_str(s, "\r\nDB not available.\r\n");
 #endif
-  }
-  else if (!strcmp(action, "fidoeditor"))
-  {
+  } else if (!strcmp(action, "fidoeditor")) {
     /* *F - FidoNet AKA/Echomail Editor */
-    if (!acs_allows(s, "+A"))
-    {
+    if (!acs_allows(s, "+A")) {
       send_str(s, "\r\nAccess denied.\r\n");
       return;
     }
 
-    while (1)
-    {
+    while (1) {
       send_str(s, "\r\n\x1b[1;36mFidoNet Editor\x1b[0m\r\n");
-      send_str(s, "----------------------------------------------------------------------\r\n");
+      send_str(s, "------------------------------------------------------------"
+                  "----------\r\n");
       send_str(s, "  [A] AKA Addresses\r\n");
       send_str(s, "  [E] Echomail Links\r\n");
       send_str(s, "  [N] Netmail Queue\r\n");
@@ -3752,34 +3491,28 @@ void bbs_handle_action(Session *s, const char *action)
 
       char buf[512];
 
-      if (line[0] == 'A' || line[0] == 'a')
-      {
+      if (line[0] == 'A' || line[0] == 'a') {
         /* AKA Address Management */
-        while (1)
-        {
+        while (1) {
           send_str(s, "\r\n\x1b[1;33mFidoNet AKA Addresses\x1b[0m\r\n");
-          send_str(s, "----------------------------------------------------------------------\r\n");
+          send_str(s, "--------------------------------------------------------"
+                      "--------------\r\n");
 
           DbFidoAka akas[20];
           int cnt = db_fido_aka_list(s->db, akas, 20);
-          if (cnt == 0)
-          {
+          if (cnt == 0) {
             send_str(s, "  No AKA addresses configured.\r\n");
-          }
-          else
-          {
-            for (int i = 0; i < cnt; i++)
-            {
+          } else {
+            for (int i = 0; i < cnt; i++) {
               char addr[32];
               fido_format_address(&akas[i], addr, sizeof(addr));
-              snprintf(buf, sizeof(buf), "  [%2d] %s%s%s\r\n",
-                       akas[i].id, addr,
+              snprintf(buf, sizeof(buf), "  [%2d] %s%s%s\r\n", akas[i].id, addr,
                        akas[i].domain[0] ? "@" : "",
                        akas[i].domain[0] ? akas[i].domain : "");
-              if (akas[i].is_primary)
-              {
+              if (akas[i].is_primary) {
                 char *cr = strstr(buf, "\r\n");
-                if (cr) *cr = '\0';
+                if (cr)
+                  *cr = '\0';
                 bbs_str_append(buf, sizeof(buf), " [PRIMARY]\r\n");
               }
               send_str(s, buf);
@@ -3791,16 +3524,15 @@ void bbs_handle_action(Session *s, const char *action)
           if (n <= 0 || line[0] == 'Q' || line[0] == 'q')
             break;
 
-          if (line[0] == 'A' || line[0] == 'a')
-          {
+          if (line[0] == 'A' || line[0] == 'a') {
             char addr[64] = {0};
-            prompt_line(s, "\r\nAddress (Zone:Net/Node.Point): ", addr, sizeof(addr));
+            prompt_line(s, "\r\nAddress (Zone:Net/Node.Point): ", addr,
+                        sizeof(addr));
             if (!addr[0])
               continue;
 
             int zone, net, node, point;
-            if (!fido_parse_address(addr, &zone, &net, &node, &point))
-            {
+            if (!fido_parse_address(addr, &zone, &net, &node, &point)) {
               send_str(s, "\r\nInvalid address format.\r\n");
               continue;
             }
@@ -3809,17 +3541,13 @@ void bbs_handle_action(Session *s, const char *action)
             prompt_line(s, "Domain (optional): ", domain, sizeof(domain));
 
             int is_primary = (cnt == 0) ? 1 : 0;
-            if (db_fido_aka_add(s->db, zone, net, node, point, domain, is_primary))
-            {
+            if (db_fido_aka_add(s->db, zone, net, node, point, domain,
+                                is_primary)) {
               send_str(s, "\r\nAKA added.\r\n");
-            }
-            else
-            {
+            } else {
               send_str(s, "\r\nFailed to add AKA.\r\n");
             }
-          }
-          else if (line[0] == 'E' || line[0] == 'e')
-          {
+          } else if (line[0] == 'E' || line[0] == 'e') {
             char sel[8] = {0};
             prompt_line(s, "\r\nAKA ID to edit: ", sel, sizeof(sel));
             int id = atoi(sel);
@@ -3827,8 +3555,7 @@ void bbs_handle_action(Session *s, const char *action)
               continue;
 
             DbFidoAka aka;
-            if (!db_fido_aka_get(s->db, id, &aka))
-            {
+            if (!db_fido_aka_get(s->db, id, &aka)) {
               send_str(s, "\r\nAKA not found.\r\n");
               continue;
             }
@@ -3839,11 +3566,9 @@ void bbs_handle_action(Session *s, const char *action)
             send_str(s, buf);
 
             prompt_line(s, "New address (blank to keep): ", addr, sizeof(addr));
-            if (addr[0])
-            {
+            if (addr[0]) {
               int zone, net, node, point;
-              if (fido_parse_address(addr, &zone, &net, &node, &point))
-              {
+              if (fido_parse_address(addr, &zone, &net, &node, &point)) {
                 aka.zone = zone;
                 aka.net = net;
                 aka.node = node;
@@ -3854,37 +3579,28 @@ void bbs_handle_action(Session *s, const char *action)
             char domain[64] = {0};
             snprintf(buf, sizeof(buf), "Current domain: %s\r\n", aka.domain);
             send_str(s, buf);
-            prompt_line(s, "New domain (blank to keep): ", domain, sizeof(domain));
-            if (domain[0])
-            {
+            prompt_line(s, "New domain (blank to keep): ", domain,
+                        sizeof(domain));
+            if (domain[0]) {
               snprintf(aka.domain, sizeof(aka.domain), "%s", domain);
             }
 
-            if (db_fido_aka_update(s->db, id, aka.zone, aka.net, aka.node, aka.point, aka.domain, aka.is_primary))
-            {
+            if (db_fido_aka_update(s->db, id, aka.zone, aka.net, aka.node,
+                                   aka.point, aka.domain, aka.is_primary)) {
               send_str(s, "\r\nAKA updated.\r\n");
-            }
-            else
-            {
+            } else {
               send_str(s, "\r\nFailed to update AKA.\r\n");
             }
-          }
-          else if (line[0] == 'D' || line[0] == 'd')
-          {
+          } else if (line[0] == 'D' || line[0] == 'd') {
             char sel[8] = {0};
             prompt_line(s, "\r\nAKA ID to delete: ", sel, sizeof(sel));
             int id = atoi(sel);
-            if (id > 0 && db_fido_aka_delete(s->db, id))
-            {
+            if (id > 0 && db_fido_aka_delete(s->db, id)) {
               send_str(s, "\r\nAKA deleted.\r\n");
-            }
-            else
-            {
+            } else {
               send_str(s, "\r\nFailed to delete AKA.\r\n");
             }
-          }
-          else if (line[0] == 'P' || line[0] == 'p')
-          {
+          } else if (line[0] == 'P' || line[0] == 'p') {
             char sel[8] = {0};
             prompt_line(s, "\r\nAKA ID to set as primary: ", sel, sizeof(sel));
             int id = atoi(sel);
@@ -3892,50 +3608,39 @@ void bbs_handle_action(Session *s, const char *action)
               continue;
 
             DbFidoAka aka;
-            if (db_fido_aka_get(s->db, id, &aka))
-            {
-              if (db_fido_aka_update(s->db, id, aka.zone, aka.net, aka.node, aka.point, aka.domain, 1))
-              {
+            if (db_fido_aka_get(s->db, id, &aka)) {
+              if (db_fido_aka_update(s->db, id, aka.zone, aka.net, aka.node,
+                                     aka.point, aka.domain, 1)) {
                 send_str(s, "\r\nPrimary AKA set.\r\n");
-              }
-              else
-              {
+              } else {
                 send_str(s, "\r\nFailed to set primary.\r\n");
               }
-            }
-            else
-            {
+            } else {
               send_str(s, "\r\nAKA not found.\r\n");
             }
           }
         }
-      }
-      else if (line[0] == 'E' || line[0] == 'e')
-      {
+      } else if (line[0] == 'E' || line[0] == 'e') {
         /* Echomail Link Management */
-        while (1)
-        {
+        while (1) {
           send_str(s, "\r\n\x1b[1;33mFidoNet Echomail Links\x1b[0m\r\n");
-          send_str(s, "----------------------------------------------------------------------\r\n");
+          send_str(s, "--------------------------------------------------------"
+                      "--------------\r\n");
 
           DbFidoEcholink links[32];
           int cnt = db_fido_echolink_list(s->db, links, 32);
-          if (cnt == 0)
-          {
+          if (cnt == 0) {
             send_str(s, "  No echomail links configured.\r\n");
-          }
-          else
-          {
-            for (int i = 0; i < cnt; i++)
-            {
+          } else {
+            for (int i = 0; i < cnt; i++) {
               DbMsgArea area;
               char area_name[64] = "???";
-              if (db_msg_area_get(s->db, links[i].area_id, &area))
-              {
+              if (db_msg_area_get(s->db, links[i].area_id, &area)) {
                 snprintf(area_name, sizeof(area_name), "%s", area.name);
               }
               snprintf(buf, sizeof(buf), "  [%2d] %-20s -> %s (HWM: %d)\r\n",
-                       links[i].id, links[i].echotag, area_name, links[i].high_water);
+                       links[i].id, links[i].echotag, area_name,
+                       links[i].high_water);
               send_str(s, buf);
             }
           }
@@ -3945,15 +3650,14 @@ void bbs_handle_action(Session *s, const char *action)
           if (n <= 0 || line[0] == 'Q' || line[0] == 'q')
             break;
 
-          if (line[0] == 'A' || line[0] == 'a')
-          {
+          if (line[0] == 'A' || line[0] == 'a') {
             /* List message areas */
             DbMsgArea areas[32];
             int acnt = db_msg_area_list(s->db, areas, 32);
             send_str(s, "\r\nMessage Areas:\r\n");
-            for (int i = 0; i < acnt; i++)
-            {
-              snprintf(buf, sizeof(buf), "  [%2d] %s\r\n", areas[i].id, areas[i].name);
+            for (int i = 0; i < acnt; i++) {
+              snprintf(buf, sizeof(buf), "  [%2d] %s\r\n", areas[i].id,
+                       areas[i].name);
               send_str(s, buf);
             }
 
@@ -3964,21 +3668,20 @@ void bbs_handle_action(Session *s, const char *action)
               continue;
 
             char echotag[64] = {0};
-            prompt_line(s, "Echo tag (e.g., BBS_CARNIVAL): ", echotag, sizeof(echotag));
+            prompt_line(s, "Echo tag (e.g., BBS_CARNIVAL): ", echotag,
+                        sizeof(echotag));
             if (!echotag[0])
               continue;
 
             /* List AKAs */
             DbFidoAka akas[20];
             int akacnt = db_fido_aka_list(s->db, akas, 20);
-            if (akacnt == 0)
-            {
+            if (akacnt == 0) {
               send_str(s, "\r\nNo AKAs configured. Add one first.\r\n");
               continue;
             }
             send_str(s, "\r\nAKA Addresses:\r\n");
-            for (int i = 0; i < akacnt; i++)
-            {
+            for (int i = 0; i < akacnt; i++) {
               char addr[32];
               fido_format_address(&akas[i], addr, sizeof(addr));
               snprintf(buf, sizeof(buf), "  [%2d] %s\r\n", akas[i].id, addr);
@@ -3993,17 +3696,12 @@ void bbs_handle_action(Session *s, const char *action)
             char origin[80] = {0};
             prompt_line(s, "Origin line (optional): ", origin, sizeof(origin));
 
-            if (db_fido_echolink_add(s->db, area_id, echotag, aka_id, origin))
-            {
+            if (db_fido_echolink_add(s->db, area_id, echotag, aka_id, origin)) {
               send_str(s, "\r\nEcholink added.\r\n");
-            }
-            else
-            {
+            } else {
               send_str(s, "\r\nFailed to add echolink.\r\n");
             }
-          }
-          else if (line[0] == 'E' || line[0] == 'e')
-          {
+          } else if (line[0] == 'E' || line[0] == 'e') {
             char sel[8] = {0};
             prompt_line(s, "\r\nEcholink ID to edit: ", sel, sizeof(sel));
             int id = atoi(sel);
@@ -4011,19 +3709,19 @@ void bbs_handle_action(Session *s, const char *action)
               continue;
 
             DbFidoEcholink link;
-            if (!db_fido_echolink_get(s->db, id, &link))
-            {
+            if (!db_fido_echolink_get(s->db, id, &link)) {
               send_str(s, "\r\nEcholink not found.\r\n");
               continue;
             }
 
-            snprintf(buf, sizeof(buf), "\r\nCurrent echotag: %s\r\n", link.echotag);
+            snprintf(buf, sizeof(buf), "\r\nCurrent echotag: %s\r\n",
+                     link.echotag);
             send_str(s, buf);
 
             char echotag[64] = {0};
-            prompt_line(s, "New echotag (blank to keep): ", echotag, sizeof(echotag));
-            if (echotag[0])
-            {
+            prompt_line(s, "New echotag (blank to keep): ", echotag,
+                        sizeof(echotag));
+            if (echotag[0]) {
               snprintf(link.echotag, sizeof(link.echotag), "%s", echotag);
             }
 
@@ -4031,78 +3729,65 @@ void bbs_handle_action(Session *s, const char *action)
             send_str(s, buf);
 
             char origin[80] = {0};
-            prompt_line(s, "New origin (blank to keep): ", origin, sizeof(origin));
-            if (origin[0])
-            {
+            prompt_line(s, "New origin (blank to keep): ", origin,
+                        sizeof(origin));
+            if (origin[0]) {
               snprintf(link.origin, sizeof(link.origin), "%s", origin);
             }
 
-            if (db_fido_echolink_update(s->db, id, link.echotag, link.aka_id, link.origin))
-            {
+            if (db_fido_echolink_update(s->db, id, link.echotag, link.aka_id,
+                                        link.origin)) {
               send_str(s, "\r\nEcholink updated.\r\n");
-            }
-            else
-            {
+            } else {
               send_str(s, "\r\nFailed to update echolink.\r\n");
             }
-          }
-          else if (line[0] == 'D' || line[0] == 'd')
-          {
+          } else if (line[0] == 'D' || line[0] == 'd') {
             char sel[8] = {0};
             prompt_line(s, "\r\nEcholink ID to delete: ", sel, sizeof(sel));
             int id = atoi(sel);
-            if (id > 0 && db_fido_echolink_delete(s->db, id))
-            {
+            if (id > 0 && db_fido_echolink_delete(s->db, id)) {
               send_str(s, "\r\nEcholink deleted.\r\n");
-            }
-            else
-            {
+            } else {
               send_str(s, "\r\nFailed to delete echolink.\r\n");
             }
           }
         }
-      }
-      else if (line[0] == 'N' || line[0] == 'n')
-      {
+      } else if (line[0] == 'N' || line[0] == 'n') {
         /* Netmail Queue */
         send_str(s, "\r\n\x1b[1;33mFidoNet Netmail Queue\x1b[0m\r\n");
-        send_str(s, "----------------------------------------------------------------------\r\n");
+        send_str(s, "----------------------------------------------------------"
+                    "------------\r\n");
 
         DbFidoNetmail mails[32];
         int cnt = db_fido_netmail_list(s->db, NULL, mails, 32);
-        if (cnt == 0)
-        {
+        if (cnt == 0) {
           send_str(s, "  No netmail in queue.\r\n");
-        }
-        else
-        {
-          for (int i = 0; i < cnt; i++)
-          {
-            snprintf(buf, sizeof(buf), "  [%2d] %s -> %d:%d/%d.%d (%s) [%s]\r\n",
-                     mails[i].id, mails[i].from_name,
-                     mails[i].to_zone, mails[i].to_net, mails[i].to_node, mails[i].to_point,
-                     mails[i].to_name, mails[i].status);
+        } else {
+          for (int i = 0; i < cnt; i++) {
+            snprintf(buf, sizeof(buf),
+                     "  [%2d] %s -> %d:%d/%d.%d (%s) [%s]\r\n", mails[i].id,
+                     mails[i].from_name, mails[i].to_zone, mails[i].to_net,
+                     mails[i].to_node, mails[i].to_point, mails[i].to_name,
+                     mails[i].status);
             send_str(s, buf);
           }
         }
 
         send_str(s, "\r\n(V)iew, (D)elete, (Q)uit: ");
         n = session_readline(s, line, sizeof(line), s->cfg.idle_timeout_sec);
-        if (n > 0 && (line[0] == 'V' || line[0] == 'v'))
-        {
+        if (n > 0 && (line[0] == 'V' || line[0] == 'v')) {
           char sel[8] = {0};
           prompt_line(s, "\r\nNetmail ID to view: ", sel, sizeof(sel));
           int id = atoi(sel);
-          if (id > 0)
-          {
+          if (id > 0) {
             DbFidoNetmail nm;
-            if (db_fido_netmail_get(s->db, id, &nm))
-            {
+            if (db_fido_netmail_get(s->db, id, &nm)) {
               snprintf(buf, sizeof(buf), "\r\nFrom: %s (%d:%d/%d.%d)\r\n",
-                       nm.from_name, nm.from_zone, nm.from_net, nm.from_node, nm.from_point);
+                       nm.from_name, nm.from_zone, nm.from_net, nm.from_node,
+                       nm.from_point);
               send_str(s, buf);
-              snprintf(buf, sizeof(buf), "To: %s (%d:%d/%d.%d)\r\n",
-                       nm.to_name, nm.to_zone, nm.to_net, nm.to_node, nm.to_point);
+              snprintf(buf, sizeof(buf), "To: %s (%d:%d/%d.%d)\r\n", nm.to_name,
+                       nm.to_zone, nm.to_net, nm.to_node, nm.to_point);
               send_str(s, buf);
               snprintf(buf, sizeof(buf), "Subject: %s\r\n", nm.subject);
               send_str(s, buf);
@@ -4112,37 +3797,29 @@ void bbs_handle_action(Session *s, const char *action)
               send_str(s, "\r\n");
             }
           }
-        }
-        else if (n > 0 && (line[0] == 'D' || line[0] == 'd'))
-        {
+        } else if (n > 0 && (line[0] == 'D' || line[0] == 'd')) {
           char sel[8] = {0};
           prompt_line(s, "\r\nNetmail ID to delete: ", sel, sizeof(sel));
           int id = atoi(sel);
-          if (id > 0 && db_fido_netmail_delete(s->db, id))
-          {
+          if (id > 0 && db_fido_netmail_delete(s->db, id)) {
             send_str(s, "\r\nNetmail deleted.\r\n");
-          }
-          else
-          {
+          } else {
             send_str(s, "\r\nFailed to delete netmail.\r\n");
           }
         }
       }
     }
-  }
-  else if (!strcmp(action, "qwkneteditor"))
-  {
+  } else if (!strcmp(action, "qwkneteditor")) {
     /* *Q - QWK Network Editor */
-    if (!acs_allows(s, "+A"))
-    {
+    if (!acs_allows(s, "+A")) {
       send_str(s, "\r\nAccess denied.\r\n");
       return;
     }
 
-    while (1)
-    {
+    while (1) {
       send_str(s, "\r\n\x1b[1;36mQWK Network Editor\x1b[0m\r\n");
-      send_str(s, "----------------------------------------------------------------------\r\n");
+      send_str(s, "------------------------------------------------------------"
+                  "----------\r\n");
       send_str(s, "  [H] Hub Management\r\n");
       send_str(s, "  [L] Area Links\r\n");
       send_str(s, "  [P] Packet Queue\r\n");
@@ -4156,24 +3833,19 @@ void bbs_handle_action(Session *s, const char *action)
 
       char buf[512];
 
-      if (line[0] == 'H' || line[0] == 'h')
-      {
+      if (line[0] == 'H' || line[0] == 'h') {
         /* Hub Management */
-        while (1)
-        {
+        while (1) {
           send_str(s, "\r\n\x1b[1;33mQWK Network Hubs\x1b[0m\r\n");
-          send_str(s, "----------------------------------------------------------------------\r\n");
+          send_str(s, "--------------------------------------------------------"
+                      "--------------\r\n");
 
           DbQwkHub hubs[16];
           int cnt = db_qwk_hub_list(s->db, hubs, 16);
-          if (cnt == 0)
-          {
+          if (cnt == 0) {
             send_str(s, "  No QWK hubs configured.\r\n");
-          }
-          else
-          {
-            for (int i = 0; i < cnt; i++)
-            {
+          } else {
+            for (int i = 0; i < cnt; i++) {
               snprintf(buf, sizeof(buf), "  [%2d] %-20s (%s) %s\r\n",
                        hubs[i].id, hubs[i].name, hubs[i].bbs_id,
                        hubs[i].enabled ? "[ENABLED]" : "[DISABLED]");
@@ -4186,8 +3858,7 @@ void bbs_handle_action(Session *s, const char *action)
           if (n <= 0 || line[0] == 'Q' || line[0] == 'q')
             break;
 
-          if (line[0] == 'A' || line[0] == 'a')
-          {
+          if (line[0] == 'A' || line[0] == 'a') {
             char name[64] = {0};
             prompt_line(s, "\r\nHub name: ", name, sizeof(name));
             if (!name[0])
@@ -4199,19 +3870,15 @@ void bbs_handle_action(Session *s, const char *action)
               continue;
 
             char schedule[64] = {0};
-            prompt_line(s, "Call schedule (optional, e.g., daily@02:00): ", schedule, sizeof(schedule));
+            prompt_line(s, "Call schedule (optional, e.g., daily@02:00): ",
+                        schedule, sizeof(schedule));
 
-            if (db_qwk_hub_add(s->db, name, bbs_id, schedule))
-            {
+            if (db_qwk_hub_add(s->db, name, bbs_id, schedule)) {
               send_str(s, "\r\nHub added.\r\n");
-            }
-            else
-            {
+            } else {
               send_str(s, "\r\nFailed to add hub.\r\n");
             }
-          }
-          else if (line[0] == 'E' || line[0] == 'e')
-          {
+          } else if (line[0] == 'E' || line[0] == 'e') {
             char sel[8] = {0};
             prompt_line(s, "\r\nHub ID to edit: ", sel, sizeof(sel));
             int id = atoi(sel);
@@ -4219,8 +3886,7 @@ void bbs_handle_action(Session *s, const char *action)
               continue;
 
             DbQwkHub hub;
-            if (!db_qwk_hub_get(s->db, id, &hub))
-            {
+            if (!db_qwk_hub_get(s->db, id, &hub)) {
               send_str(s, "\r\nHub not found.\r\n");
               continue;
             }
@@ -4235,42 +3901,37 @@ void bbs_handle_action(Session *s, const char *action)
             snprintf(buf, sizeof(buf), "Current BBS ID: %s\r\n", hub.bbs_id);
             send_str(s, buf);
             char bbs_id[16] = {0};
-            prompt_line(s, "New BBS ID (blank to keep): ", bbs_id, sizeof(bbs_id));
+            prompt_line(s, "New BBS ID (blank to keep): ", bbs_id,
+                        sizeof(bbs_id));
             if (bbs_id[0])
               snprintf(hub.bbs_id, sizeof(hub.bbs_id), "%s", bbs_id);
 
-            snprintf(buf, sizeof(buf), "Current schedule: %s\r\n", hub.call_schedule);
+            snprintf(buf, sizeof(buf), "Current schedule: %s\r\n",
+                     hub.call_schedule);
             send_str(s, buf);
             char schedule[64] = {0};
-            prompt_line(s, "New schedule (blank to keep): ", schedule, sizeof(schedule));
+            prompt_line(s, "New schedule (blank to keep): ", schedule,
+                        sizeof(schedule));
             if (schedule[0])
-              snprintf(hub.call_schedule, sizeof(hub.call_schedule), "%s", schedule);
+              snprintf(hub.call_schedule, sizeof(hub.call_schedule), "%s",
+                       schedule);
 
-            if (db_qwk_hub_update(s->db, id, hub.name, hub.bbs_id, hub.call_schedule, hub.enabled))
-            {
+            if (db_qwk_hub_update(s->db, id, hub.name, hub.bbs_id,
+                                  hub.call_schedule, hub.enabled)) {
               send_str(s, "\r\nHub updated.\r\n");
-            }
-            else
-            {
+            } else {
               send_str(s, "\r\nFailed to update hub.\r\n");
             }
-          }
-          else if (line[0] == 'D' || line[0] == 'd')
-          {
+          } else if (line[0] == 'D' || line[0] == 'd') {
             char sel[8] = {0};
             prompt_line(s, "\r\nHub ID to delete: ", sel, sizeof(sel));
             int id = atoi(sel);
-            if (id > 0 && db_qwk_hub_delete(s->db, id))
-            {
+            if (id > 0 && db_qwk_hub_delete(s->db, id)) {
               send_str(s, "\r\nHub deleted.\r\n");
-            }
-            else
-            {
+            } else {
               send_str(s, "\r\nFailed to delete hub.\r\n");
             }
-          }
-          else if (line[0] == 'T' || line[0] == 't')
-          {
+          } else if (line[0] == 'T' || line[0] == 't') {
             char sel[8] = {0};
             prompt_line(s, "\r\nHub ID to toggle: ", sel, sizeof(sel));
             int id = atoi(sel);
@@ -4278,36 +3939,34 @@ void bbs_handle_action(Session *s, const char *action)
               continue;
 
             DbQwkHub hub;
-            if (db_qwk_hub_get(s->db, id, &hub))
-            {
+            if (db_qwk_hub_get(s->db, id, &hub)) {
               hub.enabled = !hub.enabled;
-              if (db_qwk_hub_update(s->db, id, hub.name, hub.bbs_id, hub.call_schedule, hub.enabled))
-              {
-                snprintf(buf, sizeof(buf), "\r\nHub %s.\r\n", hub.enabled ? "enabled" : "disabled");
+              if (db_qwk_hub_update(s->db, id, hub.name, hub.bbs_id,
+                                    hub.call_schedule, hub.enabled)) {
+                snprintf(buf, sizeof(buf), "\r\nHub %s.\r\n",
+                         hub.enabled ? "enabled" : "disabled");
                 send_str(s, buf);
               }
             }
           }
         }
-      }
-      else if (line[0] == 'L' || line[0] == 'l')
-      {
+      } else if (line[0] == 'L' || line[0] == 'l') {
         /* Area Links */
         send_str(s, "\r\n\x1b[1;33mQWK Area Links\x1b[0m\r\n");
-        send_str(s, "----------------------------------------------------------------------\r\n");
+        send_str(s, "----------------------------------------------------------"
+                    "------------\r\n");
 
         /* First select a hub */
         DbQwkHub hubs[16];
         int hcnt = db_qwk_hub_list(s->db, hubs, 16);
-        if (hcnt == 0)
-        {
+        if (hcnt == 0) {
           send_str(s, "No hubs configured. Add a hub first.\r\n");
           continue;
         }
 
-        for (int i = 0; i < hcnt; i++)
-        {
-          snprintf(buf, sizeof(buf), "  [%2d] %s\r\n", hubs[i].id, hubs[i].name);
+        for (int i = 0; i < hcnt; i++) {
+          snprintf(buf, sizeof(buf), "  [%2d] %s\r\n", hubs[i].id,
+                   hubs[i].name);
           send_str(s, buf);
         }
 
@@ -4317,29 +3976,24 @@ void bbs_handle_action(Session *s, const char *action)
         if (hub_id <= 0)
           continue;
 
-        while (1)
-        {
+        while (1) {
           send_str(s, "\r\nArea Links for Hub:\r\n");
 
           DbQwkAreaLink links[32];
           int lcnt = db_qwk_area_link_list(s->db, hub_id, links, 32);
-          if (lcnt == 0)
-          {
+          if (lcnt == 0) {
             send_str(s, "  No area links configured.\r\n");
-          }
-          else
-          {
-            for (int i = 0; i < lcnt; i++)
-            {
+          } else {
+            for (int i = 0; i < lcnt; i++) {
               DbMsgArea area;
               char area_name[64] = "???";
-              if (db_msg_area_get(s->db, links[i].area_id, &area))
-              {
+              if (db_msg_area_get(s->db, links[i].area_id, &area)) {
                 snprintf(area_name, sizeof(area_name), "%s", area.name);
               }
-              snprintf(buf, sizeof(buf), "  [%2d] %-25s -> Conf #%d (HW: %d/%d)\r\n",
-                       links[i].id, area_name, links[i].remote_conf,
-                       links[i].high_water_in, links[i].high_water_out);
+              snprintf(buf, sizeof(buf),
+                       "  [%2d] %-25s -> Conf #%d (HW: %d/%d)\r\n", links[i].id,
+                       area_name, links[i].remote_conf, links[i].high_water_in,
+                       links[i].high_water_out);
               send_str(s, buf);
             }
           }
@@ -4349,15 +4003,14 @@ void bbs_handle_action(Session *s, const char *action)
           if (n <= 0 || line[0] == 'Q' || line[0] == 'q')
             break;
 
-          if (line[0] == 'A' || line[0] == 'a')
-          {
+          if (line[0] == 'A' || line[0] == 'a') {
             /* List message areas */
             DbMsgArea areas[32];
             int acnt = db_msg_area_list(s->db, areas, 32);
             send_str(s, "\r\nMessage Areas:\r\n");
-            for (int i = 0; i < acnt; i++)
-            {
-              snprintf(buf, sizeof(buf), "  [%2d] %s\r\n", areas[i].id, areas[i].name);
+            for (int i = 0; i < acnt; i++) {
+              snprintf(buf, sizeof(buf), "  [%2d] %s\r\n", areas[i].id,
+                       areas[i].name);
               send_str(s, buf);
             }
 
@@ -4371,78 +4024,59 @@ void bbs_handle_action(Session *s, const char *action)
             if (remote_conf < 0)
               continue;
 
-            if (db_qwk_area_link_add(s->db, hub_id, area_id, remote_conf))
-            {
+            if (db_qwk_area_link_add(s->db, hub_id, area_id, remote_conf)) {
               send_str(s, "\r\nArea link added.\r\n");
-            }
-            else
-            {
+            } else {
               send_str(s, "\r\nFailed to add area link.\r\n");
             }
-          }
-          else if (line[0] == 'E' || line[0] == 'e')
-          {
+          } else if (line[0] == 'E' || line[0] == 'e') {
             prompt_line(s, "\r\nLink ID to edit: ", sel, sizeof(sel));
             int id = atoi(sel);
             if (id <= 0)
               continue;
 
             DbQwkAreaLink link;
-            if (!db_qwk_area_link_get(s->db, id, &link))
-            {
+            if (!db_qwk_area_link_get(s->db, id, &link)) {
               send_str(s, "\r\nLink not found.\r\n");
               continue;
             }
 
-            snprintf(buf, sizeof(buf), "\r\nCurrent remote conf: %d\r\n", link.remote_conf);
+            snprintf(buf, sizeof(buf), "\r\nCurrent remote conf: %d\r\n",
+                     link.remote_conf);
             send_str(s, buf);
             prompt_line(s, "New remote conf: ", sel, sizeof(sel));
             int remote_conf = atoi(sel);
 
-            if (db_qwk_area_link_update(s->db, id, remote_conf))
-            {
+            if (db_qwk_area_link_update(s->db, id, remote_conf)) {
               send_str(s, "\r\nLink updated.\r\n");
-            }
-            else
-            {
+            } else {
               send_str(s, "\r\nFailed to update link.\r\n");
             }
-          }
-          else if (line[0] == 'D' || line[0] == 'd')
-          {
+          } else if (line[0] == 'D' || line[0] == 'd') {
             prompt_line(s, "\r\nLink ID to delete: ", sel, sizeof(sel));
             int id = atoi(sel);
-            if (id > 0 && db_qwk_area_link_delete(s->db, id))
-            {
+            if (id > 0 && db_qwk_area_link_delete(s->db, id)) {
               send_str(s, "\r\nLink deleted.\r\n");
-            }
-            else
-            {
+            } else {
               send_str(s, "\r\nFailed to delete link.\r\n");
             }
           }
         }
-      }
-      else if (line[0] == 'P' || line[0] == 'p')
-      {
+      } else if (line[0] == 'P' || line[0] == 'p') {
         /* Packet Queue */
         send_str(s, "\r\n\x1b[1;33mQWK Packet Queue\x1b[0m\r\n");
-        send_str(s, "----------------------------------------------------------------------\r\n");
+        send_str(s, "----------------------------------------------------------"
+                    "------------\r\n");
 
         DbQwkPacket packets[32];
         int pcnt = db_qwk_packet_list(s->db, 0, NULL, packets, 32);
-        if (pcnt == 0)
-        {
+        if (pcnt == 0) {
           send_str(s, "  No packets in queue.\r\n");
-        }
-        else
-        {
-          for (int i = 0; i < pcnt; i++)
-          {
+        } else {
+          for (int i = 0; i < pcnt; i++) {
             DbQwkHub hub;
             char hub_name[64] = "???";
-            if (db_qwk_hub_get(s->db, packets[i].hub_id, &hub))
-            {
+            if (db_qwk_hub_get(s->db, packets[i].hub_id, &hub)) {
               snprintf(hub_name, sizeof(hub_name), "%s", hub.name);
             }
             snprintf(buf, sizeof(buf), "  [%2d] %s %s (%s) [%s]\r\n",
@@ -4454,38 +4088,31 @@ void bbs_handle_action(Session *s, const char *action)
 
         send_str(s, "\r\n(D)elete, (M)ark processed, (Q)uit: ");
         n = session_readline(s, line, sizeof(line), s->cfg.idle_timeout_sec);
-        if (n > 0 && (line[0] == 'D' || line[0] == 'd'))
-        {
+        if (n > 0 && (line[0] == 'D' || line[0] == 'd')) {
           char sel[8] = {0};
           prompt_line(s, "\r\nPacket ID to delete: ", sel, sizeof(sel));
           int id = atoi(sel);
-          if (id > 0 && db_qwk_packet_delete(s->db, id))
-          {
+          if (id > 0 && db_qwk_packet_delete(s->db, id)) {
             send_str(s, "\r\nPacket deleted.\r\n");
           }
-        }
-        else if (n > 0 && (line[0] == 'M' || line[0] == 'm'))
-        {
+        } else if (n > 0 && (line[0] == 'M' || line[0] == 'm')) {
           char sel[8] = {0};
           prompt_line(s, "\r\nPacket ID to mark processed: ", sel, sizeof(sel));
           int id = atoi(sel);
-          if (id > 0 && db_qwk_packet_mark_processed(s->db, id))
-          {
+          if (id > 0 && db_qwk_packet_mark_processed(s->db, id)) {
             send_str(s, "\r\nPacket marked as processed.\r\n");
           }
         }
       }
     }
-  }
-  else if (!strcmp(action, "fidosend"))
-  {
+  } else if (!strcmp(action, "fidosend")) {
     /* Send FidoNet netmail */
     send_str(s, "\r\n\x1b[1;36mSend FidoNet Netmail\x1b[0m\r\n");
-    send_str(s, "----------------------------------------------------------------------\r\n");
+    send_str(s, "--------------------------------------------------------------"
+                "--------\r\n");
 
     DbFidoAka primary;
-    if (!db_fido_aka_get_primary(s->db, &primary))
-    {
+    if (!db_fido_aka_get_primary(s->db, &primary)) {
       send_str(s, "No FidoNet AKA configured. Contact sysop.\r\n");
       return;
     }
@@ -4496,8 +4123,7 @@ void bbs_handle_action(Session *s, const char *action)
       return;
 
     int to_zone, to_net, to_node, to_point;
-    if (!fido_parse_address(addr, &to_zone, &to_net, &to_node, &to_point))
-    {
+    if (!fido_parse_address(addr, &to_zone, &to_net, &to_node, &to_point)) {
       send_str(s, "\r\nInvalid address format.\r\n");
       return;
     }
@@ -4515,8 +4141,7 @@ void bbs_handle_action(Session *s, const char *action)
     send_str(s, "\r\nEnter message (blank line to end):\r\n");
     char body[2048] = {0};
     size_t body_len = 0;
-    while (body_len < sizeof(body) - 128)
-    {
+    while (body_len < sizeof(body) - 128) {
       uint8_t line[256];
       int n = session_readline(s, line, sizeof(line), s->cfg.idle_timeout_sec);
       if (n <= 0)
@@ -4524,8 +4149,7 @@ void bbs_handle_action(Session *s, const char *action)
       if (line[0] == '\0')
         break;
       size_t llen = strlen((char *)line);
-      if (body_len + llen + 2 < sizeof(body))
-      {
+      if (body_len + llen + 2 < sizeof(body)) {
         memcpy(body + body_len, line, llen);
         body_len += llen;
         body[body_len++] = '\r';
@@ -4549,79 +4173,60 @@ void bbs_handle_action(Session *s, const char *action)
     snprintf(nm.body, sizeof(nm.body), "%s", body);
     nm.attr = NET_ATTR_LOCAL;
 
-    if (db_fido_netmail_add(s->db, &nm))
-    {
+    if (db_fido_netmail_add(s->db, &nm)) {
       send_str(s, "\r\nNetmail queued for delivery.\r\n");
-    }
-    else
-    {
+    } else {
       send_str(s, "\r\nFailed to queue netmail.\r\n");
     }
-  }
-  else if (!strcmp(action, "configeditor"))
-  {
+  } else if (!strcmp(action, "configeditor")) {
     cmd_config_editor(s);
-  }
-  else if (!strcmp(action, "help"))
-  {
+  } else if (!strcmp(action, "help")) {
     send_str(s, "\r\nHelp:\r\n");
     send_str(s, "  Choose a menu key and press ENTER.\r\n");
     send_str(s, "  This is a skeleton — add modules under src/modules/.\r\n");
     send_str(s, "\r\n(press ENTER)\r\n");
     uint8_t line[64];
     session_readline(s, line, sizeof(line), s->cfg.idle_timeout_sec);
-  }
-  else if (!strcmp(action, "logout"))
-  {
+  } else if (!strcmp(action, "logout")) {
     s->alive = 0;
-  }
-  else if (!strcmp(action, "plugins"))
-  {
+  } else if (!strcmp(action, "plugins")) {
     /* List loaded plugins */
     send_str(s, "\r\n\x1b[1;33mLoaded Plugins\x1b[0m\r\n");
-    send_str(s, "----------------------------------------------------------------------\r\n");
+    send_str(s, "--------------------------------------------------------------"
+                "--------\r\n");
     char list_buf[2048];
     size_t n = plugin_registry_list(list_buf, sizeof(list_buf));
-    if (n == 0)
-    {
+    if (n == 0) {
       send_str(s, "  No plugins loaded.\r\n");
-    }
-    else
-    {
+    } else {
       send_str(s, list_buf);
     }
     send_str(s, "\r\n(press ENTER)\r\n");
     uint8_t line[64];
     session_readline(s, line, sizeof(line), s->cfg.idle_timeout_sec);
-  }
-  else if (str_starts_with(action, "plugin:"))
-  {
+  } else if (str_starts_with(action, "plugin:")) {
     /* Run a plugin: plugin:<plugin_id> */
     const char *plugin_id = action + 7;
 
-    if (!plugin_loader_enabled())
-    {
+    if (!plugin_loader_enabled()) {
       send_str(s, "\r\nPlugins are not enabled.\r\n");
       return;
     }
 
     plugin_entry_t *entry = plugin_registry_find(plugin_id);
-    if (!entry)
-    {
+    if (!entry) {
       char msg[256];
       snprintf(msg, sizeof(msg), "\r\nPlugin not found: %s\r\n", plugin_id);
       send_str(s, msg);
       return;
     }
 
-    if (!(entry->desc.caps & BBS_CAP_INTERACTIVE))
-    {
+    if (!(entry->desc.caps & BBS_CAP_INTERACTIVE)) {
       send_str(s, "\r\nPlugin does not support interactive mode.\r\n");
       return;
     }
 
-    if (!entry->desc.create_instance)
-    {
+    if (!entry->desc.create_instance) {
       send_str(s, "\r\nPlugin cannot create instances.\r\n");
       return;
     }
@@ -4631,8 +4236,7 @@ void bbs_handle_action(Session *s, const char *action)
     const bbs_plugin_instance_vtbl_t *vtbl = NULL;
 
     bbs_rc_t rc = entry->desc.create_instance((bbs_session_t *)s, &inst, &vtbl);
-    if (rc != BBS_OK || !inst || !vtbl)
-    {
+    if (rc != BBS_OK || !inst || !vtbl) {
       send_str(s, "\r\nFailed to create plugin instance.\r\n");
       return;
     }
@@ -4641,46 +4245,37 @@ void bbs_handle_action(Session *s, const char *action)
     plugin_registry_instance_inc(plugin_id);
 
     /* Run plugin lifecycle */
-    if (vtbl->on_enter)
-    {
+    if (vtbl->on_enter) {
       rc = vtbl->on_enter(inst, (bbs_session_t *)s);
-      if (rc != BBS_OK)
-      {
+      if (rc != BBS_OK) {
         log_warn("plugin %s on_enter failed: %d", plugin_id, rc);
       }
     }
 
-    if (vtbl->run)
-    {
+    if (rc == BBS_OK && vtbl->run) {
       rc = vtbl->run(inst, (bbs_session_t *)s);
-      if (rc != BBS_OK && rc != BBS_EIO)
-      {
+      if (rc != BBS_OK && rc != BBS_EIO) {
         log_warn("plugin %s run failed: %d", plugin_id, rc);
       }
     }
 
-    if (vtbl->on_exit)
-    {
+    if (vtbl->on_exit) {
       vtbl->on_exit(inst, (bbs_session_t *)s);
     }
 
     /* Destroy instance */
-    if (vtbl->destroy)
-    {
+    if (vtbl->destroy) {
       vtbl->destroy(inst);
     }
 
     /* Untrack instance */
     plugin_registry_instance_dec(plugin_id);
-  }
-  else
-  {
+  } else {
     send_str(s, "\r\nUnknown action.\r\n");
   }
 }
 
-static int detect_ansi(Session *s)
-{
+static int detect_ansi(Session *s) {
   /* Ask user if they want ANSI graphics */
   send_str(s, "\r\nWelcome to Mutineer BBS!\r\n\r\n");
   send_str(s, "ANSI graphics? (Y/n): ");
@@ -4691,29 +4286,26 @@ static int detect_ansi(Session *s)
     return -1; /* connection error */
 
   /* Default to yes if just enter pressed, or explicit Y/y */
-  if (n == 0 || resp[0] == 'Y' || resp[0] == 'y' || resp[0] == '\r' || resp[0] == '\n')
-  {
+  if (n == 0 || resp[0] == 'Y' || resp[0] == 'y' || resp[0] == '\r' ||
+      resp[0] == '\n') {
     s->ansi = 1;
     send_str(s, "ANSI enabled.\r\n");
-  }
-  else
-  {
+  } else {
     s->ansi = 0;
     send_str(s, "ASCII mode.\r\n");
   }
   return 0;
 }
 
-void *session_thread_main(void *arg)
-{
+void *session_thread_main(void *arg) {
   Session *s = (Session *)arg;
   int menu_loaded = 0;
 
   pthread_mutex_init(&s->chat_inbox_lock, NULL);
 
-  if (!online_add(s))
-  {
-    send_str(s, "\r\nAll nodes are busy or locked. Please try again later.\r\n");
+  if (!online_add(s)) {
+    send_str(s,
+             "\r\nAll nodes are busy or locked. Please try again later.\r\n");
     goto cleanup;
   }
 
@@ -4724,30 +4316,26 @@ void *session_thread_main(void *arg)
   drain_telnet_negotiation(s);
 
   /* Detect ANSI capability */
-  if (detect_ansi(s) < 0)
-  {
+  if (detect_ansi(s) < 0) {
     goto cleanup;
   }
 
   /* Now we can send appropriate content */
-  if (s->ansi)
-  {
+  if (s->ansi) {
     send_str(s, "\x1b[2J\x1b[H"); /* clear screen */
     send_str(s, ANSI_BASE);
     send_named_art(s, "mutineer");
     send_motd(s);
-  }
-  else
-  {
+  } else {
     send_str(s, "\r\n");
     send_str(s, "Welcome to the Mutineer Telnet BBS!\r\n");
-    send_str(s, "All seas are green here - hoist the flag and explore.\r\n\r\n");
+    send_str(s,
+             "All seas are green here - hoist the flag and explore.\r\n\r\n");
   }
 
   {
     DbAutomsg am;
-    if (db_automsg_get(s->db, &am))
-    {
+    if (db_automsg_get(s->db, &am)) {
       send_str(s, "\r\nAutomsg:\r\n");
       send_str(s, am.msg);
       send_str(s, "\r\n");
@@ -4756,26 +4344,18 @@ void *session_thread_main(void *arg)
   {
     DbOneliner oneliners[10];
     int n = db_oneliner_list(s->db, oneliners, 10);
-    if (n > 0)
-    {
-      if (s->ansi)
-      {
+    if (n > 0) {
+      if (s->ansi) {
         send_str(s, "\r\n\x1b[1;36mRecent One-Liners:\x1b[0m\r\n");
-      }
-      else
-      {
+      } else {
         send_str(s, "\r\nRecent One-Liners:\r\n");
       }
       char linebuf[256];
-      for (int i = n - 1; i >= 0; i--)
-      {
-        if (s->ansi)
-        {
+      for (int i = n - 1; i >= 0; i--) {
+        if (s->ansi) {
           snprintf(linebuf, sizeof(linebuf), "  \x1b[1;32m%s\x1b[0m: %s\r\n",
                    oneliners[i].user_handle, oneliners[i].text);
-        }
-        else
-        {
+        } else {
           snprintf(linebuf, sizeof(linebuf), "  %s: %s\r\n",
                    oneliners[i].user_handle, oneliners[i].text);
         }
@@ -4785,23 +4365,21 @@ void *session_thread_main(void *arg)
   }
   DbUser current_user;
   int auth = authenticate(s, &current_user);
-  if (auth <= 0)
-  {
+  if (auth <= 0) {
     send_str(s, "\r\nGoodbye.\r\n");
     goto cleanup;
   }
 
   /* Multi-login prevention check */
-  if (!s->cfg.allow_multi_login)
-  {
+  if (!s->cfg.allow_multi_login) {
     int existing_node = 0;
-    if (db_node_user_online(s->db, current_user.id, &existing_node))
-    {
+    if (db_node_user_online(s->db, current_user.id, &existing_node)) {
       char artpath[512];
       path_join(s->cfg.art_path, "multilog.ans", artpath, sizeof(artpath));
       send_art(s, artpath);
       char buf[128];
-      snprintf(buf, sizeof(buf), "\r\nYou are already logged in on node %d.\r\n", existing_node);
+      snprintf(buf, sizeof(buf),
+               "\r\nYou are already logged in on node %d.\r\n", existing_node);
       send_str(s, buf);
       send_str(s, "Multiple logins are not permitted.\r\n");
       send_str(s, "\r\nGoodbye.\r\n");
@@ -4811,10 +4389,10 @@ void *session_thread_main(void *arg)
 
   /* Daily call limit check */
   if (s->cfg.max_calls_per_day > 0 &&
-      current_user.on_today >= s->cfg.max_calls_per_day)
-  {
+      current_user.on_today >= s->cfg.max_calls_per_day) {
     if (!send_named_art(s, "2MANYCAL"))
-      send_str(s, "\r\nYou have reached your maximum calls for today. Please try again tomorrow.\r\n");
+      send_str(s, "\r\nYou have reached your maximum calls for today. Please "
+                  "try again tomorrow.\r\n");
     send_str(s, "\r\nGoodbye.\r\n");
     goto cleanup;
   }
@@ -4823,16 +4401,15 @@ void *session_thread_main(void *arg)
   db_node_upsert(s->db, s->node_num, s->user.id, "online", "menu", s->ip);
   /* override session time limit from security level if present */
   s->time_left_min = s->cfg.session_time_limit_min;
-  if (s->user.time_limit_min > 0)
-  {
+  if (s->user.time_limit_min > 0) {
     s->time_left_min = s->user.time_limit_min;
   }
   s->credits = s->user.credits;
   s->file_points = s->user.file_points;
-  if (s->user.smw > 0)
-  {
+  if (s->user.smw > 0) {
     char buf[128];
-    snprintf(buf, sizeof(buf), "\r\n*** You have %d new private messages ***\r\n", s->user.smw);
+    snprintf(buf, sizeof(buf),
+             "\r\n*** You have %d new private messages ***\r\n", s->user.smw);
     send_str(s, buf);
     db_user_clear_smw(s->db, s->user.id);
   }
@@ -4840,16 +4417,20 @@ void *session_thread_main(void *arg)
     int draft_count = db_draft_count(s->db, s->user.id);
     if (draft_count > 0) {
       char buf[128];
-      snprintf(buf, sizeof(buf), "\r\n*** You have %d saved draft(s). Use the message area to resume. ***\r\n", draft_count);
+      snprintf(buf, sizeof(buf),
+               "\r\n*** You have %d saved draft(s). Use the message area to "
+               "resume. ***\r\n",
+               draft_count);
       send_str(s, buf);
     }
   }
   db_stats_inc(s->db, "calls");
-  s->call_id = db_call_log_start(s->db, s->user.id, s->user.handle, s->node_num, s->ip);
+  s->call_id =
+      db_call_log_start(s->db, s->user.id, s->user.handle, s->node_num, s->ip);
   scheduler_run_logon_events(s);
+  plugin_loader_dispatch_event(BBS_EVT_LOGIN, (bbs_session_t *)s, NULL);
   send_str(s, "\r\n"); /* newline after login */
-  if (s->tn.term_type[0])
-  {
+  if (s->tn.term_type[0]) {
     send_str(s, "Terminal: ");
     send_str(s, s->tn.term_type);
     send_str(s, "\r\n");
@@ -4865,30 +4446,23 @@ void *session_thread_main(void *arg)
   memset(&menu, 0, sizeof(menu));
   char active_menu_path[256];
   resolve_start_menu_path(s, active_menu_path, sizeof(active_menu_path));
-  if (!menu_load(active_menu_path, &menu))
-  {
+  if (!menu_load(active_menu_path, &menu)) {
     send_str(s, "ERROR: failed to load menu file.\r\n");
     s->alive = 0;
-  }
-  else
-  {
+  } else {
     menu_loaded = 1;
   }
 
-  while (s->alive)
-  {
-    if (g_stop)
-    {
+  while (s->alive) {
+    if (g_stop) {
       send_str(s, "\r\nSystem shutting down.\r\n");
       break;
     }
-    if (s->time_left_min > 0)
-    {
+    if (s->time_left_min > 0) {
       time_t now = time(NULL);
       double elapsed = difftime(now, s->started_at) / 60.0;
       double remaining = (double)s->time_left_min - elapsed;
-      if (remaining <= 0)
-      {
+      if (remaining <= 0) {
         if (!send_named_art(s, "NOTLEFTA"))
           send_str(s, "\r\nSession time limit reached. Goodbye.\r\n");
         break;
@@ -4900,8 +4474,7 @@ void *session_thread_main(void *arg)
 
     char render[4096];
     size_t rlen = menu_render_template(&menu, s, render, sizeof(render));
-    if (rlen == 0)
-    {
+    if (rlen == 0) {
       /* Template rendering failed, fall back to classic renderer */
       rlen = menu_render(&menu, s, render, sizeof(render));
     }
@@ -4911,8 +4484,7 @@ void *session_thread_main(void *arg)
     int n = session_readline(s, line, sizeof(line), s->cfg.idle_timeout_sec);
     if (n == 0)
       break;
-    if (n == -2)
-    {
+    if (n == -2) {
       send_str(s, "\r\nIdle timeout.\r\n");
       break;
     }
@@ -4928,30 +4500,25 @@ void *session_thread_main(void *arg)
 
     char key = (char)line[0];
     const MenuItem *it = menu_find(&menu, key);
-    if (!it)
-    {
+    if (!it) {
       send_str(s, "\r\nInvalid selection.\r\n");
       continue;
     }
-    if (!acs_allows(s, it->acs))
-    {
+    if (!acs_allows(s, it->acs)) {
       if (!send_named_art(s, "NOACCESS"))
         send_str(s, "\r\nAccess denied.\r\n");
       continue;
     }
-    if (it->flags & CMD_FLAG_PASSWORD)
-    {
+    if (it->flags & CMD_FLAG_PASSWORD) {
       char pw[64] = {0};
       if (prompt_password(s, "Command password: ", pw, sizeof(pw)) <= 0 ||
-          strcmp(pw, it->password) != 0)
-      {
+          strcmp(pw, it->password) != 0) {
         send_str(s, "\r\nInvalid command password.\r\n");
         log_audit(s->user.handle, "menu_password_denied", it->action);
         continue;
       }
     }
-    if (it->flags & CMD_FLAG_SYSOP_LOG)
-    {
+    if (it->flags & CMD_FLAG_SYSOP_LOG) {
       log_audit(s->user.handle, "menu_sysop_command", it->action);
     }
     bbs_handle_action(s, it->action);
@@ -4959,10 +4526,13 @@ void *session_thread_main(void *arg)
   }
 
 cleanup:
+  if (s->user.id > 0)
+    plugin_loader_dispatch_event(s->alive ? BBS_EVT_LOGOUT
+                                          : BBS_EVT_FORCED_DISCONNECT,
+                                 (bbs_session_t *)s, NULL);
   if (menu_loaded)
     menu_free(&menu);
-  if (s->call_id > 0)
-  {
+  if (s->call_id > 0) {
     int duration = (int)((time(NULL) - s->started_at) / 60);
     db_call_log_end(s->db, s->call_id, duration);
   }

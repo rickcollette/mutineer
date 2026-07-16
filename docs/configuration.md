@@ -142,6 +142,8 @@ Keys match `BbsConfig` fields in `include/bbs_config.h`. Defaults shown are from
 | `door_copy_mode` | string | `copy` | No | File copy mode for door launch |
 | `door_default_timeout_sec` | int | `300` | No | Door timeout; `0` = no timeout |
 | `door_cleanup_on_exit` | int | `1` | No | Remove runtime tree on successful exit |
+| `door_janitor_interval_sec` | int | `60` | No | Seconds between stale door-runtime scans; `0` disables |
+| `door_stale_age_sec` | int | `300` | No | Minimum age before an offline node's launch tree is removed |
 | `door_keep_failed_runs` | int | `0` | No | Keep runtime tree on failure for debugging |
 | `door_session_hmac_secret` | string | `mutineer-dev-door-secret` | Yes for production | Shared secret for signing native-door session assertions |
 
@@ -205,6 +207,8 @@ dosbox_path=/usr/bin/dosbox
 door_runtime_path=/var/lib/mutineer/door_runtime
 door_default_timeout_sec=600
 door_cleanup_on_exit=1
+door_janitor_interval_sec=60
+door_stale_age_sec=300
 door_session_hmac_secret=replace-with-a-long-random-production-secret
 
 plugins_enabled=true

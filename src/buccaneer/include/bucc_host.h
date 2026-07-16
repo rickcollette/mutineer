@@ -36,6 +36,7 @@ typedef struct bucc_host_context bucc_host_context_t;
 #define BUCC_CAP_SESSION_READ   (1ULL << 14)
 #define BUCC_CAP_SESSION_WRITE  (1ULL << 15)
 #define BUCC_CAP_DOOR_CHAIN     (1ULL << 16)
+#define BUCC_CAP_LEADERBOARD    (1ULL << 17)
 
 #define BUCC_CAP_ALL            0xFFFFFFFFFFFFFFFFULL
 #define BUCC_CAP_SAFE           (BUCC_CAP_TERM_OUTPUT | BUCC_CAP_TERM_INPUT | \
@@ -112,6 +113,11 @@ typedef struct bucc_bbs_api {
     int (*get_node)(void* ctx);
 } bucc_bbs_api_t;
 
+typedef struct bucc_leaderboard_api {
+    bool (*enabled)(void* ctx);
+    bool (*submit)(void* ctx, int64_t score, const char* detail);
+} bucc_leaderboard_api_t;
+
 typedef struct bucc_users_api {
     bucc_array_t* (*find)(void* ctx, bucc_map_t* query, int limit);
     bucc_map_t* (*get)(void* ctx, int64_t id);
@@ -138,6 +144,7 @@ struct bucc_host_context {
     void*           users_ctx;
     void*           msg_ctx;
     void*           file_ctx;
+    void*           leaderboard_ctx;
     
     bucc_term_api_t*   term;
     bucc_user_api_t*   user;
@@ -148,6 +155,7 @@ struct bucc_host_context {
     bucc_users_api_t*  users;
     bucc_msg_api_t*    msg;
     bucc_file_api_t*   file;
+    bucc_leaderboard_api_t* leaderboard;
     
     bucc_map_t*     app_state;
     bucc_map_t*     shared_state;
@@ -175,6 +183,7 @@ void bucc_host_set_bbs_api(bucc_host_context_t* ctx, bucc_bbs_api_t* api, void* 
 void bucc_host_set_users_api(bucc_host_context_t* ctx, bucc_users_api_t* api, void* users_ctx);
 void bucc_host_set_msg_api(bucc_host_context_t* ctx, bucc_msg_api_t* api, void* msg_ctx);
 void bucc_host_set_file_api(bucc_host_context_t* ctx, bucc_file_api_t* api, void* file_ctx);
+void bucc_host_set_leaderboard_api(bucc_host_context_t* ctx, bucc_leaderboard_api_t* api, void* leaderboard_ctx);
 
 bucc_value_t bucc_host_dispatch(bucc_vm_t* vm, const char* ns, const char* fn,
                                 bucc_value_t* args, int argc, void* ctx);

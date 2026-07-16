@@ -561,6 +561,38 @@ static int compute_columns(int body_width, int requested_max, int item_count) {
   return 1;
 }
 
+/* Templates may draw a border below %%PROMPT%%. After streaming that border the
+ * terminal cursor sits on the following row, so return ANSI callers to the end
+ * of the prompt before readline begins. */
+static size_t append_prompt_cursor(const Menu* m, const Session* s,
+                                   char* buf, size_t len, size_t cap) {
+  if (!m || !s || !s->ansi || !m->prompt[0] || !buf || len >= cap) return len;
+
+  char* prompt = NULL;
+  for (char* found = strstr(buf, m->prompt); found; found = strstr(found + 1, m->prompt))
+    prompt = found;
+  if (!prompt) return len;
+
+  char* line_start = prompt;
+  while (line_start > buf && line_start[-1] != '\n') line_start--;
+  const char* prompt_end = prompt + strlen(m->prompt);
+  int rows_up = 0;
+  for (const char* p = prompt_end; p < buf + len; p++)
+    if (*p == '\n') rows_up++;
+  if (rows_up <= 0) return len;
+
+  size_t prefix_len = (size_t)(prompt_end - line_start);
+  char prefix[512];
+  if (prefix_len >= sizeof(prefix)) return len;
+  memcpy(prefix, line_start, prefix_len);
+  prefix[prefix_len] = '\0';
+  size_t column = visible_len(prefix) + 1;
+
+  int written = snprintf(buf + len, cap - len, "\x1b[%dA\x1b[%zuG", rows_up, column);
+  if (written < 0 || (size_t)written >= cap - len) return len;
+  return len + (size_t)written;
+}
+
 size_t menu_render_template(const Menu* m, const Session* s,
                             char* buf, size_t cap) {
   if (!m || !buf || cap == 0) return 0;
@@ -748,6 +780,8 @@ size_t menu_render_template(const Menu* m, const Session* s,
     }
   }
   
+  buf[o] = '\0';
+  o = append_prompt_cursor(m, s, buf, o, cap);
   buf[o] = '\0';
   free(expanded);
   

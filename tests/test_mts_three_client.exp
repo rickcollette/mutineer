@@ -1,0 +1,135 @@
+#!/usr/bin/expect -f
+set timeout 20
+set host $env(MUTINEER_EXPECT_HOST)
+set port $env(MUTINEER_EXPECT_PORT)
+
+proc login_client {host port handle} {
+  spawn telnet $host $port
+  set id $spawn_id
+  expect {
+    -i $id -re {ANSI.*\?|graphics.*\?} { send -i $id "N\r"; exp_continue }
+    -i $id "Handle:" { send -i $id "$handle\r" }
+    -i $id timeout { error "$handle did not receive Handle prompt" }
+  }
+  expect -i $id "Password:"
+  send -i $id "mutineer\r"
+  expect -i $id "Selection:"
+  send -i $id "C\r"
+  expect -i $id "MTS> "
+  return $id
+}
+proc command {id text} {
+  send -i $id "$text\r"
+  expect -i $id "MTS> "
+}
+
+set alice [login_client $host $port alice]
+set bob [login_client $host $port bob]
+set charlie [login_client $host $port charlie]
+
+send -i $alice "three-client-public\r"
+expect -i $bob -re {alice: three-client-public}
+expect -i $alice "MTS> "
+
+send -i $charlie "/create SideRoom\r"
+expect -i $charlie -re {Room created and joined\..*MTS> }
+send -i $alice "lobby-only\r"
+expect -i $alice "MTS> "
+after 500
+send -i $charlie "/who\r"
+expect {
+  -i $charlie "lobby-only" { error "cross-room public traffic leaked" }
+  -i $charlie -re {Present:.*charlie.*MTS> } { }
+  -i $charlie timeout { error "room-isolation probe timed out" }
+}
+
+send -i $alice "/msg bob private-three-client\r"
+expect -i $bob -re {\[private\].*alice: private-three-client}
+expect -i $alice "MTS> "
+
+command $bob "/afk testing-afk"
+send -i $alice "/msg bob first-afk\r"
+expect -i $alice -re {\[AFK\].*testing-afk}
+expect -i $alice "MTS> "
+send -i $alice "/msg bob second-afk\r"
+expect {
+  -i $alice -re {\[AFK\]} { error "AFK response loop or duplicate response" }
+  -i $alice "MTS> " { }
+  -i $alice timeout { error "missing prompt after second AFK message" }
+}
+
+command $bob "/afk"
+command $bob "/block alice"
+send -i $alice "/msg bob blocked-probe\r"
+expect -i $alice -re {Message could not be delivered\..*MTS> }
+command $bob "/unblock alice"
+
+send -i $alice "/chat bob\r"
+expect -i $bob -re {Focused chat requested.*MTS> }
+send -i $bob "/accept\r"
+expect -i $bob -re {Focused chat started.*MTS> }
+send -i $alice "focused-payload\r"
+expect -i $bob -re {\[private\].*alice: focused-payload}
+command $alice "/decline"
+
+command $bob "/watch SideRoom"
+send -i $charlie "watch-payload\r"
+expect -i $bob -re {\[watch:.*\].*charlie: watch-payload}
+command $bob "/unwatch"
+
+set sysop [login_client $host $port sysop]
+send -i $alice "/announce forbidden\r"
+expect -i $alice -re {Sysop authorization required\..*MTS> }
+command $sysop "/globalmute alice 1m readiness-test"
+send -i $alice "muted-attempt\r"
+expect -i $alice -re {You are muted in this room\..*MTS> }
+command $sysop "/unglobalmute alice"
+
+set alice2 [login_client $host $port alice]
+send -i $bob "/msg alice duplicate-session-probe\r"
+expect -i $alice -re {\[private\].*bob: duplicate-session-probe}
+expect -i $alice2 -re {\[private\].*bob: duplicate-session-probe}
+
+proc console_kick {host port node} {
+  set channel [socket $host $port]
+  fconfigure $channel -buffering line -translation lf
+  puts $channel {{"id":"1","cmd":"hello"}}
+  gets $channel
+  puts $channel {{"id":"2","cmd":"login","user":"sysop","password":"mutineer"}}
+  while {[gets $channel line] >= 0} {
+    if {[string first {"id":"2"} $line] >= 0} break
+  }
+  puts $channel "{\"id\":\"3\",\"cmd\":\"node.kick\",\"node\":$node}"
+  while {[gets $channel line] >= 0} {
+    if {[string first {"id":"3"} $line] >= 0} {
+      if {[string first {"ok":true} $line] < 0} { error "node.kick failed: $line" }
+      break
+    }
+  }
+  close $channel
+}
+console_kick $host $env(MUTINEER_EXPECT_CONSOLE_PORT) 3
+expect -i $charlie eof
+
+set shutdown_marker [open "$env(MUTINEER_EXPECT_ROOT)/daemon-shutdown-requested" w]
+puts $shutdown_marker "requested"
+close $shutdown_marker
+exec kill -TERM $env(MUTINEER_EXPECT_DAEMON_PID)
+foreach id [list $alice $alice2 $bob $sysop] {
+  expect {
+    -i $id eof { }
+    -i $id timeout { error "active client did not close on shutdown" }
+  }
+}
+puts "three-client MTS test passed"
+exit 0
+
+foreach id [list $alice $bob $charlie] {
+  catch { send -i $id "/quit\r" }
+  catch { expect -i $id "Selection:" }
+  catch { send -i $id "Q\r" }
+  catch { close -i $id }
+  catch { wait -i $id }
+}
+puts "three-client MTS test passed"
+exit 0

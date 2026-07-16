@@ -102,6 +102,29 @@ int main(void)
   ASSERT_TRUE(bbslib_status_json(ctx, json, sizeof(json)) == BBSLIB_OK, "status json failed");
   ASSERT_TRUE(strstr(json, "SDK Test BBS") != NULL, "status json missing bbs name");
 
+  ASSERT_TRUE(db_node_upsert(bbslib_db(ctx), 2, 1, "online", "door:Test Quest", "192.0.2.10"),
+              "node fixture failed");
+  ASSERT_TRUE(bbslib_web_status_json(ctx, json, sizeof(json)) == BBSLIB_OK,
+              "web status json failed");
+  ASSERT_TRUE(strstr(json, "\"online\":{\"count\":1") != NULL,
+              "web status missing online count");
+  ASSERT_TRUE(strstr(json, "Test Quest") != NULL, "web status missing active door");
+  ASSERT_TRUE(strstr(json, "192.0.2.10") == NULL, "web status leaked caller IP");
+  ASSERT_TRUE(db_exec(bbslib_db(ctx),
+              "INSERT INTO doors(name,dropfile,command,runner,enabled,lb_enable,lb_key,lb_label,lb_order) "
+              "VALUES('Test Quest','DOOR.SYS','/bin/true','native',1,1,'test-quest','Gold','desc')"),
+              "leaderboard door fixture failed");
+  DbDoor test_doors[4];
+  int test_door_count = db_doors_list(bbslib_db(ctx), test_doors, 4);
+  ASSERT_TRUE(test_door_count == 1, "leaderboard door lookup failed");
+  ASSERT_TRUE(bbslib_leaderboard_submit(ctx, test_doors[0].id, "sdkuser", 1200, "Level 4") == BBSLIB_OK,
+              "door score submit failed");
+  DbDoorScore scores[4];
+  ASSERT_TRUE(db_door_scores_list(bbslib_db(ctx), scores, 4) == 1,
+              "door score list failed");
+  ASSERT_TRUE(scores[0].score == 1200 && !strcmp(scores[0].handle, "sdkuser"),
+              "door score data mismatch");
+
   DbUser user;
   bool upgrade = false;
   ASSERT_TRUE(bbslib_authenticate_user(ctx, "sdkuser", "secret", &user, &upgrade) == BBSLIB_OK, "auth failed");

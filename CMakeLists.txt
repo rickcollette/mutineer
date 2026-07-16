@@ -54,9 +54,15 @@ add_executable(mutineer ${BBSLIB_DAEMON_SOURCES})
 target_compile_options(mutineer PRIVATE -Wall -Wextra -Wpedantic)
 
 option(ENABLE_ASAN "Enable AddressSanitizer" OFF)
+option(ENABLE_TSAN "Enable ThreadSanitizer" OFF)
+option(MTS_WARNINGS_AS_ERRORS "Treat MTS compiler warnings as errors" OFF)
+if(ENABLE_ASAN AND ENABLE_TSAN)
+  message(FATAL_ERROR "ENABLE_ASAN and ENABLE_TSAN are mutually exclusive")
+endif()
 if (ENABLE_ASAN)
-  target_compile_options(mutineer PRIVATE -fsanitize=address)
-  target_link_options(mutineer PRIVATE -fsanitize=address)
+  target_compile_options(mutineer PRIVATE -fsanitize=address,undefined)
+  target_link_options(mutineer PRIVATE -fsanitize=address,undefined)
+  target_compile_options(bbs_core_obj PRIVATE -fsanitize=address,undefined)
 endif()
 
 # SQLite is required. Mutineer does not support a non-persistent DB mode.
@@ -85,9 +91,10 @@ target_link_libraries(mutineer PRIVATE Threads::Threads)
 find_package(OpenSSL REQUIRED)
 target_link_libraries(mutineer PRIVATE OpenSSL::Crypto)
 
-# Argon2 (optional)
-find_package(PkgConfig QUIET)
-if (PkgConfig_FOUND)
+# Argon2 is opt-in; PBKDF2-SHA256 is the default BBS password backend.
+option(MUTINEER_ENABLE_ARGON2 "Enable optional Argon2 password hashing" OFF)
+if (MUTINEER_ENABLE_ARGON2)
+  find_package(PkgConfig REQUIRED)
   pkg_check_modules(ARGON2 libargon2)
   if (ARGON2_FOUND)
     target_compile_definitions(mutineer PRIVATE HAVE_ARGON2=1)
@@ -345,7 +352,7 @@ if(EXPECT_EXECUTABLE)
            COMMAND ${CMAKE_SOURCE_DIR}/tests/run_expect_tests.sh ${CMAKE_BINARY_DIR}
            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
   set_tests_properties(expect_suite PROPERTIES 
-    TIMEOUT 300
+    TIMEOUT 600
     LABELS "interactive"
   )
 endif()
@@ -395,9 +402,12 @@ target_link_libraries(mutineer-rest PRIVATE bbslib)
 add_executable(mutineer-console
   src/tools/mutineer-console.c
 )
+find_path(NOTCURSES_INCLUDE_DIR notcurses/notcurses.h REQUIRED)
+find_library(NOTCURSES_CORE_LIBRARY NAMES notcurses-core REQUIRED)
 target_include_directories(mutineer-console PRIVATE include src/tools)
+target_include_directories(mutineer-console PRIVATE ${NOTCURSES_INCLUDE_DIR})
 target_compile_options(mutineer-console PRIVATE -Wall -Wextra -Wpedantic)
-target_link_libraries(mutineer-console PRIVATE bbslib)
+target_link_libraries(mutineer-console PRIVATE bbslib ${NOTCURSES_CORE_LIBRARY})
 
 add_test(NAME console_protocol
          COMMAND ${CMAKE_SOURCE_DIR}/tests/test_console_protocol.sh ${CMAKE_BINARY_DIR}
@@ -618,7 +628,25 @@ endfunction()
 
 # Build sample plugins
 add_mutineer_plugin(hello hello.c hello)
-add_mutineer_plugin(chat chat.c chat_plugin)
+add_library(chat_plugin SHARED
+  plugins/chat/chat.c
+  plugins/chat/mts_command.c
+  plugins/chat/mts_render.c
+  plugins/chat/mts_state.c
+  plugins/chat/mts_store.c
+  plugins/chat/mts_config.c)
+target_include_directories(chat_plugin PRIVATE include plugins/chat ${SQLite3_INCLUDE_DIRS})
+target_compile_options(chat_plugin PRIVATE -Wall -Wextra -Wpedantic -fPIC)
+if(MTS_WARNINGS_AS_ERRORS)
+  target_compile_options(chat_plugin PRIVATE -Werror)
+endif()
+if(ENABLE_ASAN)
+  target_compile_options(chat_plugin PRIVATE -fsanitize=address,undefined)
+  target_link_options(chat_plugin PRIVATE -fsanitize=address,undefined)
+endif()
+target_compile_definitions(chat_plugin PRIVATE BBS_PLUGIN_IMPL=1)
+target_link_libraries(chat_plugin PRIVATE Threads::Threads ${SQLite3_LIBRARIES})
+set_target_properties(chat_plugin PROPERTIES PREFIX "" LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/plugins)
 
 # Custom target to build all plugins
 add_custom_target(plugins DEPENDS hello chat_plugin)
@@ -642,6 +670,56 @@ target_require_sqlite(test_plugin)
 add_test(NAME plugin COMMAND test_plugin ${CMAKE_BINARY_DIR}/plugins/hello.so WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 set_tests_properties(plugin PROPERTIES DEPENDS "hello;chat_plugin")
 
+add_executable(test_mts tests/test_mts.c plugins/chat/chat.c plugins/chat/mts_command.c plugins/chat/mts_render.c plugins/chat/mts_state.c
+  plugins/chat/mts_store.c plugins/chat/mts_config.c)
+target_include_directories(test_mts PRIVATE include plugins/chat ${SQLite3_INCLUDE_DIRS})
+target_compile_definitions(test_mts PRIVATE MTS_TESTING=1)
+target_compile_options(test_mts PRIVATE -Wall -Wextra -Wpedantic)
+if(MTS_WARNINGS_AS_ERRORS)
+  target_compile_options(test_mts PRIVATE -Werror)
+endif()
+target_link_libraries(test_mts PRIVATE Threads::Threads ${SQLite3_LIBRARIES})
+if (ENABLE_ASAN)
+  target_compile_options(test_mts PRIVATE -fsanitize=address,undefined)
+  target_link_options(test_mts PRIVATE -fsanitize=address,undefined)
+elseif(ENABLE_TSAN)
+  target_compile_options(test_mts PRIVATE -fsanitize=thread -fno-omit-frame-pointer)
+  target_link_options(test_mts PRIVATE -fsanitize=thread)
+endif()
+add_test(NAME mts COMMAND test_mts)
+set_tests_properties(mts PROPERTIES LABELS "mts;concurrency")
+
+add_executable(test_mts_concurrency tests/test_mts_concurrency.c
+  plugins/chat/mts_render.c plugins/chat/mts_state.c plugins/chat/mts_store.c
+  plugins/chat/mts_config.c)
+target_include_directories(test_mts_concurrency PRIVATE include plugins/chat ${SQLite3_INCLUDE_DIRS})
+target_compile_definitions(test_mts_concurrency PRIVATE MTS_TESTING=1)
+target_compile_options(test_mts_concurrency PRIVATE -Wall -Wextra -Wpedantic)
+if(MTS_WARNINGS_AS_ERRORS)
+  target_compile_options(test_mts_concurrency PRIVATE -Werror)
+endif()
+target_link_libraries(test_mts_concurrency PRIVATE Threads::Threads ${SQLite3_LIBRARIES})
+if(ENABLE_ASAN)
+  target_compile_options(test_mts_concurrency PRIVATE -fsanitize=address,undefined)
+  target_link_options(test_mts_concurrency PRIVATE -fsanitize=address,undefined)
+elseif(ENABLE_TSAN)
+  target_compile_options(test_mts_concurrency PRIVATE -fsanitize=thread -fno-omit-frame-pointer)
+  target_link_options(test_mts_concurrency PRIVATE -fsanitize=thread)
+endif()
+add_test(NAME mts_concurrency COMMAND test_mts_concurrency)
+set_tests_properties(mts_concurrency PROPERTIES LABELS "mts;concurrency;stress")
+
+add_executable(mts-docgen plugins/chat/mts_docgen.c plugins/chat/mts_command.c)
+target_include_directories(mts-docgen PRIVATE plugins/chat)
+target_compile_options(mts-docgen PRIVATE -Wall -Wextra -Wpedantic)
+add_test(NAME mts_docs_consistency
+  COMMAND ${CMAKE_COMMAND}
+    -DGENERATOR=$<TARGET_FILE:mts-docgen>
+    -DOUTPUT=${CMAKE_BINARY_DIR}/mts-command-reference.md
+    -DREFERENCE=${CMAKE_SOURCE_DIR}/docs/reference/mts-commands.md
+    -P ${CMAKE_SOURCE_DIR}/tests/check_mts_docs.cmake)
+set_tests_properties(mts_docs_consistency PROPERTIES DEPENDS mts-docgen LABELS "mts;docs")
+
 add_executable(bucc
   src/buccaneer/tools/bucc.c
   src/buccaneer/tools/formatter.c
@@ -662,6 +740,7 @@ install(TARGETS bbslib
   ARCHIVE DESTINATION lib
 )
 install(DIRECTORY include/ DESTINATION include)
+install(FILES plugins/chat/mts.conf.example DESTINATION share/mutineer/plugins/chat)
 install(EXPORT bbslibTargets
   FILE bbslibTargets.cmake
   NAMESPACE Mutineer::

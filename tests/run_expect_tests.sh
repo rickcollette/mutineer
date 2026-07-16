@@ -9,12 +9,14 @@ PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 BUILD_DIR="${1:-$PROJECT_DIR/build}"
 HOST="127.0.0.1"
 PORT="${MUTINEER_TEST_PORT:-}"
+CONSOLE_PORT=""
 RUNTIME_DIR="${MUTINEER_TEST_ROOT:-}"
 CONFIG_FILE=""
 DAEMON_PID=""
 TESTS_PASSED=0
 TESTS_FAILED=0
 FAILED_TESTS=""
+ALLOW_MULTI_LOGIN=0
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -84,6 +86,7 @@ prepare_runtime() {
     if [[ -z "$PORT" ]]; then
         PORT="$(choose_port)"
     fi
+    CONSOLE_PORT="$(choose_port)"
     if port_open "$HOST" "$PORT"; then
         log_error "Refusing to attach to existing daemon: $HOST:$PORT is already in use"
         exit 1
@@ -120,15 +123,27 @@ bbs_name=Mutineer Test BBS
 sysop_name=Sysop
 motd=$PROJECT_DIR/art/motd.ans
 wfc_enabled=0
-console_enabled=0
+console_enabled=1
+console_bind=$HOST
+console_port=$CONSOLE_PORT
 scheduler_enabled=0
-allow_multi_login=0
+allow_multi_login=$ALLOW_MULTI_LOGIN
+plugins_enabled=true
+plugins_dir=$BUILD_DIR/plugins
 login_max_attempts=20
 door_runtime_path=$RUNTIME_DIR/door_runtime
 EOF
 
     log_info "Initializing private test DB at $RUNTIME_DIR/data/mutineer.db"
     "$BUILD_DIR/mutineer-initbbs" -c "$CONFIG_FILE" -y > "$RUNTIME_DIR/initbbs.log" 2>&1
+    sqlite3 "$RUNTIME_DIR/data/mutineer.db" <<'SQL'
+INSERT OR IGNORE INTO users(handle,pw_hash,security_level_id,flags)
+SELECT 'alice',pw_hash,security_level_id,0 FROM users WHERE lower(handle)='sysop';
+INSERT OR IGNORE INTO users(handle,pw_hash,security_level_id,flags)
+SELECT 'bob',pw_hash,security_level_id,0 FROM users WHERE lower(handle)='sysop';
+INSERT OR IGNORE INTO users(handle,pw_hash,security_level_id,flags)
+SELECT 'charlie',pw_hash,security_level_id,0 FROM users WHERE lower(handle)='sysop';
+SQL
 }
 
 start_daemon() {
@@ -155,6 +170,10 @@ start_daemon() {
         tail -40 "$RUNTIME_DIR/mutineer_test.log" || true
         exit 1
     fi
+    if ! wait_for_port "$HOST" "$CONSOLE_PORT" 30; then
+        log_error "Console service failed to start"
+        exit 1
+    fi
     sleep 1
 }
 
@@ -178,7 +197,37 @@ run_test() {
     echo "Running: $test_name"
     echo "========================================"
 
-    if MUTINEER_EXPECT_HOST="$HOST" MUTINEER_EXPECT_PORT="$PORT" expect "$test_file"; then
+    local expect_ok=0
+    if MUTINEER_EXPECT_HOST="$HOST" MUTINEER_EXPECT_PORT="$PORT" \
+       MUTINEER_EXPECT_CONSOLE_PORT="$CONSOLE_PORT" \
+       MUTINEER_EXPECT_DAEMON_PID="$DAEMON_PID" \
+       MUTINEER_EXPECT_ROOT="$RUNTIME_DIR" expect "$test_file"; then
+        expect_ok=1
+    fi
+    if [[ -f "$RUNTIME_DIR/daemon-shutdown-requested" ]]; then
+        for _ in {1..100}; do
+            kill -0 "$DAEMON_PID" 2>/dev/null || break
+            sleep 0.1
+        done
+        if kill -0 "$DAEMON_PID" 2>/dev/null; then
+            log_error "$test_name: daemon did not finish shutdown"
+            expect_ok=0
+        fi
+    fi
+    if ! kill -0 "$DAEMON_PID" 2>/dev/null; then
+        local daemon_rc=0
+        wait "$DAEMON_PID" || daemon_rc=$?
+        DAEMON_PID=""
+        if [[ $daemon_rc -ne 0 ]]; then
+            log_error "$test_name: daemon exited abnormally ($daemon_rc)"
+            expect_ok=0
+        fi
+    fi
+    if [[ -z "$DAEMON_PID" && $expect_ok -eq 1 ]]; then
+        rm -f "$RUNTIME_DIR/daemon-shutdown-requested"
+        start_daemon
+    fi
+    if [[ $expect_ok -eq 1 ]]; then
         log_info "$test_name: PASSED"
         ((TESTS_PASSED++))
         return 0
@@ -220,6 +269,12 @@ trap cleanup EXIT
 main() {
     local requested_tests=("${@:2}")
 
+    for requested in "${requested_tests[@]}"; do
+        if [[ $(basename "$requested") == test_mts_three_client.exp ]]; then
+            ALLOW_MULTI_LOGIN=1
+        fi
+    done
+
     log_info "Mutineer BBS Expect Test Suite"
     log_info "=============================="
 
@@ -243,7 +298,11 @@ main() {
         done
     else
         for f in "$SCRIPT_DIR"/test_*.exp; do
-            [[ -f "$f" ]] && test_files+=("$f")
+            [[ -f "$f" ]] || continue
+            # The active-shutdown MTS scenario owns its daemon lifecycle and
+            # is run explicitly by its dedicated CTest/CI readiness gate.
+            [[ $(basename "$f") == test_mts_three_client.exp ]] && continue
+            test_files+=("$f")
         done
     fi
 

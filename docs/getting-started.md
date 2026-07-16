@@ -23,6 +23,7 @@ Optional but recommended:
 | Package | Purpose |
 |---------|---------|
 | `libargon2-dev` | Argon2 password upgrade path |
+| `libnotcurses-core-dev` | Responsive sysop console TUI |
 | `dosbox` | DOS door runner |
 | `expect` | Interactive integration tests |
 | `libzstd-dev` | PLANK bundle compression |
@@ -66,7 +67,7 @@ Debian/Ubuntu:
 
 ```bash
 sudo apt-get install cmake build-essential libsqlite3-dev sqlite3 libssl-dev \
-  libarchive-dev libargon2-dev dosbox expect
+  libarchive-dev libnotcurses-core-dev libargon2-dev dosbox expect
 ```
 
 ### 3. Configure and build

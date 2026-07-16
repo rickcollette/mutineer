@@ -1,0 +1,19 @@
+# Mutineer Teleconference System configuration
+enabled=true
+max_users=128
+max_rooms=64
+max_message_bytes=512
+history_per_room=200
+history_retention_days=30
+messages_per_window=8
+rate_window_seconds=10
+allow_user_rooms=true
+allow_private_rooms=true
+max_rooms_per_user=1
+default_room=Lobby
+moderation_audit_retention_days=365
+persist_history=false
+
+# Permanent rooms are reconciled at startup. Repeat this key as needed.
+room=General|public|General discussion
+room=Staff|private|Private staff conference

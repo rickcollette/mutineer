@@ -66,6 +66,20 @@ Host functions are called from bytecode as `NAMESPACE.NAME(args)`. The Mutineer 
 | `DOOR.EXIT(code?)` | — | Exit door and preserve the exit code |
 | `DOOR.CHAIN(target, args?)` | door.chain | Request a Buccaneer chain target and args |
 
+## LEADERBOARD — canonical door scores
+
+Requires the `leaderboard.write` manifest capability. The host binds submissions
+to the current door and authenticated caller. See the [Door Leaderboard
+Standard](../leaderboards.md).
+
+Accepted personal bests feed the same top 10, recent 10, and score-ranked current
+player views used by native and DOS doors.
+
+| Function | Cap | Returns | Notes |
+|----------|-----|---------|-------|
+| `LEADERBOARD.ENABLED()` | leaderboard.write | BOOLEAN | True only when the door has `LB_ENABLE=1` |
+| `LEADERBOARD.SUBMIT(score, detail?)` | leaderboard.write | BOOLEAN | Submit the caller's signed 64-bit integer result |
+
 ## DATA — structured datasets
 
 | Function | Cap | Notes |

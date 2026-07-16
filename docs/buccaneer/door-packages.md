@@ -46,12 +46,16 @@ Example:
     "user.read",
     "data.read",
     "data.write",
-    "kv.write"
+    "kv.write",
+    "leaderboard.write"
   ]
 }
 ```
 
 Capabilities in `door.json` must be a superset of `CAPABILITY` lines in source metadata.
+`leaderboard.write` permits the canonical `LEADERBOARD.ENABLED` and
+`LEADERBOARD.SUBMIT` calls; the operator must also set `LB_ENABLE=1` on the
+registered door. See the [Door Leaderboard Standard](../leaderboards.md).
 
 ## Build workflow
 
@@ -114,4 +118,5 @@ Do not grant `data.write` or `bbs.message` unless the door truly needs them.
 
 - [Programmer's Guide](programmers-guide.md)
 - [Host API Reference](host-api.md)
+- [Door Leaderboard Standard](../leaderboards.md)
 - [Toolchain](toolchain.md)

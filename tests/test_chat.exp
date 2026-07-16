@@ -14,20 +14,14 @@ run_test "enter_send_exit_chat" {
 
     send "C\r"
     expect {
-        -re "Channel.*:" { send "\r" }
-        "> " { }
+        "MTS> " { }
         "restricted" { return 0 }
-        timeout { return 0 }
-    }
-
-    expect {
-        "> " { }
         timeout { return 0 }
     }
 
     send "Hello from expect test!\r"
     expect {
-        "> " { }
+        "MTS> " { }
         timeout { return 0 }
     }
 

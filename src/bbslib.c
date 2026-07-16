@@ -257,6 +257,169 @@ BbsLibResult bbslib_status_json(BbsLibContext *ctx, char *out, size_t cap)
   return BBSLIB_OK;
 }
 
+static const char *active_door_name(BbsLibContext *ctx, const DbNode *node,
+                                    char *name, size_t cap)
+{
+  if (!ctx || !node || !name || cap == 0 || !node->activity[0])
+    return NULL;
+  if (!strncmp(node->activity, "door:", 5) && node->activity[5])
+  {
+    copy_string(name, cap, node->activity + 5);
+    return name;
+  }
+
+  /* Older menu-driven door launches stored the bare door name as activity. */
+  DbDoor doors[256];
+  int count = db_doors_list(ctx->db, doors, 256);
+  for (int i = 0; i < count; i++)
+  {
+    if (doors[i].enabled && !strcmp(node->activity, doors[i].name))
+    {
+      copy_string(name, cap, doors[i].name);
+      return name;
+    }
+  }
+  return NULL;
+}
+
+BbsLibResult bbslib_web_status_json(BbsLibContext *ctx, char *out, size_t cap)
+{
+  if (!ctx || !out || cap == 0)
+    return set_error(ctx, BBSLIB_ERR_INVALID, "missing web status output");
+
+  BbsLibMetrics m;
+  BbsLibResult r = bbslib_metrics_get(ctx, &m);
+  if (r != BBSLIB_OK)
+    return r;
+
+  DbNode nodes[256];
+  int node_count = db_node_list(ctx->db, nodes, 256);
+  int online_count = 0;
+  int door_count = 0;
+  for (int i = 0; i < node_count; i++)
+  {
+    if (nodes[i].user_id <= 0 || !nodes[i].handle[0])
+      continue;
+    online_count++;
+    char door_name[128];
+    if (active_door_name(ctx, &nodes[i], door_name, sizeof(door_name)))
+      door_count++;
+  }
+
+  char bbs_name[256];
+  json_escape(bbs_name, sizeof(bbs_name), m.bbs_name);
+  time_t now = time(NULL);
+  struct tm utc;
+  gmtime_r(&now, &utc);
+  char generated_at[32];
+  strftime(generated_at, sizeof(generated_at), "%Y-%m-%dT%H:%M:%SZ", &utc);
+
+  size_t o = (size_t)snprintf(
+      out, cap,
+      "{\"generated_at\":\"%s\",\"bbs\":{\"name\":\"%s\",\"version\":\"%s\"},"
+      "\"stats\":{\"users\":%d,\"messages\":%d,\"message_areas\":%d,"
+      "\"calls_today\":%d,\"posts_today\":%d,\"total_calls\":%d,"
+      "\"days_online\":%d},\"online\":{\"count\":%d,\"users\":[",
+      generated_at, bbs_name, bbslib_version(), m.users, m.messages,
+      m.message_areas, m.today.calls, m.today.posts, m.totals.total_calls,
+      m.totals.days_online, online_count);
+  if (o >= cap)
+    return set_error(ctx, BBSLIB_ERR_BUFFER, "web status JSON buffer too small");
+
+  int emitted = 0;
+  for (int i = 0; i < node_count; i++)
+  {
+    if (nodes[i].user_id <= 0 || !nodes[i].handle[0])
+      continue;
+    char handle[128], status[64], activity[160];
+    json_escape(handle, sizeof(handle), nodes[i].handle);
+    json_escape(status, sizeof(status), nodes[i].status);
+    json_escape(activity, sizeof(activity), nodes[i].activity);
+    int n = snprintf(out + o, cap - o,
+                     "%s{\"node\":%d,\"handle\":\"%s\",\"status\":\"%s\",\"activity\":\"%s\"}",
+                     emitted ? "," : "", nodes[i].node_num, handle, status, activity);
+    if (n < 0 || (size_t)n >= cap - o)
+      return set_error(ctx, BBSLIB_ERR_BUFFER, "web status JSON buffer too small");
+    o += (size_t)n;
+    emitted++;
+  }
+
+  int n = snprintf(out + o, cap - o,
+                   "]},\"active_doors\":{\"count\":%d,\"sessions\":[", door_count);
+  if (n < 0 || (size_t)n >= cap - o)
+    return set_error(ctx, BBSLIB_ERR_BUFFER, "web status JSON buffer too small");
+  o += (size_t)n;
+
+  emitted = 0;
+  for (int i = 0; i < node_count; i++)
+  {
+    if (nodes[i].user_id <= 0 || !nodes[i].handle[0])
+      continue;
+    char door_name_raw[128];
+    if (!active_door_name(ctx, &nodes[i], door_name_raw, sizeof(door_name_raw)))
+      continue;
+    char handle[128], door_name[256];
+    json_escape(handle, sizeof(handle), nodes[i].handle);
+    json_escape(door_name, sizeof(door_name), door_name_raw);
+    n = snprintf(out + o, cap - o,
+                 "%s{\"node\":%d,\"handle\":\"%s\",\"name\":\"%s\"}",
+                 emitted ? "," : "", nodes[i].node_num, handle, door_name);
+    if (n < 0 || (size_t)n >= cap - o)
+      return set_error(ctx, BBSLIB_ERR_BUFFER, "web status JSON buffer too small");
+    o += (size_t)n;
+    emitted++;
+  }
+
+  n = snprintf(out + o, cap - o, "]}}");
+  if (n < 0 || (size_t)n >= cap - o)
+    return set_error(ctx, BBSLIB_ERR_BUFFER, "web status JSON buffer too small");
+  return BBSLIB_OK;
+}
+
+BbsLibResult bbslib_leaderboard_config(BbsLibContext *ctx, int door_id,
+                                       BbsLibLeaderboardConfig *out)
+{
+  if (!ctx || !out || door_id <= 0)
+    return set_error(ctx, BBSLIB_ERR_INVALID, "missing leaderboard config argument");
+  DbDoor door;
+  if (!db_door_get(ctx->db, door_id, &door))
+    return set_error(ctx, BBSLIB_ERR_NOT_FOUND, "door not found: %d", door_id);
+  memset(out, 0, sizeof(*out));
+  out->door_id = door.id;
+  out->enabled = door.enabled && door.lb_enable;
+  char fallback_key[32];
+  snprintf(fallback_key, sizeof(fallback_key), "door-%d", door.id);
+  copy_string(out->game_key, sizeof(out->game_key), door.lb_key[0] ? door.lb_key : fallback_key);
+  copy_string(out->game_name, sizeof(out->game_name), door.name);
+  copy_string(out->score_label, sizeof(out->score_label), door.lb_label[0] ? door.lb_label : "Score");
+  copy_string(out->score_order, sizeof(out->score_order), !strcmp(door.lb_order, "asc") ? "asc" : "desc");
+  return BBSLIB_OK;
+}
+
+BbsLibResult bbslib_leaderboard_submit(BbsLibContext *ctx, int door_id,
+                                       const char *handle, int64_t score,
+                                       const char *detail)
+{
+  if (!ctx || door_id <= 0 || !handle || !handle[0])
+    return set_error(ctx, BBSLIB_ERR_INVALID, "missing leaderboard score argument");
+  BbsLibLeaderboardConfig cfg;
+  BbsLibResult r = bbslib_leaderboard_config(ctx, door_id, &cfg);
+  if (r != BBSLIB_OK)
+    return r;
+  if (!cfg.enabled)
+    return set_error(ctx, BBSLIB_ERR_DENIED, "leaderboard disabled for door: %d", door_id);
+  if (!db_door_score_submit(ctx->db, door_id, handle, score, detail))
+    return set_error(ctx, BBSLIB_ERR_DB, "failed to submit leaderboard score");
+  return BBSLIB_OK;
+}
+
+int bbslib_leaderboard_list(BbsLibContext *ctx, DbDoorScore *out, int max)
+{
+  if (!ctx || !out || max <= 0)
+    return 0;
+  return db_door_scores_list(ctx->db, out, max);
+}
+
 BbsLibResult bbslib_user_get(BbsLibContext *ctx, const char *handle, DbUser *out)
 {
   if (!ctx || !handle || !out)

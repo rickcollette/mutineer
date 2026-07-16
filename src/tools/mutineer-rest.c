@@ -264,6 +264,122 @@ static const char *query_value(const char *path, const char *key, char *out, siz
   return NULL;
 }
 
+static bool web_leaderboards_json(BbsLibContext *ctx, char *json, size_t cap)
+{
+  DbDoorScore scores[1024];
+  DbDoor doors[256];
+  DbNode nodes[256];
+  int score_count = db_door_scores_list(bbslib_db(ctx), scores, 1024);
+  int door_count = db_doors_list(bbslib_db(ctx), doors, 256);
+  int node_count = bbslib_node_list(ctx, nodes, 256);
+  size_t o = (size_t)snprintf(json, cap, "{\"leaderboards\":[");
+  if (o >= cap) return false;
+  int game_count = 0;
+  for (int d = 0; d < door_count; d++)
+  {
+    if (!doors[d].enabled || !doors[d].lb_enable) continue;
+    char fallback_key[32];
+    snprintf(fallback_key, sizeof(fallback_key), "door-%d", doors[d].id);
+    const char *game_key = doors[d].lb_key[0] ? doors[d].lb_key : fallback_key;
+    char key[128], name[128], label[64], order[16];
+    json_escape(key, sizeof(key), game_key);
+    json_escape(name, sizeof(name), doors[d].name);
+    json_escape(label, sizeof(label), doors[d].lb_label[0] ? doors[d].lb_label : "Score");
+    json_escape(order, sizeof(order), doors[d].lb_order[0] ? doors[d].lb_order : "desc");
+    int n = snprintf(json + o, cap - o,
+                     "%s{\"game_key\":\"%s\",\"game_name\":\"%s\","
+                     "\"score_label\":\"%s\",\"score_order\":\"%s\",\"top\":[",
+                     game_count ? "," : "", key, name, label, order);
+    if (n < 0 || (size_t)n >= cap - o) return false;
+    o += (size_t)n;
+
+    int matching[1024], matching_count = 0;
+    for (int i = 0; i < score_count; i++)
+      if (!strcmp(scores[i].game_key, game_key)) matching[matching_count++] = i;
+
+    for (int rank = 0; rank < matching_count && rank < 10; rank++)
+    {
+      DbDoorScore *s = &scores[matching[rank]];
+      char handle[128], detail[256], achieved[64];
+      json_escape(handle, sizeof(handle), s->handle); json_escape(detail, sizeof(detail), s->detail);
+      json_escape(achieved, sizeof(achieved), s->achieved_at);
+      n = snprintf(json + o, cap - o, "%s{\"rank\":%d,\"handle\":\"%s\",\"score\":%lld,\"detail\":\"%s\",\"achieved_at\":\"%s\"}",
+                   rank ? "," : "", rank + 1, handle, (long long)s->score, detail, achieved);
+      if (n < 0 || (size_t)n >= cap - o) return false;
+      o += (size_t)n;
+    }
+    n = snprintf(json + o, cap - o, "],\"recent\":[");
+    if (n < 0 || (size_t)n >= cap - o) return false;
+    o += (size_t)n;
+
+    for (int i = 0; i < matching_count; i++)
+      for (int j = i + 1; j < matching_count; j++)
+        if (strcmp(scores[matching[i]].achieved_at, scores[matching[j]].achieved_at) < 0)
+        { int tmp = matching[i]; matching[i] = matching[j]; matching[j] = tmp; }
+    for (int recent = 0; recent < matching_count && recent < 10; recent++)
+    {
+      DbDoorScore *s = &scores[matching[recent]];
+      char handle[128], detail[256], achieved[64];
+      json_escape(handle, sizeof(handle), s->handle); json_escape(detail, sizeof(detail), s->detail);
+      json_escape(achieved, sizeof(achieved), s->achieved_at);
+      n = snprintf(json + o, cap - o, "%s{\"handle\":\"%s\",\"score\":%lld,\"detail\":\"%s\",\"achieved_at\":\"%s\"}",
+                   recent ? "," : "", handle, (long long)s->score, detail, achieved);
+      if (n < 0 || (size_t)n >= cap - o) return false;
+      o += (size_t)n;
+    }
+    n = snprintf(json + o, cap - o, "],\"current\":[");
+    if (n < 0 || (size_t)n >= cap - o) return false;
+    o += (size_t)n;
+
+    int current_nodes[256], current_count = 0;
+    int64_t current_scores[256];
+    bool current_has_score[256];
+    char expected_activity[128];
+    snprintf(expected_activity, sizeof(expected_activity), "door:%s", doors[d].name);
+    for (int i = 0; i < node_count; i++)
+      if (!strcmp(nodes[i].activity, expected_activity)) {
+        current_nodes[current_count] = i;
+        current_scores[current_count] = 0;
+        current_has_score[current_count] = false;
+        for (int k = 0; k < score_count; k++)
+          if (!strcmp(scores[k].game_key, game_key) && !strcmp(scores[k].handle, nodes[i].handle)) {
+            current_scores[current_count] = scores[k].score;
+            current_has_score[current_count] = true;
+            break;
+          }
+        current_count++;
+      }
+    for (int i = 0; i < current_count; i++)
+      for (int j = i + 1; j < current_count; j++) {
+        bool swap = !current_has_score[i] ? current_has_score[j] :
+                    (current_has_score[j] && (!strcasecmp(doors[d].lb_order, "asc")
+                      ? current_scores[i] > current_scores[j]
+                      : current_scores[i] < current_scores[j]));
+        if (swap) {
+          int tmp_node = current_nodes[i]; current_nodes[i] = current_nodes[j]; current_nodes[j] = tmp_node;
+          int64_t tmp_score = current_scores[i]; current_scores[i] = current_scores[j]; current_scores[j] = tmp_score;
+          bool tmp_has = current_has_score[i]; current_has_score[i] = current_has_score[j]; current_has_score[j] = tmp_has;
+        }
+      }
+    for (int i = 0; i < current_count; i++) {
+      DbNode *node = &nodes[current_nodes[i]];
+      char handle[128]; json_escape(handle, sizeof(handle), node->handle);
+      if (current_has_score[i])
+        n = snprintf(json + o, cap - o, "%s{\"handle\":\"%s\",\"node\":%d,\"score\":%lld}", i ? "," : "", handle, node->node_num, (long long)current_scores[i]);
+      else
+        n = snprintf(json + o, cap - o, "%s{\"handle\":\"%s\",\"node\":%d,\"score\":null}", i ? "," : "", handle, node->node_num);
+      if (n < 0 || (size_t)n >= cap - o) return false;
+      o += (size_t)n;
+    }
+    n = snprintf(json + o, cap - o, "]}");
+    if (n < 0 || (size_t)n >= cap - o) return false;
+    o += (size_t)n;
+    game_count++;
+  }
+  int n = snprintf(json + o, cap - o, "]}");
+  return n >= 0 && (size_t)n < cap - o;
+}
+
 static void handle_bridge_action(int fd, BbsLibContext *ctx, BridgeSession *bs, const char *path, const char *body)
 {
   char action[128] = "";
@@ -321,6 +437,24 @@ static void handle_request(int fd, BbsLibContext *ctx, char *req, const char *to
       http_send(fd, 200, "application/json", json);
     else
       http_send(fd, 500, "application/json", "{\"error\":\"status unavailable\"}");
+    return;
+  }
+  if (!strcmp(method, "GET") && !strcmp(path, "/api/web/status"))
+  {
+    char json[RESP_MAX];
+    if (bbslib_web_status_json(ctx, json, sizeof(json)) == BBSLIB_OK)
+      http_send(fd, 200, "application/json", json);
+    else
+      http_send(fd, 500, "application/json", "{\"error\":\"web status unavailable\"}");
+    return;
+  }
+  if (!strcmp(method, "GET") && !strcmp(path, "/api/web/leaderboards"))
+  {
+    char json[RESP_MAX];
+    if (web_leaderboards_json(ctx, json, sizeof(json)))
+      http_send(fd, 200, "application/json", json);
+    else
+      http_send(fd, 500, "application/json", "{\"error\":\"leaderboards unavailable\"}");
     return;
   }
   if (!strcmp(method, "GET") && !strcmp(path, "/api/nodes"))

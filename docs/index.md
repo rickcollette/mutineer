@@ -25,11 +25,13 @@ Deep guides for each major subsystem:
 |----------|--------|
 | [Overview](overview.md) | Features, layout, binaries, design goals |
 | [Configuration](configuration.md) | All `BbsConfig` keys |
+| [Customizing Your BBS](customizing-your-bbs.md) | Branding checklist for config, ANSI/ASCII art, menus, content, doors, and plugins |
 | [Menus and UI](menus-and-ui.md) | `.mnu` files, templates, MCI, ACS, art, F-keys |
 | [Messages and Mail](messages-and-mail.md) | Areas, M*/R* commands, QWK, FidoNet, conferences |
 | [Files and Protocols](files-and-protocols.md) | File areas, batch, archives, credits, protocols |
 | [Chat and Social](chat-and-social.md) | Chat, paging, wall, whisper, oneliners |
 | [Doors and Scripting](doors-and-scripting.md) | Native, DOSBox, Buccaneer, plugins |
+| [Door Leaderboards](leaderboards.md) | Canonical opt-in score contract for doors, SDKs, and REST |
 | [Sysop Guide](sysop-guide.md) | WFC, editors, scheduler, maintenance, security |
 | [PLANK Networking](networking-plank.md) | Store-and-forward, daemons, plankctl |
 | [Plugins](plugins.md) | `.so` plugins, API, examples |

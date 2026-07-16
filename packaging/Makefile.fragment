@@ -1,0 +1,27 @@
+# Proposed Mutineer packaging targets.
+# Include or copy these into the root Makefile after reviewing the packaging/
+# scripts. This file is intentionally not wired into the build yet.
+
+DIST_IMAGE ?= mutineer-dist-glibc228
+
+.PHONY: docker-image dist dist-local dist-clean
+
+docker-image:
+	docker build -f packaging/Dockerfile.dist -t "$(DIST_IMAGE)" .
+
+dist: docker-image
+	docker run --rm \
+	  -u "$$(id -u):$$(id -g)" \
+	  -v "$$(pwd):/work" \
+	  -w /work \
+	  -e VERSION="$(or $(VERSION),dev)" \
+	  -e JOBS="$(or $(JOBS),2)" \
+	  "$(DIST_IMAGE)" \
+	  make -f packaging/Makefile.fragment dist-local
+
+dist-local:
+	BUILD_DIR=build-dist DIST_ROOT=dist VERSION="$(or $(VERSION),dev)" JOBS="$(or $(JOBS),2)" \
+	  bash packaging/package.sh
+
+dist-clean:
+	rm -rf dist build-dist

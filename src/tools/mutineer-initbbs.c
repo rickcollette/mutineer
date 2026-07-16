@@ -175,6 +175,8 @@ static const char* DEFAULT_CONFIG =
     "dropfile_path=data/dropfiles\n"
     "protocol_path=conf/protocols.conf\n"
     "door_cleanup_on_exit=1\n"
+    "door_janitor_interval_sec=60\n"
+    "door_stale_age_sec=300\n"
     "door_keep_failed_runs=0\n"
     "# Change this before production native-door integrations.\n"
     "door_session_hmac_secret=mutineer-dev-door-secret\n"

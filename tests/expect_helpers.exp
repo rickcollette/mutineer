@@ -105,7 +105,9 @@ proc handle_ansi_prompt {} {
     
     expect {
         -re "ANSI.*\\?|graphics.*\\?" {
-            send "Y\r"
+            # General behavioral tests use deterministic plain rendering.
+            # ANSI rendering has dedicated golden-fixture coverage.
+            send "N\r"
             return 1
         }
         "Handle:" {
@@ -126,7 +128,7 @@ proc login_as {handle password} {
     # Handle ANSI prompt first if present
     expect {
         -re "ANSI.*\\?|graphics.*\\?" {
-            send "Y\r"
+            send "N\r"
         }
         "Handle:" { }
         timeout {
@@ -406,8 +408,9 @@ proc run_test {name body} {
         catch { wait -i $current_spawn_id }
         set current_spawn_id ""
         set spawn_id ""
-        # Allow OS to fully reap the process before next spawn
-        after 100
+        # Allow the detached server session to leave the online registry before
+        # the next login in the same test file.
+        after 500
     }
     
     # code 0 = normal return, code 2 = return statement

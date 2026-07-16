@@ -33,12 +33,13 @@ Default telnet port: **2929**. See [docs/quick-start.md](docs/quick-start.md), [
 | OpenSSL | Yes | PBKDF2 password hashing |
 | pthreads | Yes | One thread per connection |
 | libarchive | Yes | Archive and QWK package handling |
+| notcurses-core | Yes | Responsive sysop console TUI |
 | libargon2 | Optional | Argon2 password upgrade path |
 | DOSBox | Optional | DOS door runner (`dosbox` on PATH) |
 
 Install on Debian/Ubuntu:
 ```bash
-apt-get install libsqlite3-dev sqlite3 libssl-dev libarchive-dev libargon2-dev dosbox
+apt-get install libsqlite3-dev sqlite3 libssl-dev libarchive-dev libnotcurses-core-dev libargon2-dev dosbox
 ```
 
 ## Features

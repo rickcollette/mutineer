@@ -168,11 +168,11 @@ Hotkeys in the standalone `mutineer-console` WFC screen:
 
 | Key | Action |
 |-----|--------|
-| `k<N>` | Kick node N |
-| `l<N>` | Lock node N (prevent new logins) |
-| `b<msg>` | Broadcast message to all nodes |
-| `q` | Shutdown BBS |
-| `@<pos>` | Inspect node (e.g. `@A0`) |
+| `K`, then N | Kick node N |
+| `l`, then N | Lock node N (prevent new logins) |
+| `u`, then N | Unlock node N |
+| `b`, then message | Broadcast message to all nodes |
+| `@`, then N | Inspect node N |
 | `Q` | Quit console |
 | `S` | Show system status |
 

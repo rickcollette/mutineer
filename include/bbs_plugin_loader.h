@@ -50,6 +50,10 @@ bool plugin_loader_enabled(void);
  */
 const char* plugin_loader_get_dir(void);
 
+/* Notify every loaded plugin of a host lifecycle event. */
+void plugin_loader_dispatch_event(bbs_event_type_t type, bbs_session_t* session,
+                                  void* data);
+
 #ifdef __cplusplus
 }
 #endif

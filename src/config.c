@@ -58,7 +58,7 @@ static void cfg_defaults(BbsConfig *c)
   c->scheduler_tick_sec = 30;
   c->login_window_sec = 120;
   c->login_max_attempts = 5;
-  c->password_upgrade = 1;
+  c->password_upgrade = 0;
   c->default_credits = 5000;
   c->default_file_points = 0;
   snprintf(c->doors_path, sizeof(c->doors_path), "doors");
@@ -81,6 +81,8 @@ static void cfg_defaults(BbsConfig *c)
   c->door_default_timeout_sec = 300; /* 5 minutes */
   c->door_cleanup_on_exit = 1;
   c->door_keep_failed_runs = 0;
+  c->door_janitor_interval_sec = 60;
+  c->door_stale_age_sec = 300;
   snprintf(c->door_session_hmac_secret, sizeof(c->door_session_hmac_secret),
            "mutineer-dev-door-secret");
   c->max_page_sysop = 3;
@@ -340,6 +342,14 @@ bool cfg_load(const char *path, BbsConfig *out)
     {
       out->door_keep_failed_runs = cfg_bool(v);
     }
+    else if (!strcmp(k, "door_janitor_interval_sec"))
+    {
+      out->door_janitor_interval_sec = atoi(v);
+    }
+    else if (!strcmp(k, "door_stale_age_sec"))
+    {
+      out->door_stale_age_sec = atoi(v);
+    }
     else if (!strcmp(k, "door_session_hmac_secret"))
     {
       snprintf(out->door_session_hmac_secret, sizeof(out->door_session_hmac_secret), "%s", v);
@@ -435,6 +445,8 @@ bool cfg_save(const char *path, const BbsConfig *c)
   WINT("door_default_timeout_sec", c->door_default_timeout_sec);
   WINT("door_cleanup_on_exit", c->door_cleanup_on_exit);
   WINT("door_keep_failed_runs", c->door_keep_failed_runs);
+  WINT("door_janitor_interval_sec", c->door_janitor_interval_sec);
+  WINT("door_stale_age_sec", c->door_stale_age_sec);
   WSTR("door_session_hmac_secret", c->door_session_hmac_secret);
   WINT("max_page_sysop", c->max_page_sysop);
   WINT("max_calls_per_day", c->max_calls_per_day);

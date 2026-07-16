@@ -50,3 +50,8 @@ void dosbox_cleanup_runtime(const char *runtime_root);
 /* Generate dropfiles and launch doors/protocols. */
 bool door_launch(Session* s, const DbDoor* door);
 bool protocol_launch(Session* s, const DbProtocol* proto, const char* filepath, const char* direction);
+
+/* Periodically removes offline, aged native/DOS door launch trees. */
+int door_janitor_run_once(const BbsConfig* cfg, BbsDb* db);
+void door_janitor_start(const BbsConfig* cfg, BbsDb* db);
+void door_janitor_stop(void);

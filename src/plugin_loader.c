@@ -16,6 +16,9 @@
 #include <string.h>
 #include <stdlib.h>
 #include <sys/stat.h>
+#include <time.h>
+#include <pthread.h>
+#include <unistd.h>
 
 /* Plugin configuration */
 static struct {
@@ -25,6 +28,18 @@ static struct {
   char denylist[1024];
   bool initialized;
 } g_plugin_cfg = {0};
+static pthread_t g_plugin_tick_thread;
+static volatile int g_plugin_tick_running;
+
+static void* plugin_tick_main(void* unused) {
+  (void)unused;
+  while (g_plugin_tick_running) {
+    sleep(1);
+    if (g_plugin_tick_running)
+      plugin_loader_dispatch_event(BBS_EVT_TICK_1S, NULL, NULL);
+  }
+  return NULL;
+}
 
 /* Forward declarations */
 extern const bbs_host_api_t* plugin_host_api_get(void);
@@ -269,12 +284,22 @@ bool plugin_loader_init(const BbsConfig* cfg) {
   log_info("plugin loader initialized: %d plugin(s) loaded from %s", loaded, g_plugin_cfg.dir);
   
   g_plugin_cfg.initialized = true;
+  g_plugin_tick_running = 1;
+  if (pthread_create(&g_plugin_tick_thread, NULL, plugin_tick_main, NULL) != 0) {
+    g_plugin_tick_running = 0;
+    log_warn("could not start plugin event ticker");
+  }
   return true;
 }
 
 void plugin_loader_shutdown(void) {
   if (!g_plugin_cfg.initialized) return;
   
+  plugin_loader_dispatch_event(BBS_EVT_SHUTDOWN, NULL, NULL);
+  if (g_plugin_tick_running) {
+    g_plugin_tick_running = 0;
+    pthread_join(g_plugin_tick_thread, NULL);
+  }
   /* Check for active instances */
   if (plugin_registry_has_instances()) {
     log_warn("plugin shutdown called with active instances!");
@@ -359,4 +384,15 @@ bool plugin_loader_enabled(void) {
 
 const char* plugin_loader_get_dir(void) {
   return g_plugin_cfg.dir;
+}
+
+void plugin_loader_dispatch_event(bbs_event_type_t type, bbs_session_t* session,
+                                  void* data) {
+  if (!g_plugin_cfg.initialized || !g_plugin_cfg.enabled) return;
+  bbs_event_t ev = {.type=type,.session=session,.now_ms=(uint64_t)time(NULL)*1000u,.data=data};
+  size_t count=plugin_registry_count();
+  for(size_t i=0;i<count;i++){
+    plugin_entry_t* e=plugin_registry_get(i);
+    if(e&&e->loaded&&e->desc.on_event)e->desc.on_event(&ev);
+  }
 }

@@ -148,6 +148,22 @@ CREATE TABLE IF NOT EXISTS bucc_data_records (
 
 CREATE INDEX IF NOT EXISTS idx_bucc_data_scope_dataset ON bucc_data_records(scope, dataset, id);
 
+CREATE TABLE IF NOT EXISTS door_leaderboard (
+  door_id INTEGER,
+  game_key TEXT NOT NULL,
+  game_name TEXT NOT NULL,
+  score_label TEXT NOT NULL DEFAULT 'Score',
+  score_order TEXT NOT NULL DEFAULT 'desc',
+  handle TEXT NOT NULL,
+  score INTEGER NOT NULL,
+  detail TEXT NOT NULL DEFAULT '',
+  achieved_at TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY(game_key, handle)
+);
+
+CREATE INDEX IF NOT EXISTS idx_door_leaderboard_rank
+  ON door_leaderboard(game_key, score DESC, achieved_at ASC);
+
 CREATE TABLE IF NOT EXISTS conferences (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   key TEXT NOT NULL UNIQUE,
@@ -341,7 +357,15 @@ CREATE TABLE IF NOT EXISTS doors (
   command TEXT NOT NULL,
   workdir TEXT,
   acs TEXT,
-  flags INTEGER NOT NULL DEFAULT 0
+  flags INTEGER NOT NULL DEFAULT 0,
+  runner TEXT NOT NULL DEFAULT 'native',
+  manifest TEXT NOT NULL DEFAULT '',
+  enabled INTEGER NOT NULL DEFAULT 1,
+  timeout_sec INTEGER NOT NULL DEFAULT 0,
+  lb_enable INTEGER NOT NULL DEFAULT 0,
+  lb_key TEXT NOT NULL DEFAULT '',
+  lb_label TEXT NOT NULL DEFAULT 'Score',
+  lb_order TEXT NOT NULL DEFAULT 'desc'
 );
 
 CREATE TABLE IF NOT EXISTS protocols (

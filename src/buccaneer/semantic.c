@@ -347,6 +347,11 @@ static const host_fn_def_t kv_functions[] = {
     {"EXISTS",        "kv.read", TYPE_BOOLEAN, 1},
 };
 
+static const host_fn_def_t leaderboard_functions[] = {
+    {"ENABLED", "leaderboard.write", TYPE_BOOLEAN, 0},
+    {"SUBMIT",  "leaderboard.write", TYPE_BOOLEAN, -1},
+};
+
 static const host_fn_def_t app_functions[] = {
     {"GET",           "app.state", TYPE_ANY, 2},
     {"SET",           "app.state", TYPE_VOID, 2},
@@ -397,6 +402,7 @@ static const host_ns_def_t host_namespaces[] = {
     {"SHARED",  shared_functions,  sizeof(shared_functions)/sizeof(shared_functions[0])},
     {"TEXT",    text_functions,    sizeof(text_functions)/sizeof(text_functions[0])},
     {"BBS",     bbs_functions,     sizeof(bbs_functions)/sizeof(bbs_functions[0])},
+    {"LEADERBOARD", leaderboard_functions, sizeof(leaderboard_functions)/sizeof(leaderboard_functions[0])},
     {"SYS",     sys_functions,     sizeof(sys_functions)/sizeof(sys_functions[0])},
     {"SESSION", session_functions, sizeof(session_functions)/sizeof(session_functions[0])},
     {"DOOR",    door_functions,    sizeof(door_functions)/sizeof(door_functions[0])},

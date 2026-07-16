@@ -110,8 +110,13 @@ sqlite3 data/mutineer.db < sql/plank_schema.sql
 | Table | Purpose |
 |-------|---------|
 | `events` | Scheduler events (cron, logon, permission) |
-| `doors` | Door program definitions |
+| `doors` | Door definitions, including `lb_enable`, stable leaderboard key, score label, and rank order |
+| `door_leaderboard` | Canonical per-door, per-handle personal best scores and achievement times |
 | `protocols` | File transfer protocol definitions |
+
+Only enabled doors with `lb_enable=1` accept or publish leaderboard scores.
+`door_leaderboard` feeds the public top 10, recent 10, and currently-playing
+views described in the [Door Leaderboard Standard](../leaderboards.md).
 
 ## Statistics
 

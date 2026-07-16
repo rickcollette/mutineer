@@ -146,15 +146,10 @@ ctest --test-dir build -R expect_suite
 # includes test_chat.exp, interactive_chat.exp
 ```
 
-## Plugin Chat
+## Mutineer Teleconference System
 
-Sample plugin `plugins/chat/chat.c` demonstrates plugin-based chat as alternative to built-in chat. Invoked via:
-
-```
-2|Chat Plugin|plugin:com.mutineer.chat|L10
-```
-
-See [Plugins](plugins.md) for plugin vs native chat comparison.
+MTS (`com.mutineer.chat`) is the primary stock real-time conference interface.
+See [MTS](mts.md) and the generated [command reference](reference/mts-commands.md).
 
 ## Related Documentation
 

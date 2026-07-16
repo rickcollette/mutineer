@@ -8,3 +8,4 @@
 #include "bbslib/bridge.h"
 #include "bbslib/admin.h"
 #include "bbslib/plank.h"
+#include "bbslib/leaderboard.h"

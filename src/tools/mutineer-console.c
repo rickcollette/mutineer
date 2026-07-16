@@ -4,6 +4,7 @@
 #include <ctype.h>
 #include <errno.h>
 #include <netinet/in.h>
+#include <notcurses/notcurses.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -13,20 +14,6 @@
 #include <termios.h>
 #include <time.h>
 #include <unistd.h>
-
-#define CSI "\033["
-#define CLEAR_SCREEN CSI "2J" CSI "H"
-#define HIDE_CURSOR CSI "?25l"
-#define SHOW_CURSOR CSI "?25h"
-#define COLOR_RESET CSI "0m"
-#define COLOR_BOLD CSI "1m"
-
-#define BOX_TL "+"
-#define BOX_TR "+"
-#define BOX_BL "+"
-#define BOX_BR "+"
-#define BOX_H "-"
-#define BOX_V "|"
 
 typedef struct ConsoleState
 {
@@ -42,71 +29,24 @@ typedef struct ConsoleState
   char nodes_json[12000];
 } ConsoleState;
 
-static struct termios g_orig_termios;
-static int g_raw = 0;
+static struct notcurses *g_nc;
+static struct termios g_passthrough_termios;
+static bool g_passthrough_raw;
 
 static void disable_raw(void)
 {
-  if (g_raw)
-  {
-    tcsetattr(STDIN_FILENO, TCSAFLUSH, &g_orig_termios);
-    g_raw = 0;
-  }
-  printf(SHOW_CURSOR COLOR_RESET);
-  fflush(stdout);
+  if (g_nc) notcurses_stop(g_nc);
+  g_nc = NULL;
 }
 
 static void enable_raw(void)
 {
-  if (g_raw) return;
-  tcgetattr(STDIN_FILENO, &g_orig_termios);
-  atexit(disable_raw);
-  struct termios raw = g_orig_termios;
-  raw.c_lflag &= ~(ECHO | ICANON);
-  raw.c_cc[VMIN] = 0;
-  raw.c_cc[VTIME] = 0;
-  tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw);
-  g_raw = 1;
-}
-
-static void gotoxy(int x, int y) { printf(CSI "%d;%dH", y, x); }
-static void set_fg(int color)
-{
-  if (color < 8) printf(CSI "%dm", 30 + color);
-  else printf(CSI "%d;1m", 30 + (color - 8));
-}
-static void set_bg(int color) { printf(CSI "%dm", 40 + color); }
-static void set_colors(ConsoleState *st)
-{
-  set_fg(st->cfg.wfc_fg_color);
-  set_bg(st->cfg.wfc_bg_color);
-}
-
-static void draw_box(int x, int y, int w, int h)
-{
-  gotoxy(x, y);
-  printf(BOX_TL);
-  for (int i = 0; i < w - 2; i++) printf(BOX_H);
-  printf(BOX_TR);
-  for (int i = 1; i < h - 1; i++)
-  {
-    gotoxy(x, y + i);
-    printf(BOX_V);
-    gotoxy(x + w - 1, y + i);
-    printf(BOX_V);
-  }
-  gotoxy(x, y + h - 1);
-  printf(BOX_BL);
-  for (int i = 0; i < w - 2; i++) printf(BOX_H);
-  printf(BOX_BR);
-}
-
-static void draw_titled_box(int x, int y, int w, int h, const char *title)
-{
-  draw_box(x, y, w, h);
-  int tlen = (int)strlen(title);
-  gotoxy(x + (w - tlen - 2) / 2, y);
-  printf(" %s ", title);
+  if (g_nc) return;
+  const notcurses_options opts = {
+    .loglevel = NCLOGLEVEL_SILENT,
+    .flags = NCOPTION_SUPPRESS_BANNERS,
+  };
+  g_nc = notcurses_core_init(&opts, stdout);
 }
 
 static void format_bytes(long long bytes, char *out, size_t cap)
@@ -303,135 +243,182 @@ static int request(ConsoleState *st, const char *cmd, const char *extra, char *r
   }
 }
 
-static void draw_header(ConsoleState *st)
+static void plane_colors(struct ncplane *n, unsigned fr, unsigned fg, unsigned fb,
+                         unsigned br, unsigned bg, unsigned bb)
 {
-  time_t now = time(NULL);
-  struct tm *tm = localtime(&now);
-  char timestr[16], datestr[16];
-  strftime(timestr, sizeof(timestr), "%I:%M %p", tm);
-  strftime(datestr, sizeof(datestr), "%m-%d-%Y", tm);
-  set_colors(st);
-  printf(COLOR_BOLD);
-  gotoxy(2, 1);
-  printf("%-10s", timestr);
-  int namelen = (int)strlen(st->cfg.bbs_name);
-  gotoxy((80 - namelen) / 2, 1);
-  printf("%s", st->cfg.bbs_name);
-  gotoxy(70, 1);
-  printf("%s", datestr);
-  printf(COLOR_RESET);
+  ncplane_set_fg_rgb8(n, fr, fg, fb);
+  ncplane_set_bg_rgb8(n, br, bg, bb);
+}
+
+static struct ncplane *panel(struct ncplane *parent, int y, int x, int h, int w,
+                             const char *title, unsigned r, unsigned g, unsigned b)
+{
+  const ncplane_options opts = {.y = y, .x = x, .rows = h, .cols = w, .name = title};
+  struct ncplane *n = ncplane_create(parent, &opts);
+  if (!n) return NULL;
+  plane_colors(n, r, g, b, 8, 18, 32);
+  ncplane_set_base(n, " ", NCSTYLE_NONE, ncplane_channels(n));
+  ncplane_rounded_box(n, NCSTYLE_BOLD, ncplane_channels(n), (unsigned)h - 1, (unsigned)w - 1, 0);
+  ncplane_set_styles(n, NCSTYLE_BOLD);
+  ncplane_printf_yx(n, 0, 2, " %s ", title);
+  ncplane_set_styles(n, NCSTYLE_NONE);
+  return n;
+}
+
+static void metric(struct ncplane *n, int y, const char *label, const char *value)
+{
+  unsigned h, w;
+  ncplane_dim_yx(n, &h, &w);
+  (void)h;
+  plane_colors(n, 115, 205, 255, 8, 18, 32);
+  ncplane_printf_yx(n, y, 2, "%s", label);
+  plane_colors(n, 245, 250, 255, 8, 18, 32);
+  int x = (int)w - (int)strlen(value) - 2;
+  ncplane_printf_yx(n, y, x > 2 ? x : 2, "%s", value);
+}
+
+static const char *node_status(ConsoleState *st, int node, bool *active)
+{
+  char needle[32], status[32] = {0};
+  snprintf(needle, sizeof(needle), "\"node\":%d", node);
+  const char *p = strstr(st->nodes_json, needle);
+  *active = p != NULL;
+  if (!p) return "·";
+  json_str(p, "status", status, sizeof(status));
+  if (!strcmp(status, "locked")) return "L";
+  if (!strcmp(status, "chat") || !strcmp(status, "sysop_chat")) return "C";
+  if (!strcmp(status, "logging_in")) return "…";
+  return "●";
+}
+
+static void fill_stats_panel(struct ncplane *n, ConsoleState *st, int kind)
+{
+  char v[32];
+  int days = st->days_online > 0 ? st->days_online : 1;
+  if (kind == 0) {
+    snprintf(v, sizeof(v), "%d", st->calls_today); metric(n, 2, "Calls", v);
+    snprintf(v, sizeof(v), "%d", st->posts_today); metric(n, 3, "Posts", v);
+    snprintf(v, sizeof(v), "%d", st->newusers_today); metric(n, 4, "New crew", v);
+    snprintf(v, sizeof(v), "%d / %d", st->uploads_today, st->downloads_today); metric(n, 5, "Up / down", v);
+  } else if (kind == 1) {
+    snprintf(v, sizeof(v), "%.1f", (double)st->total_calls / days); metric(n, 2, "Calls / day", v);
+    snprintf(v, sizeof(v), "%.1f", (double)st->total_posts / days); metric(n, 3, "Posts / day", v);
+    snprintf(v, sizeof(v), "%d", st->total_users); metric(n, 4, "Crew", v);
+    snprintf(v, sizeof(v), "%d", st->days_online); metric(n, 5, "Days online", v);
+  } else if (kind == 2) {
+    snprintf(v, sizeof(v), "%d", st->total_calls); metric(n, 2, "Calls", v);
+    snprintf(v, sizeof(v), "%d", st->total_posts); metric(n, 3, "Posts", v);
+    snprintf(v, sizeof(v), "%d", st->total_uploads); metric(n, 4, "Uploads", v);
+    snprintf(v, sizeof(v), "%d", st->total_downloads); metric(n, 5, "Downloads", v);
+  } else {
+    metric(n, 2, "Platform", st->os[0] ? st->os : "Unknown");
+    snprintf(v, sizeof(v), "%d", st->mail_waiting); metric(n, 3, "Waiting mail", v);
+    snprintf(v, sizeof(v), "%d", st->errors); metric(n, 4, "Errors", v);
+    format_bytes(st->disk_free_kb * 1024, v, sizeof(v)); metric(n, 5, "Disk free", v);
+  }
 }
 
 static void draw_dashboard(ConsoleState *st)
 {
-  char buf[32];
-  printf(CLEAR_SCREEN HIDE_CURSOR);
-  draw_header(st);
-  set_colors(st);
-  draw_titled_box(1, 2, 20, 8, "Today's Stats");
-  set_fg(11);
-  gotoxy(3, 3); printf("Calls     %7d", st->calls_today);
-  gotoxy(3, 4); printf("Posts     %7d", st->posts_today);
-  gotoxy(3, 5); printf("Email     %7d", st->emails_today);
-  gotoxy(3, 6); printf("Newusers  %7d", st->newusers_today);
-  gotoxy(3, 7); printf("Uploads   %7d", st->uploads_today);
-  gotoxy(3, 8); printf("Downloads %7d", st->downloads_today);
+  if (!g_nc) return;
+  struct ncplane *std = notcurses_stdplane(g_nc);
+  unsigned rows, cols;
+  ncplane_dim_yx(std, &rows, &cols);
+  ncplane_erase(std);
+  plane_colors(std, 215, 235, 255, 3, 10, 22);
+  ncplane_set_base(std, " ", NCSTYLE_NONE, ncplane_channels(std));
 
-  set_colors(st);
-  draw_titled_box(21, 2, 20, 8, "Sys Averages");
-  int days = st->days_online > 0 ? st->days_online : 1;
-  set_fg(11);
-  gotoxy(23, 3); printf("Calls   %8.1f", (double)st->total_calls / days);
-  gotoxy(23, 4); printf("Posts   %8.1f", (double)st->total_posts / days);
-  gotoxy(23, 5); printf("Uploads %8.1f", (double)st->total_uploads / days);
-  gotoxy(23, 6); printf("Downlds %8.1f", (double)st->total_downloads / days);
-  gotoxy(23, 7); printf("Users   %8d", st->total_users);
-  gotoxy(23, 8); printf("Days    %8d", st->days_online);
-
-  set_colors(st);
-  draw_titled_box(41, 2, 20, 8, "Sys Totals");
-  set_fg(11);
-  gotoxy(43, 3); printf("Calls   %8d", st->total_calls);
-  gotoxy(43, 4); printf("Posts   %8d", st->total_posts);
-  gotoxy(43, 5); printf("Uploads %8d", st->total_uploads);
-  gotoxy(43, 6); printf("Downlds %8d", st->total_downloads);
-  format_bytes(st->ul_kb_today * 1024, buf, sizeof(buf));
-  gotoxy(43, 7); printf("UL Today%8s", buf);
-  format_bytes(st->dl_kb_today * 1024, buf, sizeof(buf));
-  gotoxy(43, 8); printf("DL Today%8s", buf);
-
-  set_colors(st);
-  draw_titled_box(61, 2, 19, 8, "Other Info");
-  set_fg(11);
-  gotoxy(63, 3); printf("Node    %7d", 0);
-  gotoxy(63, 4); printf("OS      %7.7s", st->os[0] ? st->os : "Unknown");
-  gotoxy(63, 5); printf("Errors  %7d", st->errors);
-  gotoxy(63, 6); printf("Mail    %7d", st->mail_waiting);
-  format_bytes(st->disk_free_kb * 1024, buf, sizeof(buf));
-  gotoxy(63, 7); printf("Free    %7s", buf);
-  gotoxy(63, 8); printf("Feedbk  %7d", st->feedback_today);
-
-  set_colors(st);
-  draw_titled_box(1, 10, 79, 7, "Node Matrix [@=inspect]");
-  set_fg(15);
-  gotoxy(6, 11); printf("0  1  2  3  4  5  6  7  8  9  A  B  C  D  E  F");
-  for (int row = 0; row < 4; row++)
-  {
-    gotoxy(3, 12 + row);
-    set_fg(15); printf("%c ", 'A' + row);
-    set_fg(11); printf(BOX_V);
-    for (int col = 0; col < 16; col++)
-    {
-      int node = row * 16 + col + 1;
-      char needle[32];
-      snprintf(needle, sizeof(needle), "\"node\":%d", node);
-      const char *p = strstr(st->nodes_json, needle);
-      char ch = st->cfg.wfc_status_idle_char;
-      if (p)
-      {
-        char status[32];
-        json_str(p, "status", status, sizeof(status));
-        if (!strcmp(status, "logging_in")) ch = st->cfg.wfc_status_logging_char;
-        else if (!strcmp(status, "chat") || !strcmp(status, "sysop_chat")) ch = st->cfg.wfc_status_chat_char;
-        else if (!strcmp(status, "online") || !strcmp(status, "active")) ch = st->cfg.wfc_status_online_char;
-        else if (!strcmp(status, "locked")) ch = 'L';
-      }
-      set_fg(ch == st->cfg.wfc_status_idle_char ? 8 : 10);
-      printf(" %c ", ch);
-    }
-    set_fg(11); printf(BOX_V);
+  if (rows < 22 || cols < 70) {
+    ncplane_set_styles(std, NCSTYLE_BOLD);
+    ncplane_printf_aligned(std, (int)rows / 2 - 1, NCALIGN_CENTER, "MUTINEER COMMAND DECK");
+    ncplane_set_styles(std, NCSTYLE_NONE);
+    ncplane_printf_aligned(std, (int)rows / 2 + 1, NCALIGN_CENTER, "Resize to at least 70 x 22  •  current %u x %u", cols, rows);
+    notcurses_render(g_nc);
+    return;
   }
 
-  set_colors(st);
-  printf(COLOR_BOLD);
-  gotoxy(32, 17); printf("Waiting For Call");
-  printf(COLOR_RESET);
-  set_colors(st);
-  draw_box(1, 18, 79, 6);
-  set_fg(11);
-  gotoxy(3, 19); printf("[S]ystem [F]ile base [C]allers [!]Validate [@]Inspect [Q]uit");
-  gotoxy(3, 20); printf("[U]ser   [B]Msg Base  [L]ogs    [Z]History  [N]odes   [D]rop shell");
-  gotoxy(3, 21); printf("[E]vents [W]rite mail [R]ead    [K]ick node [b]roadcast [ ]Local logon");
-  set_fg(8);
-  gotoxy(1, 24); printf("F4=refresh @<pos>=inspect k<n>=kick l<n>=lock u<n>=unlock b=broadcast");
-  fflush(stdout);
+  time_t now = time(NULL);
+  char clockbuf[32];
+  strftime(clockbuf, sizeof(clockbuf), "%a %d %b  %H:%M:%S", localtime(&now));
+  plane_colors(std, 94, 234, 212, 3, 10, 22);
+  ncplane_set_styles(std, NCSTYLE_BOLD);
+  ncplane_printf_yx(std, 0, 2, "◈ MUTINEER // COMMAND DECK");
+  ncplane_printf_yx(std, 0, (int)cols - (int)strlen(clockbuf) - 2, "%s", clockbuf);
+  plane_colors(std, 164, 180, 200, 3, 10, 22);
+  ncplane_set_styles(std, NCSTYLE_NONE);
+  ncplane_printf_yx(std, 1, 2, "%s", st->cfg.bbs_name);
+  ncplane_printf_yx(std, 1, (int)cols - 25, "LINK  ● SECURE  LIVE");
+
+  int gap = 1;
+  int card_y = 3;
+  int card_h = 7;
+  int card_cols = cols >= 100 ? 4 : 2;
+  int card_rows = card_cols == 4 ? 1 : 2;
+  int card_w = ((int)cols - 4 - gap * (card_cols - 1)) / card_cols;
+  const char *titles[] = {"TODAY", "VELOCITY", "ALL TIME", "SYSTEM"};
+  const unsigned accents[][3] = {{94,234,212},{96,165,250},{192,132,252},{251,191,36}};
+  for (int i = 0; i < 4; i++) {
+    int row = i / card_cols, col = i % card_cols;
+    struct ncplane *p = panel(std, card_y + row * (card_h + 1), 2 + col * (card_w + gap),
+                              card_h, card_w, titles[i], accents[i][0], accents[i][1], accents[i][2]);
+    if (p) fill_stats_panel(p, st, i);
+  }
+
+  int node_y = card_y + card_rows * (card_h + 1);
+  int footer_h = 5;
+  int node_h = (int)rows - node_y - footer_h - 1;
+  struct ncplane *nodes = panel(std, node_y, 2, node_h, (int)cols - 4, "NODE MATRIX", 94, 234, 212);
+  if (nodes) {
+    int usable = (int)cols - 8;
+    int per_row = usable / 5;
+    if (per_row > 16) per_row = 16;
+    if (per_row < 8) per_row = 8;
+    for (int node = 1; node <= 64; node++) {
+      int y = 2 + (node - 1) / per_row;
+      if (y >= node_h - 1) break;
+      int x = 2 + ((node - 1) % per_row) * 5;
+      bool active;
+      const char *status = node_status(st, node, &active);
+      if (active) plane_colors(nodes, 94, 234, 212, 8, 18, 32);
+      else plane_colors(nodes, 69, 85, 108, 8, 18, 32);
+      ncplane_printf_yx(nodes, y, x, "%02d%s", node, status);
+    }
+  }
+
+  int fy = (int)rows - footer_h;
+  plane_colors(std, 180, 200, 225, 10, 22, 38);
+  ncplane_set_base(std, " ", NCSTYLE_NONE, ncplane_channels(std));
+  ncplane_printf_yx(std, fy, 2, " S SYSTEM   C CALLERS   N NODES   L LOGS   Z HISTORY   @ INSPECT   K KICK ");
+  ncplane_printf_yx(std, fy + 1, 2, " U USERS    F FILES     B AREAS   E EVENTS  W MAIL     D SHELL     Q QUIT ");
+  plane_colors(std, 110, 130, 155, 10, 22, 38);
+  ncplane_printf_yx(std, fy + 3, 2, "b broadcast   l lock   u unlock   SPACE local session   auto-refresh %dms", st->cfg.wfc_refresh_ms);
+  notcurses_render(g_nc);
 }
 
 static void wait_key(void)
 {
-  gotoxy(1, 24);
-  set_fg(8);
-  printf("Press any key to continue...");
-  fflush(stdout);
-  char c;
-  while (read(STDIN_FILENO, &c, 1) <= 0) usleep(10000);
+  ncinput ni;
+  if (g_nc) notcurses_get_blocking(g_nc, &ni);
 }
 
 static void show_text_response(ConsoleState *st, const char *title, const char *cmd)
 {
   char resp[65536];
   request(st, cmd, "", resp, sizeof(resp));
-  printf(CLEAR_SCREEN SHOW_CURSOR COLOR_RESET "\n  %s\n  ===============\n\n%s\n", title, resp);
+  if (!g_nc) return;
+  struct ncplane *std = notcurses_stdplane(g_nc);
+  unsigned rows, cols;
+  ncplane_dim_yx(std, &rows, &cols);
+  ncplane_erase(std);
+  plane_colors(std, 225, 235, 248, 3, 10, 22);
+  ncplane_set_base(std, " ", NCSTYLE_NONE, ncplane_channels(std));
+  ncplane_set_styles(std, NCSTYLE_BOLD);
+  ncplane_printf_yx(std, 1, 2, "◈ %s", title);
+  ncplane_set_styles(std, NCSTYLE_NONE);
+  ncplane_printf_yx(std, 3, 2, "%.*s", (int)((rows - 6) * (cols - 4)), resp);
+  plane_colors(std, 94, 234, 212, 3, 10, 22);
+  ncplane_printf_yx(std, (int)rows - 2, 2, "Press any key to return");
+  notcurses_render(g_nc);
   wait_key();
 }
 
@@ -439,7 +426,13 @@ static void raw_forward_until_passthrough_end(ConsoleState *st)
 {
   char sock_line[8192];
   size_t sock_len = 0;
-  enable_raw();
+  if (tcgetattr(STDIN_FILENO, &g_passthrough_termios) == 0) {
+    struct termios raw = g_passthrough_termios;
+    raw.c_lflag &= (tcflag_t)~(ECHO | ICANON);
+    raw.c_cc[VMIN] = 1;
+    raw.c_cc[VTIME] = 0;
+    g_passthrough_raw = tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw) == 0;
+  }
   for (;;)
   {
     fd_set rfds;
@@ -481,8 +474,7 @@ static void raw_forward_until_passthrough_end(ConsoleState *st)
           sock_line[sock_len] = '\0';
           if (strstr(sock_line, "\"event\":\"passthrough.end\""))
           {
-            enable_raw();
-            return;
+            goto done;
           }
           fwrite(sock_line, 1, sock_len, stdout);
           fflush(stdout);
@@ -497,7 +489,9 @@ static void raw_forward_until_passthrough_end(ConsoleState *st)
       }
     }
   }
-  enable_raw();
+done:
+  if (g_passthrough_raw) tcsetattr(STDIN_FILENO, TCSAFLUSH, &g_passthrough_termios);
+  g_passthrough_raw = false;
 }
 
 static void passthrough(ConsoleState *st, const char *action)
@@ -520,6 +514,7 @@ static void passthrough(ConsoleState *st, const char *action)
     break;
   }
   raw_forward_until_passthrough_end(st);
+  enable_raw();
 }
 
 static void shell_passthrough(ConsoleState *st)
@@ -533,6 +528,7 @@ static void shell_passthrough(ConsoleState *st)
     {
       passthrough_started = 1;
       raw_forward_until_passthrough_end(st);
+      enable_raw();
       break;
     }
     if (strstr(line, "\"event\":\"passthrough.end\"")) break;
@@ -551,35 +547,24 @@ static void shell_passthrough(ConsoleState *st)
 
 static int prompt_line_raw(const char *prompt, char *out, size_t cap)
 {
-  gotoxy(1, 23);
-  printf(CSI "2K");
-  set_fg(15);
-  printf("%s", prompt);
-  fflush(stdout);
+  if (!g_nc || !out || cap == 0) return 0;
+  struct ncplane *std = notcurses_stdplane(g_nc);
+  unsigned rows, cols;
+  ncplane_dim_yx(std, &rows, &cols);
   size_t o = 0;
   while (o + 1 < cap)
   {
-    char c;
-    if (read(STDIN_FILENO, &c, 1) <= 0)
-    {
-      usleep(10000);
-      continue;
-    }
-    if (c == '\r' || c == '\n') break;
-    if (c == 27) { o = 0; break; }
-    if ((c == 127 || c == 8) && o > 0)
-    {
-      o--;
-      printf("\b \b");
-      fflush(stdout);
-      continue;
-    }
-    if (c >= 32 && c < 127)
-    {
-      out[o++] = c;
-      putchar(c);
-      fflush(stdout);
-    }
+    plane_colors(std, 245, 250, 255, 17, 34, 54);
+    ncplane_erase_region(std, (int)rows - 3, 0, 1, -1);
+    ncplane_printf_yx(std, (int)rows - 3, 2, "%s%s█", prompt, out);
+    notcurses_render(g_nc);
+    ncinput ni;
+    uint32_t key = notcurses_get_blocking(g_nc, &ni);
+    if (key == NCKEY_ENTER || key == '\r' || key == '\n') break;
+    if (key == NCKEY_ESC) { o = 0; break; }
+    if ((key == NCKEY_BACKSPACE || key == 127 || key == 8) && o > 0) o--;
+    else if (key >= 32 && key < 127) out[o++] = (char)key;
+    out[o] = '\0';
   }
   out[o] = '\0';
   return (int)o;
@@ -616,8 +601,19 @@ static void handle_key(ConsoleState *st, char c)
     {
       snprintf(extra, sizeof(extra), "\"node\":%d", atoi(input));
       request(st, "node.inspect", extra, resp, sizeof(resp));
-      printf(CLEAR_SCREEN SHOW_CURSOR COLOR_RESET "\n%s\n", resp);
-      wait_key();
+      if (g_nc) {
+        struct ncplane *std = notcurses_stdplane(g_nc);
+        unsigned rows, cols;
+        ncplane_dim_yx(std, &rows, &cols);
+        ncplane_erase(std);
+        plane_colors(std, 225, 235, 248, 3, 10, 22);
+        ncplane_set_base(std, " ", NCSTYLE_NONE, ncplane_channels(std));
+        ncplane_printf_yx(std, 1, 2, "◈ NODE INSPECTOR");
+        ncplane_printf_yx(std, 3, 2, "%.*s", (int)((rows - 6) * (cols - 4)), resp);
+        ncplane_printf_yx(std, (int)rows - 2, 2, "Press any key to return");
+        notcurses_render(g_nc);
+        wait_key();
+      }
     }
     break;
   case 'K':
@@ -724,25 +720,36 @@ int main(int argc, char **argv)
 
   signal(SIGINT, SIG_IGN);
   enable_raw();
+  if (!g_nc)
+  {
+    fprintf(stderr, "Failed to initialize notcurses (check TERM and terminal capabilities).\n");
+    close(st.fd);
+    return 5;
+  }
+  atexit(disable_raw);
   char refresh_id[32];
   send_cmd(&st, "stats.get", "", refresh_id, sizeof(refresh_id));
   while (read_line(st.fd, resp, sizeof(resp), 100) > 0)
     update_from_json(&st, resp);
 
+  int refresh_ms = st.cfg.wfc_refresh_ms > 0 ? st.cfg.wfc_refresh_ms : 1000;
+  struct timespec last_refresh;
+  clock_gettime(CLOCK_MONOTONIC, &last_refresh);
   for (;;)
   {
     draw_dashboard(&st);
-    fd_set rfds;
-    FD_ZERO(&rfds);
-    FD_SET(STDIN_FILENO, &rfds);
-    struct timeval tv = {.tv_sec = 1, .tv_usec = 0};
-    int sel = select(STDIN_FILENO + 1, &rfds, NULL, NULL, &tv);
-    if (sel > 0)
-    {
-      char c;
-      if (read(STDIN_FILENO, &c, 1) > 0) handle_key(&st, c);
+    ncinput ni;
+    uint32_t key = notcurses_get_nblock(g_nc, &ni);
+    if (key > 0 && key < 256) handle_key(&st, (char)key);
+    struct timespec now;
+    clock_gettime(CLOCK_MONOTONIC, &now);
+    long elapsed = (now.tv_sec - last_refresh.tv_sec) * 1000L +
+                   (now.tv_nsec - last_refresh.tv_nsec) / 1000000L;
+    if (elapsed >= refresh_ms) {
+      request(&st, "stats.get", "", resp, sizeof(resp));
+      request(&st, "nodes.list", "", resp, sizeof(resp));
+      last_refresh = now;
     }
-    request(&st, "stats.get", "", resp, sizeof(resp));
-    request(&st, "nodes.list", "", resp, sizeof(resp));
+    usleep(25000);
   }
 }

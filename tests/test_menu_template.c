@@ -7,6 +7,7 @@
 #include <string.h>
 #include "bbs_menu.h"
 #include "bbs_menu_template.h"
+#include "bbs_session.h"
 
 #define TEST_ASSERT(cond, msg) do { \
   if (!(cond)) { \
@@ -319,6 +320,26 @@ static int test_render_with_template(void) {
   return 0;
 }
 
+static int test_ansi_render_restores_prompt_cursor(void) {
+  Menu m;
+  Session s = {0};
+  s.ansi = 1;
+  TEST_ASSERT(menu_load("menus/main.mnu", &m), "should load main.mnu");
+
+  char buf[4096];
+  size_t len = menu_render_template(&m, &s, buf, sizeof(buf));
+  TEST_ASSERT(len > 0, "ANSI menu should render");
+  const char* cursor_restore = "\x1b[2A\x1b[14G";
+  size_t cursor_restore_len = strlen(cursor_restore);
+  TEST_ASSERT(len >= cursor_restore_len &&
+              strcmp(buf + len - cursor_restore_len, cursor_restore) == 0,
+              "cursor should return to the Selection prompt after bottom border");
+
+  menu_free(&m);
+  TEST_PASS("ansi_render_restores_prompt_cursor");
+  return 0;
+}
+
 static int test_multichar_key_rendering(void) {
   /* Multi-char keys should render as [GO] not [G] */
   Menu m = {0};
@@ -402,6 +423,7 @@ int main(void) {
   failures += test_validate_stock_templates();
   failures += test_render_fallback();
   failures += test_render_with_template();
+  failures += test_ansi_render_restores_prompt_cursor();
   failures += test_multichar_key_rendering();
   failures += test_empty_menu_render();
   

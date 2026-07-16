@@ -2,7 +2,7 @@
 W|Who's Online|who|
 M|Messages|messages|L10
 F|Files|files|L10
-C|Chat|chat|L10
+C|Teleconference (MTS)|plugin:com.mutineer.chat|L10
 B|Bulletins|bulletins|L10
 P|Page Sysop|page|+A
 O|Doors|doors|L20
@@ -11,13 +11,13 @@ S|Whisper|whisper|L10
 E|User Editor|useredit|+A
 V|Vote Booth|vote|L10
 T|Time Bank|timebank|L10
+Y|Change Password|changepassword|L10
 N|Netmail/QWK|netmail|L20
 A|Area Admin|areaadmin|+A
 R|File Admin|fileadmin|+A
 X|Batch Queue|batchrun|L10
 D|Maintenance|maintenance|+A
 1|Hello Plugin|plugin:com.mutineer.hello|L10
-2|Chat Plugin|plugin:com.mutineer.chat|L10
 3|List Plugins|plugins|+A
 H|Help|help|
 Q|Logoff|logout|

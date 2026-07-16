@@ -1,0 +1,27 @@
+FROM debian:buster
+
+RUN set -eux; \
+    printf '%s\n' \
+      'deb http://archive.debian.org/debian buster main' \
+      'deb http://archive.debian.org/debian-security buster/updates main' \
+      > /etc/apt/sources.list; \
+    printf 'Acquire::Check-Valid-Until "false";\n' > /etc/apt/apt.conf.d/99archive; \
+    apt-get update; \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+      bash \
+      ca-certificates \
+      build-essential \
+      cmake \
+      coreutils \
+      file \
+      gzip \
+      libarchive-dev \
+      libc6-dev \
+      libsqlite3-dev \
+      libssl-dev \
+      make \
+      pkg-config \
+      sqlite3 \
+      tar; \
+    rm -rf /var/lib/apt/lists/*; \
+    ldd --version | head -1

@@ -24,6 +24,7 @@ typedef struct BbsLibMetrics
 
 BbsLibResult bbslib_metrics_get(BbsLibContext *ctx, BbsLibMetrics *out);
 BbsLibResult bbslib_status_json(BbsLibContext *ctx, char *out, size_t cap);
+BbsLibResult bbslib_web_status_json(BbsLibContext *ctx, char *out, size_t cap);
 
 #ifdef __cplusplus
 }

@@ -78,6 +78,9 @@ static bucc_host_function_t host_functions[] = {
     { "BBS", "ONLINE",    "bbs.query",   NULL, 0, 0, false },
     { "BBS", "NODE",      "bbs.query",   NULL, 0, 0, false },
 
+    { "LEADERBOARD", "ENABLED", "leaderboard.write", NULL, 0, 0, false },
+    { "LEADERBOARD", "SUBMIT",  "leaderboard.write", NULL, 1, 2, true },
+
     { "USERS", "FIND",    "user.read",   NULL, 1, 2, true  },
     { "USERS", "GET",     "user.read",   NULL, 1, 1, false },
 
@@ -193,6 +196,12 @@ void bucc_host_set_file_api(bucc_host_context_t* ctx, bucc_file_api_t* api, void
     ctx->file_ctx = file_ctx;
 }
 
+void bucc_host_set_leaderboard_api(bucc_host_context_t* ctx, bucc_leaderboard_api_t* api, void* leaderboard_ctx) {
+    if (!ctx) return;
+    ctx->leaderboard = api;
+    ctx->leaderboard_ctx = leaderboard_ctx;
+}
+
 static bucc_host_function_t* find_host_function(const char* ns, const char* fn) {
     for (int i = 0; host_functions[i].ns != NULL; i++) {
         if (strcasecmp_local(host_functions[i].ns, ns) == 0 &&
@@ -223,6 +232,7 @@ static uint64_t capability_from_string(const char* cap) {
     if (strcmp(cap, "session.read") == 0) return BUCC_CAP_SESSION_READ;
     if (strcmp(cap, "session.write") == 0) return BUCC_CAP_SESSION_WRITE;
     if (strcmp(cap, "door.chain") == 0) return BUCC_CAP_DOOR_CHAIN;
+    if (strcmp(cap, "leaderboard.write") == 0) return BUCC_CAP_LEADERBOARD;
 
     return 0;
 }
@@ -1323,6 +1333,21 @@ bucc_value_t bucc_host_dispatch(bucc_vm_t* vm, const char* ns, const char* fn,
         if (strcasecmp_local(fn, "SENDMSG") == 0) return bucc_host_bbs_send_msg(ctx, args, argc);
         if (strcasecmp_local(fn, "ONLINE") == 0) return bucc_host_bbs_online(ctx, args, argc);
         if (strcasecmp_local(fn, "NODE") == 0) return bucc_host_bbs_node(ctx, args, argc);
+    }
+    else if (strcasecmp_local(ns, "LEADERBOARD") == 0) {
+        if (strcasecmp_local(fn, "ENABLED") == 0) {
+            return BUCC_BOOL_VAL(ctx->leaderboard && ctx->leaderboard->enabled &&
+                                 ctx->leaderboard->enabled(ctx->leaderboard_ctx));
+        }
+        if (strcasecmp_local(fn, "SUBMIT") == 0) {
+            if (!ctx->leaderboard || !ctx->leaderboard->submit)
+                return bucc_make_error("LEADERBOARD.SUBMIT not available");
+            int64_t score = bucc_value_to_int(args[0]);
+            char* detail = argc > 1 ? bucc_value_to_cstring(args[1]) : NULL;
+            bool ok = ctx->leaderboard->submit(ctx->leaderboard_ctx, score, detail ? detail : "");
+            free(detail);
+            return BUCC_BOOL_VAL(ok);
+        }
     }
     else if (strcasecmp_local(ns, "USERS") == 0) {
         if (strcasecmp_local(fn, "FIND") == 0) return bucc_host_users_find(ctx, args, argc);

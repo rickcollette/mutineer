@@ -72,6 +72,8 @@ typedef struct BbsConfig
   int  door_default_timeout_sec;  /* 0=no timeout */
   int  door_cleanup_on_exit;      /* 1=remove runtime tree on success */
   int  door_keep_failed_runs;     /* 1=keep runtime tree on failure for debugging */
+  int  door_janitor_interval_sec; /* periodic stale door-tree scan; 0 disables */
+  int  door_stale_age_sec;        /* minimum offline launch age before removal */
   char door_session_hmac_secret[128]; /* shared secret for signed native-door sessions */
   /* chat */
   int  max_page_sysop;            /* max sysop page attempts per session (0=unlimited) */

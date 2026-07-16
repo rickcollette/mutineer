@@ -1,5 +1,6 @@
 # Sysop menu
 U|User Editor|useredit|+A
+P|Change User Password|changepassword|+A
 M|Maintenance|maintenance|+A
 B|Broadcast|wall|+A
 K|Kick Node|wfc_kick|+A

@@ -12,7 +12,9 @@ and the console logs in with a sysop BBS account.
 
 ### Display
 
-WFC shows a grid of node slots with status characters:
+WFC uses a responsive notcurses dashboard with live statistic cards, a node
+matrix, true-color status accents, modal detail views, and resize handling.
+The minimum supported terminal size is 70 by 22 cells.
 
 | Config Key | Default | Meaning |
 |------------|---------|---------|

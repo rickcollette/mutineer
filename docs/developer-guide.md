@@ -29,7 +29,7 @@ cmake --build build
 
 ### Dependencies
 
-Required: SQLite3, OpenSSL, pthreads, libdl.
+Required: SQLite3, OpenSSL, pthreads, libdl, libnotcurses-core.
 
 Optional: libargon2, libzstd (PLANK compression).
 

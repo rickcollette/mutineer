@@ -994,9 +994,16 @@ static void run_maintenance(void) {
 
 static void run_daemon(void) {
     plank_log(PLANK_LOG_INFO, "coved", "Starting COVE service");
-    
-    time_t last_process = 0;
-    time_t last_maintenance = 0;
+
+    /*
+     * The listeners are created before this loop.  Treat daemon entry as the
+     * initial successful processing/maintenance point so an open listener is
+     * immediately responsive.  Starting these at zero made the first loop run
+     * all periodic database and health work before accepting a queued client;
+     * callers could connect successfully and then time out waiting for HTTP.
+     */
+    time_t last_process = time(NULL);
+    time_t last_maintenance = last_process;
     
     while (g_running) {
         if (g_reload) {
@@ -1182,6 +1189,10 @@ int main(int argc, char* argv[]) {
         plank_shutdown();
         return 1;
     }
+    /* COVE performs short concurrent queue and management transactions. WAL
+       avoids writer starvation between the service loop and hub sessions;
+       NORMAL retains crash consistency without an fsync for every API field. */
+    db_exec(g_db, "PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL;");
     
     /* Initialize PLANK store */
     g_store = plank_store_open(g_db);
@@ -1229,6 +1240,7 @@ int main(int argc, char* argv[]) {
             plank_shutdown();
             return 1;
         }
+        db_exec(g_auth_db, "PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL;");
         if (!auth_init_schema()) {
             fprintf(stderr, "Failed to initialize COVE auth database: %s\n",
                     db_last_error(g_auth_db));
@@ -1252,6 +1264,7 @@ int main(int argc, char* argv[]) {
             plank_shutdown();
             return 1;
         }
+        db_exec(g_mgmt_db, "PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL;");
         if (!mgmt_init_schema()) {
             fprintf(stderr, "Failed to initialize COVE management database: %s\n",
                     db_last_error(g_mgmt_db));

@@ -12,6 +12,7 @@
 #include "bbs_chat.h"
 #include "bbs_plugin_loader.h"
 #include "bbs_console_service.h"
+#include "bbs_doors.h"
 
 int net_run_listener(const struct BbsConfig* cfg, struct BbsDb* db, volatile sig_atomic_t* stop_flag);
 void broadcast_check(const char* data_path);
@@ -109,10 +110,13 @@ int main(int argc, char** argv) {
   /* start remote console and scheduler threads */
   console_service_start(&cfg, db);
   scheduler_start(&cfg, db);
+  door_janitor_start(&cfg, db);
 
   int rc = net_run_listener(&cfg, db, &g_stop);
 
   online_broadcast("\r\nSystem shutting down.\r\n");
+  online_shutdown_and_wait();
+  door_janitor_stop();
   scheduler_stop();
   console_service_stop();
   plugin_loader_shutdown();

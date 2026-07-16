@@ -43,6 +43,7 @@ bbslib_close(ctx);
 |--------|--------|---------|
 | Lifecycle | `bbslib/lifecycle.h` | Context open/close, versions, result codes |
 | Metrics | `bbslib/metrics.h` | Counts, daily totals, status JSON |
+| Leaderboards | `bbslib/leaderboard.h` | Door opt-in configuration, score submission, and ranked results |
 | Users | `bbslib/users.h` | User lookup, update, password authentication |
 | Messages | `bbslib/messages.h` | Message area list, message list/post |
 | Files | `bbslib/files.h` | File area list, file list/lookups |
@@ -91,6 +92,8 @@ Read-only endpoints:
 | `GET /health` | Service health |
 | `GET /api/status` | Status JSON |
 | `GET /api/metrics` | Alias for status JSON |
+| `GET /api/web/status` | Public-safe stats, version, online handles, and active door sessions |
+| `GET /api/web/leaderboards` | Public-safe per-game `top` 10, `recent` 10, and score-ranked `current` players |
 | `GET /api/nodes` | Node table snapshot |
 | `GET /api/messages/areas` | Message area list |
 | `GET /api/files/areas` | File area list |

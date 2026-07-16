@@ -76,7 +76,11 @@ def request(method, path, body="", auth=False):
     body_bytes = body.encode()
     headers.append(f"Content-Length: {len(body_bytes)}")
     raw = ("\r\n".join(headers) + "\r\n\r\n").encode() + body_bytes
-    sock = socket.create_connection(("127.0.0.1", mgmt_port), timeout=4)
+    # Node mutations touch both the PLANK and management databases.  Under a
+    # loaded sanitizer/full-suite runner they may legitimately wait behind the
+    # configured five-second SQLite busy timeout, so use an end-to-end API
+    # deadline that exceeds that bound instead of a four-second read timeout.
+    sock = socket.create_connection(("127.0.0.1", mgmt_port), timeout=20)
     sock.sendall(raw)
     sock.shutdown(socket.SHUT_WR)
     chunks = []
@@ -131,7 +135,6 @@ foreground=1
         stderr=subprocess.STDOUT,
     )
     wait_port(mgmt_port)
-    wait_port(hub_port)
 
     assert os.path.exists(auth_db), "auth db not created"
     assert os.path.exists(mgmt_db), "management db not created"

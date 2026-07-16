@@ -184,6 +184,7 @@ static uint64_t capability_from_string(const char* cap) {
     if (strcmp(cap, "session.read") == 0) return BUCC_CAP_SESSION_READ;
     if (strcmp(cap, "session.write") == 0) return BUCC_CAP_SESSION_WRITE;
     if (strcmp(cap, "door.chain") == 0) return BUCC_CAP_DOOR_CHAIN;
+    if (strcmp(cap, "leaderboard.write") == 0) return BUCC_CAP_LEADERBOARD;
     
     return 0;
 }

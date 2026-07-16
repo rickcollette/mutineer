@@ -11,9 +11,12 @@ JOBS      ?= 2
 BINARY    := $(BUILD_DIR)/mutineer
 BUCC      := $(BUILD_DIR)/bucc
 
-.PHONY: all clean dist dist-mutineer dist-buccaneer configure test bbs-up bbs-down bbs-status tools plank plugins bucc release release-debian release-fedora release-alpine
+.PHONY: all clean dist dist-mutineer dist-buccaneer configure test bbs-up bbs-down bbs-status tools plank plugins bucc release release-debian release-fedora release-alpine version-bump
 
-all: $(BINARY)
+version-bump:
+	@./scripts/bump-build-version.sh
+
+all: version-bump $(BINARY)
 
 $(BUILD_DIR)/CMakeCache.txt: CMakeLists.txt
 	@mkdir -p $(BUILD_DIR)
@@ -24,24 +27,24 @@ $(BUILD_DIR)/CMakeCache.txt: CMakeLists.txt
 	fi
 	@$(CMAKE) -S . -B $(BUILD_DIR) -DCMAKE_BUILD_TYPE=$(CMAKE_BUILD_TYPE) $(CMAKE_ARGS)
 
-configure: $(BUILD_DIR)/CMakeCache.txt
+configure: version-bump $(BUILD_DIR)/CMakeCache.txt
 
 $(BINARY): $(BUILD_DIR)/CMakeCache.txt
 	@$(CMAKE) --build $(BUILD_DIR) --parallel $(JOBS) --target mutineer
 
-tools: $(BUILD_DIR)/CMakeCache.txt
+tools: version-bump $(BUILD_DIR)/CMakeCache.txt
 	@$(CMAKE) --build $(BUILD_DIR) --parallel $(JOBS) --target tools
 
-plank: $(BUILD_DIR)/CMakeCache.txt
+plank: version-bump $(BUILD_DIR)/CMakeCache.txt
 	@$(CMAKE) --build $(BUILD_DIR) --parallel $(JOBS) --target plank
 
-plugins: $(BUILD_DIR)/CMakeCache.txt
+plugins: version-bump $(BUILD_DIR)/CMakeCache.txt
 	@$(CMAKE) --build $(BUILD_DIR) --parallel $(JOBS) --target plugins
 
-bucc: $(BUILD_DIR)/CMakeCache.txt
+bucc: version-bump $(BUILD_DIR)/CMakeCache.txt
 	@$(CMAKE) --build $(BUILD_DIR) --parallel $(JOBS) --target bucc
 
-test: $(BUILD_DIR)/CMakeCache.txt
+test: version-bump $(BUILD_DIR)/CMakeCache.txt
 	@$(CMAKE) --build $(BUILD_DIR) --parallel $(JOBS)
 	@ctest --test-dir $(BUILD_DIR) --output-on-failure
 

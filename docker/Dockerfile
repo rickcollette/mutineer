@@ -3,7 +3,7 @@ FROM debian:bookworm-slim AS builder
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential cmake pkg-config \
-    libsqlite3-dev libssl-dev libargon2-dev libzstd-dev libarchive-dev \
+    libsqlite3-dev libssl-dev libargon2-dev libzstd-dev libarchive-dev libnotcurses-core-dev \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /src
@@ -17,7 +17,7 @@ RUN cmake -S . -B build -DCMAKE_BUILD_TYPE=Release \
 FROM debian:bookworm-slim
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libsqlite3-0 libssl3 libargon2-1 libzstd1 libarchive13 sqlite3 ca-certificates \
+    libsqlite3-0 libssl3 libargon2-1 libzstd1 libarchive13 libnotcurses-core3 sqlite3 ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /opt/mutineer

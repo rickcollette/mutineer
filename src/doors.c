@@ -16,6 +16,7 @@
 #include <string.h>
 #include <time.h>
 #include <ctype.h>
+#include <pthread.h>
 #include <openssl/hmac.h>
 #include <openssl/rand.h>
 #include <openssl/evp.h>
@@ -61,8 +62,12 @@ static void door_fixed_copy(unsigned char* dst, size_t len, const char* src) {
   memcpy(dst, src, n);
 }
 
-static bool write_mutineer_session_json(Session* s, const char* dir) {
-  if (!s || !dir || !dir[0]) return false;
+static bool write_mutineer_session_json(Session* s, const DbDoor* door, const char* dir) {
+  if (!s || !door || !dir || !dir[0]) return false;
+  /* A prior run must never be mistaken for the current game's result. */
+  char leaderboard_path[1024];
+  path_join(dir, "MUTINEER_LB_RESULT.JSON", leaderboard_path, sizeof(leaderboard_path));
+  unlink(leaderboard_path);
   char nonce_bytes[16];
   unsigned char hmac[EVP_MAX_MD_SIZE];
   unsigned int hmac_len = 0;
@@ -122,7 +127,14 @@ static bool write_mutineer_session_json(Session* s, const char* dir) {
   fprintf(f, "  \"issued_at\": %ld,\n", (long)issued);
   fprintf(f, "  \"expires_at\": %ld,\n", (long)expires);
   fprintf(f, "  \"nonce\": "); json_escape(f, nonce); fprintf(f, ",\n");
-  fprintf(f, "  \"hmac\": "); json_escape(f, hmac_hex); fprintf(f, "\n");
+  fprintf(f, "  \"hmac\": "); json_escape(f, hmac_hex); fprintf(f, ",\n");
+  fprintf(f, "  \"leaderboard\": {\n");
+  fprintf(f, "    \"LB_ENABLE\": %d,\n", door->lb_enable ? 1 : 0);
+  fprintf(f, "    \"LB_GAME_KEY\": "); json_escape(f, door->lb_key); fprintf(f, ",\n");
+  fprintf(f, "    \"LB_SCORE_LABEL\": "); json_escape(f, door->lb_label); fprintf(f, ",\n");
+  fprintf(f, "    \"LB_ORDER\": "); json_escape(f, door->lb_order); fprintf(f, ",\n");
+  fprintf(f, "    \"LB_RESULT_FILE\": \"MUTINEER_LB_RESULT.JSON\"\n");
+  fprintf(f, "  }\n");
   fprintf(f, "}\n");
   fclose(f);
   return true;
@@ -152,6 +164,136 @@ static bool remove_tree_recursive(const char* path) {
   }
 
   return unlink(path) == 0;
+}
+
+static pthread_t g_door_janitor_thread;
+static pthread_mutex_t g_door_janitor_mu = PTHREAD_MUTEX_INITIALIZER;
+static BbsConfig g_door_janitor_cfg;
+static BbsDb* g_door_janitor_db;
+static int g_door_janitor_running;
+static int g_door_janitor_stop;
+
+static int janitor_node_number(const char* name) {
+  char extra;
+  int node = 0;
+  if (!name || sscanf(name, "node%d%c", &node, &extra) != 1 || node < 1 || node > 256)
+    return 0;
+  return node;
+}
+
+static int janitor_scan_base(const char* base, int stale_age, time_t now) {
+  DIR* doors;
+  struct dirent* door_ent;
+  int removed = 0;
+  if (!base || !base[0] || (doors = opendir(base)) == NULL)
+    return 0;
+  while ((door_ent = readdir(doors)) != NULL) {
+    if (!strcmp(door_ent->d_name, ".") || !strcmp(door_ent->d_name, "..")) continue;
+    char door_path[1024];
+    snprintf(door_path, sizeof(door_path), "%s/%s", base, door_ent->d_name);
+    struct stat door_st;
+    if (lstat(door_path, &door_st) != 0 || !S_ISDIR(door_st.st_mode)) continue;
+    DIR* nodes = opendir(door_path);
+    if (!nodes) continue;
+    struct dirent* node_ent;
+    while ((node_ent = readdir(nodes)) != NULL) {
+      int node = janitor_node_number(node_ent->d_name);
+      if (!node || online_get_node(node) != NULL) continue;
+      char node_path[1024];
+      path_join(door_path, node_ent->d_name, node_path, sizeof(node_path));
+      DIR* launches = opendir(node_path);
+      if (!launches) continue;
+      struct dirent* launch_ent;
+      while ((launch_ent = readdir(launches)) != NULL) {
+        if (!strcmp(launch_ent->d_name, ".") || !strcmp(launch_ent->d_name, "..")) continue;
+        char launch_path[1024];
+        struct stat st;
+        path_join(node_path, launch_ent->d_name, launch_path, sizeof(launch_path));
+        if (lstat(launch_path, &st) != 0 || !S_ISDIR(st.st_mode)) continue;
+        if (stale_age > 0 && difftime(now, st.st_mtime) < stale_age) continue;
+        if (remove_tree_recursive(launch_path)) {
+          removed++;
+          log_info("door janitor: removed stale offline launch %s", launch_path);
+        } else {
+          log_warn("door janitor: failed to remove %s: %s", launch_path, strerror(errno));
+        }
+      }
+      closedir(launches);
+      rmdir(node_path);
+    }
+    closedir(nodes);
+    rmdir(door_path);
+  }
+  closedir(doors);
+  return removed;
+}
+
+int door_janitor_run_once(const BbsConfig* cfg, BbsDb* db) {
+  int age;
+  int removed;
+  if (!cfg) return 0;
+  age = cfg->door_stale_age_sec < 0 ? 0 : cfg->door_stale_age_sec;
+  removed = janitor_scan_base(cfg->dropfile_path, age, time(NULL));
+  if (strcmp(cfg->door_runtime_path, cfg->dropfile_path))
+    removed += janitor_scan_base(cfg->door_runtime_path, age, time(NULL));
+  if (db) {
+    DbNode nodes[256];
+    int count = db_node_list(db, nodes, 256);
+    for (int i = 0; i < count; i++)
+      if (!strcmp(nodes[i].status, "online") &&
+          online_get_node(nodes[i].node_num) == NULL) {
+        db_node_upsert(db, nodes[i].node_num, 0, "offline", "idle", "");
+        log_info("door janitor: reconciled stale online database node %d",
+                 nodes[i].node_num);
+      }
+  }
+  return removed;
+}
+
+static void* door_janitor_main(void* unused) {
+  (void)unused;
+  door_janitor_run_once(&g_door_janitor_cfg, g_door_janitor_db);
+  for (;;) {
+    int interval = g_door_janitor_cfg.door_janitor_interval_sec;
+    for (int elapsed = 0; elapsed < interval; elapsed++) {
+      pthread_mutex_lock(&g_door_janitor_mu);
+      int stop = g_door_janitor_stop;
+      pthread_mutex_unlock(&g_door_janitor_mu);
+      if (stop) return NULL;
+      sleep(1);
+    }
+    door_janitor_run_once(&g_door_janitor_cfg, g_door_janitor_db);
+  }
+}
+
+void door_janitor_start(const BbsConfig* cfg, BbsDb* db) {
+  if (!cfg || cfg->door_janitor_interval_sec <= 0) return;
+  pthread_mutex_lock(&g_door_janitor_mu);
+  if (!g_door_janitor_running) {
+    g_door_janitor_cfg = *cfg;
+    g_door_janitor_db = db;
+    g_door_janitor_stop = 0;
+    if (pthread_create(&g_door_janitor_thread, NULL, door_janitor_main, NULL) == 0)
+      g_door_janitor_running = 1;
+    else
+      log_warn("door janitor: unable to start background thread");
+  }
+  pthread_mutex_unlock(&g_door_janitor_mu);
+}
+
+void door_janitor_stop(void) {
+  pthread_mutex_lock(&g_door_janitor_mu);
+  if (!g_door_janitor_running) {
+    pthread_mutex_unlock(&g_door_janitor_mu);
+    return;
+  }
+  g_door_janitor_stop = 1;
+  pthread_t thread = g_door_janitor_thread;
+  pthread_mutex_unlock(&g_door_janitor_mu);
+  pthread_join(thread, NULL);
+  pthread_mutex_lock(&g_door_janitor_mu);
+  g_door_janitor_running = 0;
+  pthread_mutex_unlock(&g_door_janitor_mu);
 }
 
 /* =========================================================================
@@ -217,6 +359,41 @@ static bool json_bool(const char* json, const char* key, int* out) {
   return false;
 }
 
+static void ingest_leaderboard_result(Session* s, const DbDoor* door, const char* dir) {
+  if (!s || !s->db || !door || !door->lb_enable || !dir) return;
+  char path[1024];
+  path_join(dir, "MUTINEER_LB_RESULT.JSON", path, sizeof(path));
+  struct stat st;
+  if (lstat(path, &st) != 0) return;
+  if (!S_ISREG(st.st_mode) || st.st_size <= 0 || st.st_size > 4096) {
+    log_warn("door %s: rejected invalid leaderboard result file", door->name);
+    return;
+  }
+  char* json = file_read_all(path, NULL);
+  if (!json) return;
+  const char* score_value = json_find_key(json, "score");
+  if (!score_value) {
+    log_warn("door %s: leaderboard result missing score", door->name);
+    free(json);
+    return;
+  }
+  while (isspace((unsigned char)*score_value)) score_value++;
+  char* end = NULL;
+  errno = 0;
+  long long score = strtoll(score_value, &end, 10);
+  while (end && isspace((unsigned char)*end)) end++;
+  if (errno || end == score_value || (*end && *end != ',' && *end != '}')) {
+    log_warn("door %s: leaderboard result has invalid score", door->name);
+    free(json);
+    return;
+  }
+  char detail[128] = "";
+  json_str(json, "detail", detail, sizeof(detail));
+  if (!db_door_score_submit(s->db, door->id, s->user.handle, (int64_t)score, detail))
+    log_warn("door %s: leaderboard result was not accepted", door->name);
+  free(json);
+}
+
 /* =========================================================================
  * Path safety helpers
  * ========================================================================= */
@@ -236,9 +413,22 @@ static bool path_is_safe_relative(const char* path) {
 
 typedef struct BuccLiveCtx {
   Session* s;
+  const DbDoor* door;
   char scope[128];
   char text_root[512];
 } BuccLiveCtx;
+
+static bool bucc_leaderboard_enabled_cb(void* ctx) {
+  BuccLiveCtx* live = (BuccLiveCtx*)ctx;
+  return live && live->door && live->door->enabled && live->door->lb_enable;
+}
+
+static bool bucc_leaderboard_submit_cb(void* ctx, int64_t score, const char* detail) {
+  BuccLiveCtx* live = (BuccLiveCtx*)ctx;
+  return live && live->s && live->s->db && live->door &&
+         db_door_score_submit(live->s->db, live->door->id,
+                              live->s->user.handle, score, detail);
+}
 
 /* =========================================================================
  * DOSBox manifest parsing and validation
@@ -805,7 +995,7 @@ static bool door_launch_native(Session* s, const DbDoor* door) {
   write_pcboardsys(s, dir);
   write_callinfo(s, dir);
   write_sfdoors(s, dir);
-  if (!write_mutineer_session_json(s, dir)) {
+  if (!write_mutineer_session_json(s, door, dir)) {
     log_error("native door %s: failed to write MUTINEER_SESSION.JSON", door->name);
     send_str(s, "\r\nDoor session setup failed. Contact the sysop.\r\n");
     return false;
@@ -832,6 +1022,7 @@ static bool door_launch_native(Session* s, const DbDoor* door) {
                                  (s && s->fd > STDERR_FILENO) ? s->fd : -1,
                                  &pres, errbuf, sizeof(errbuf));
   if (!ok && errbuf[0]) log_error("native door %s: %s", door->name, errbuf);
+  if (ok) ingest_leaderboard_result(s, door, dir);
   bbs_argv_free(argv);
   if (s->db) db_node_upsert(s->db, s->node_num, s->user.id, "online", "menu", s->ip);
   if (ok && s->cfg.door_cleanup_on_exit) {
@@ -935,6 +1126,11 @@ static bool door_launch_dosbox(Session* s, const DbDoor* door) {
   char game_dir[1024], conf_path[1024];
   path_join(runtime_root, "game", game_dir, sizeof(game_dir));
   path_join(runtime_root, "dosbox.conf", conf_path, sizeof(conf_path));
+  if (!write_mutineer_session_json(s, door, game_dir)) {
+    log_error("door %s: failed to write leaderboard session metadata", door->name);
+    dosbox_cleanup_runtime(runtime_root);
+    return false;
+  }
 
   if (!dosbox_build_conf(&m, game_dir, conf_path, errbuf, sizeof(errbuf))) {
     log_error("door %s: conf generation failed: %s", door->name, errbuf);
@@ -1024,6 +1220,7 @@ static bool door_launch_dosbox(Session* s, const DbDoor* door) {
   }
 
   bool success = !timed_out && WIFEXITED(status) && WEXITSTATUS(status) == 0;
+  if (success) ingest_leaderboard_result(s, door, game_dir);
 
   if (WIFEXITED(status))
     log_info("door %s: dosbox exited with code %d", door->name, WEXITSTATUS(status));
@@ -1603,10 +1800,15 @@ static bool door_launch_bucc(Session* s, const DbDoor* door) {
     .commit_tx = bucc_data_tx_cb,
     .rollback_tx = bucc_data_tx_cb
   };
+  bucc_leaderboard_api_t leaderboard_api = {
+    .enabled = bucc_leaderboard_enabled_cb,
+    .submit = bucc_leaderboard_submit_cb
+  };
 
   BuccLiveCtx live;
   memset(&live, 0, sizeof(live));
   live.s = s;
+  live.door = door;
   snprintf(live.scope, sizeof(live.scope), "door:%d:%s", door->id, door->name);
   char bucc_root[512];
   path_join(s->cfg.data_path, "buccaneer", bucc_root, sizeof(bucc_root));
@@ -1623,6 +1825,7 @@ static bool door_launch_bucc(Session* s, const DbDoor* door) {
   bucc_host_set_msg_api(runner->host_ctx, &msg_api, &live);
   bucc_host_set_file_api(runner->host_ctx, &file_api, &live);
   bucc_host_set_data_api(runner->host_ctx, &data_api, &live);
+  bucc_host_set_leaderboard_api(runner->host_ctx, &leaderboard_api, &live);
 
   char activity[128];
   snprintf(activity, sizeof(activity), "door:%s", door->name);

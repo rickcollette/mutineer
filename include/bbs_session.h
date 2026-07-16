@@ -67,6 +67,8 @@ bool online_add(Session* s);
 void online_remove(Session* s);
 size_t online_list(char* out, size_t cap);
 void online_broadcast(const char* msg);
+/* Stop every active session and wait until its detached worker has completed. */
+void online_shutdown_and_wait(void);
 Session* online_get_node(int node_num);
 bool online_mark_node_dead(int node_num, const Session *except, const char *msg);
 void online_set_node_locked(int node_num, bool locked);

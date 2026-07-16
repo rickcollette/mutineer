@@ -82,7 +82,7 @@ Best if you want to **build from source**, run tests, or develop on Windows.
    ```bash
    sudo apt update
    sudo apt install -y git cmake build-essential libsqlite3-dev sqlite3 \
-     libssl-dev libarchive-dev telnet dosbox expect
+     libssl-dev libarchive-dev libnotcurses-core-dev telnet dosbox expect
    ```
 
 ### Clone and build

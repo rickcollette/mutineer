@@ -17,7 +17,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             build-essential cmake libsqlite3-dev libssl-dev \
-            libargon2-dev libzstd-dev libarchive-dev sqlite3
+            libargon2-dev libzstd-dev libarchive-dev libnotcurses-core-dev sqlite3
 
       - name: Build and test
         run: ./scripts/ci-build.sh
@@ -29,3 +29,60 @@ jobs:
           tar tzf dist/releases/mutineer-ci-*.tar.gz | grep -q '/bin/mutineer-console$'
           tar tzf dist/releases/mutineer-ci-*.tar.gz | grep -q '/plank/bin/coved$'
           tar tzf dist/releases/mutineer-ci-*.tar.gz | grep -q '/scripts/open-wfc.sh$'
+
+  mts-asan-ubsan:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends build-essential cmake libsqlite3-dev expect
+      - name: Configure ASan and UBSan
+        run: cmake -S . -B build-mts-asan -DENABLE_ASAN=ON -DCMAKE_BUILD_TYPE=Debug
+      - name: Build MTS tests
+        run: cmake --build build-mts-asan --target test_mts test_mts_concurrency -j2
+      - name: Run MTS tests
+        run: ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 ctest --test-dir build-mts-asan -R '^mts(_concurrency)?$' --output-on-failure
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: mts-asan-ubsan-logs
+          path: build-mts-asan/Testing/Temporary/
+
+  mts-tsan:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends build-essential cmake libsqlite3-dev clang-18 libclang-rt-18-dev
+      - name: Probe Clang TSan runtime
+        run: |
+          printf 'int main(void) { return 0; }\n' > /tmp/tsan-probe.c
+          clang-18 -fsanitize=thread /tmp/tsan-probe.c -o /tmp/tsan-probe
+          /tmp/tsan-probe
+      - name: Configure TSan
+        run: CC=clang-18 cmake -S . -B build-mts-tsan -DENABLE_TSAN=ON -DCMAKE_BUILD_TYPE=Debug
+      - name: Build MTS concurrency tests
+        run: cmake --build build-mts-tsan --target test_mts_concurrency -j2
+      - name: Run MTS concurrency tests
+        run: MTS_STRESS_ROUNDS=25 MTS_STRESS_OPS=500 TSAN_OPTIONS=halt_on_error=1:history_size=7 ./build-mts-tsan/test_mts_concurrency
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: mts-tsan-logs
+          path: build-mts-tsan/Testing/Temporary/
+
+  mts-three-client:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends build-essential cmake libsqlite3-dev expect telnet netcat-openbsd sqlite3
+      - name: Build MTS integration targets
+        run: cmake -S . -B build-mts-integration -DCMAKE_BUILD_TYPE=Debug && cmake --build build-mts-integration --target mutineer mutineer-initbbs chat_plugin -j2
+      - name: Run three-client MTS integration
+        run: tests/run_expect_tests.sh build-mts-integration test_mts_three_client.exp
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: mts-three-client-logs
+          path: /tmp/mutineer-expect.*/

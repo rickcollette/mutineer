@@ -62,7 +62,9 @@ run_test "user_editor_view" {
         timeout { return 0 }
     }
     
-    send "sysop\r"
+    # Never use the authentication authority itself as an editor fixture.
+    # The runner seeds Alice specifically for mutation-safe integration tests.
+    send "alice\r"
     
     # Should see user fields
     expect {
@@ -111,6 +113,10 @@ run_test "user_editor_view" {
 }
 
 # Test 3: Area admin access
+# User-editor paths exercise a stateful prompt loop in a detached server
+# worker. Give its socket EOF cleanup and SQLite transaction teardown a clear
+# barrier before authenticating the next admin session.
+after 3000
 run_test "area_admin_access" {
     if {![connect_bbs]} { return 0 }
     if {![login_as "sysop" "mutineer"]} { return 0 }

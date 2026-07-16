@@ -41,6 +41,11 @@ int prompt_line(Session* s, const char* prompt, char* out, size_t cap) {
 }
 size_t online_list(char* out, size_t cap) { (void)out; (void)cap; return 0; }
 void online_broadcast(const char* msg) { (void)msg; }
+static int g_active_node;
+Session* online_get_node(int node_num) {
+  static Session active;
+  return node_num == g_active_node ? &active : NULL;
+}
 
 /* =========================================================================
  * Test helpers
@@ -674,6 +679,30 @@ static void test_protocol_argv_and_rejection(void) {
   unlink(filepath);
 }
 
+static void test_door_janitor(void) {
+  printf("\n[door janitor: offline cleanup and active preservation]\n");
+  BbsConfig cfg;
+  memset(&cfg, 0, sizeof(cfg));
+  make_tmp_path(cfg.dropfile_path, sizeof(cfg.dropfile_path),
+                "test_janitor_drop_%d", (int)getpid());
+  make_tmp_path(cfg.door_runtime_path, sizeof(cfg.door_runtime_path),
+                "test_janitor_runtime_%d", (int)getpid());
+  char launch[512];
+  snprintf(launch, sizeof(launch), "%s/game/node07/old-launch", cfg.dropfile_path);
+  char command[1024];
+  snprintf(command, sizeof(command), "mkdir -p '%s'", launch);
+  CHECK(system(command) == 0, "janitor fixture created");
+  cfg.door_stale_age_sec = 0;
+  g_active_node = 7;
+  CHECK(door_janitor_run_once(&cfg, NULL) == 0 && access(launch, F_OK) == 0,
+        "janitor preserves launches for a connected node");
+  g_active_node = 0;
+  CHECK(door_janitor_run_once(&cfg, NULL) == 1 && access(launch, F_OK) != 0,
+        "janitor removes offline launch tree");
+  rm_rf(cfg.dropfile_path);
+  rm_rf(cfg.door_runtime_path);
+}
+
 /* =========================================================================
  * main
  * ========================================================================= */
@@ -694,6 +723,7 @@ int main(void) {
   test_native_door_argv_and_rejection();
   test_native_door_session_json_and_dropdir_marker();
   test_protocol_argv_and_rejection();
+  test_door_janitor();
 
   printf("\n=== Results: %d passed, %d failed ===\n", g_pass, g_fail);
   return g_fail > 0 ? 1 : 0;
