@@ -9,23 +9,23 @@
 static mts_command_def_t C[] = {
     {"help", "?", "/help [command]", "Show command help",
      "Help is generated from the MTS command registry.", MTS_ROLE_USER, 0, 1},
-    {"rooms", "", "/rooms [admin]", "List rooms",
+    {"rooms", "r", "/rooms [admin]", "List rooms",
      "Sysops may add admin for ownership and occupancy details.", MTS_ROLE_USER,
      0, 1},
-    {"join", "", "/join <room>", "Join a room",
+    {"join", "j", "/join <room>", "Join a room",
      "Private rooms require ownership, invitation, or sysop access.",
      MTS_ROLE_USER, 1, 1},
-    {"leave", "", "/leave", "Return to Lobby",
+    {"leave", "l", "/leave", "Return to Lobby",
      "Lobby is immutable and always available.", MTS_ROLE_USER, 0, 0},
-    {"who", "", "/who [room]", "List room occupants",
+    {"who", "s", "/who [room]", "List room occupants",
      "Shows node, AFK state, and role.", MTS_ROLE_USER, 0, 1},
-    {"topic", "", "/topic [text]", "View or set topic",
+    {"topic", "t", "/topic [text]", "View or set topic",
      "Setting requires room moderator authority.", MTS_ROLE_USER, 0, -1},
     {"msg", "m", "/msg <user> <message>", "Send private message",
      "Aliases include /<user> message.", MTS_ROLE_USER, 2, -1},
     {"reply", "//", "/reply <message>", "Reply privately",
      "Replies to the last private correspondent.", MTS_ROLE_USER, 1, -1},
-    {"me", "", "/me <action>", "Send an action",
+    {"me", "em", "/me <action>", "Send an action",
      "Actions obey recipient visibility preferences.", MTS_ROLE_USER, 1, -1},
     {"afk", "", "/afk [message]", "Toggle AFK",
      "One automatic response is sent per sender and AFK epoch.", MTS_ROLE_USER,
@@ -85,7 +85,7 @@ static mts_command_def_t C[] = {
      MTS_ROLE_SYSOP, 0, 1},
     {"profile", "", "/profile [set text|user]", "View or edit profile", "",
      MTS_ROLE_USER, 0, -1},
-    {"members", "", "/members [prefix]", "List members", "", MTS_ROLE_USER, 0,
+    {"members", "sc", "/members [prefix]", "List members", "", MTS_ROLE_USER, 0,
      1},
     {"recent", "", "/recent", "List recent users", "", MTS_ROLE_USER, 0, 0},
     {"history", "", "/history [count]", "Show room history", "", MTS_ROLE_USER,
@@ -109,15 +109,18 @@ static mts_command_def_t C[] = {
 #if defined(__GNUC__)
 #pragma GCC diagnostic pop
 #endif
-const mts_command_def_t *mts_commands(size_t *n) {
+const mts_command_def_t *mts_commands(size_t *n)
+{
   if (n)
     *n = sizeof C / sizeof *C;
   return C;
 }
-const mts_command_def_t *mts_command_find(const char *name) {
+const mts_command_def_t *mts_command_find(const char *name)
+{
   size_t n;
   const mts_command_def_t *c = mts_commands(&n);
-  for (size_t i = 0; i < n; i++) {
+  for (size_t i = 0; i < n; i++)
+  {
     if (!strcasecmp(name, c[i].name))
       return &c[i];
     char a[64];
@@ -129,7 +132,8 @@ const mts_command_def_t *mts_command_find(const char *name) {
   }
   return NULL;
 }
-int mts_command_bind(const char *name, mts_command_handler_t handler) {
+int mts_command_bind(const char *name, mts_command_handler_t handler)
+{
   mts_command_def_t *command = (mts_command_def_t *)mts_command_find(name);
   if (!command)
     return 0;

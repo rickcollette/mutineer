@@ -93,6 +93,16 @@ if compgen -G "/usr/local/lib/libnotcurses-core.so*" >/dev/null; then
   install -m 0755 /usr/local/lib/libnotcurses-core.so* "$STAGING/lib/"
 fi
 
+# notcurses is built from source in the compatibility image.  Bundle its
+# non-glibc runtime closure as well; minimal target hosts do not necessarily
+# provide these SONAMEs (notably libunistring.so.2).
+for soname in libtinfo.so.6 libunistring.so.2 libdeflate.so.0; do
+  resolved="$(ldd /usr/local/lib/libnotcurses-core.so | awk -v name="$soname" '$1 == name && $2 == "=>" { print $3; exit }')"
+  [ -n "$resolved" ] || die "unable to resolve notcurses runtime library: $soname"
+  require_file "$resolved"
+  install -m 0755 "$resolved" "$STAGING/lib/$soname"
+done
+
 # The compatibility build may link OpenSSL 1.1 even when the target host only
 # ships OpenSSL 3. Bundle the exact SONAMEs selected by the linker. The release
 # RPATH above lets both root-level and bin/ executables find them in lib/.

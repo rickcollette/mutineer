@@ -1,10 +1,25 @@
 # Mutineer BBS — production container image
 FROM debian:bookworm-slim AS builder
 
+ARG NOTCURSES_VERSION=3.0.13
+
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential cmake pkg-config \
-    libsqlite3-dev libssl-dev libargon2-dev libzstd-dev libarchive-dev libnotcurses-core-dev \
-    && rm -rf /var/lib/apt/lists/*
+    build-essential cmake ninja-build pkg-config ca-certificates wget \
+    libsqlite3-dev libssl-dev libargon2-dev libzstd-dev libarchive-dev \
+    libncurses-dev libunistring-dev libdeflate-dev \
+    && wget -O /tmp/notcurses.tar.gz \
+      "https://github.com/dankamongmen/notcurses/archive/refs/tags/v${NOTCURSES_VERSION}.tar.gz" \
+    && mkdir -p /tmp/notcurses-src \
+    && tar -C /tmp/notcurses-src --strip-components=1 -xzf /tmp/notcurses.tar.gz \
+    && cmake -S /tmp/notcurses-src -B /tmp/notcurses-build -G Ninja \
+      -DCMAKE_BUILD_TYPE=Release \
+      -DCMAKE_INSTALL_PREFIX=/usr/local \
+      -DUSE_MULTIMEDIA=none \
+      -DUSE_DOCTEST=OFF \
+      -DUSE_PANDOC=OFF \
+    && cmake --build /tmp/notcurses-build --target install --parallel "$(nproc)" \
+    && rm -rf /var/lib/apt/lists/* /tmp/notcurses.tar.gz \
+      /tmp/notcurses-src /tmp/notcurses-build
 
 WORKDIR /src
 COPY . .
@@ -17,18 +32,21 @@ RUN cmake -S . -B build -DCMAKE_BUILD_TYPE=Release \
 FROM debian:bookworm-slim
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libsqlite3-0 libssl3 libargon2-1 libzstd1 libarchive13 libnotcurses-core3 sqlite3 ca-certificates \
+    libsqlite3-0 libssl3 libargon2-1 libzstd1 libarchive13 \
+    libncursesw6 libunistring2 sqlite3 ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /opt/mutineer
 
 COPY --from=builder /src/dist/releases/mutineer-docker-x86_64-debian/ ./
+COPY --from=builder /usr/local/lib/libnotcurses-core.so* /usr/local/lib/
 
 COPY docker/mutineer.docker.conf conf/mutineer.docker.conf
 COPY docker/mutineer.wfc.conf conf/mutineer.wfc.conf
 COPY docker/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh mutineer bin/* plank/bin/* 2>/dev/null || true \
-    && chmod +x plugins/*.so 2>/dev/null || true
+    && chmod +x plugins/*.so 2>/dev/null || true \
+    && ldconfig
 
 EXPOSE 2929
 

@@ -46,7 +46,6 @@ static bool valid_menu_basename(const char *name) {
 }
 
 /* Simple online registry */
-#define MAX_ONLINE 256
 static Session *g_online[MAX_ONLINE];
 static int g_node_locked[MAX_ONLINE];
 static pthread_mutex_t g_online_mu = PTHREAD_MUTEX_INITIALIZER;
@@ -391,7 +390,7 @@ static int readline_echo(Session *s, uint8_t *buf, size_t cap, int timeout_sec,
                           echo_mode == ECHO_ON);
 
   size_t n = 0;
-  while (n + 1 < cap) {
+  for (;;) {
     fd_set rfds;
     FD_ZERO(&rfds);
     FD_SET(s->fd, &rfds);
@@ -407,10 +406,10 @@ static int readline_echo(Session *s, uint8_t *buf, size_t cap, int timeout_sec,
 
     uint8_t clean[256];
     int got = recv_clean(s, clean, sizeof(clean));
-    if (got == 0)
-      return -1; /* peer disconnected; an empty submitted line returns 0 */
-    if (got < 0)
+    if (got == -3)
       continue;
+    if (got <= 0)
+      return -1; /* EOF or a fatal socket error; do not spin on a dead peer */
 
     for (int i = 0; i < got; i++) {
       uint8_t ch = clean[i];
@@ -435,6 +434,11 @@ static int readline_echo(Session *s, uint8_t *buf, size_t cap, int timeout_sec,
       if (ch < 0x20 && ch != 0x1B)
         continue;
 
+      /* Keep consuming an overlong line through its terminator, but never
+         write or echo beyond the caller's buffer.  Returning as soon as the
+         buffer fills would leave the tail to become the next command. */
+      if (n + 1 >= cap)
+        continue;
       buf[n++] = ch;
 
       /* echo the character */
@@ -446,8 +450,6 @@ static int readline_echo(Session *s, uint8_t *buf, size_t cap, int timeout_sec,
       }
     }
   }
-  buf[n] = 0;
-  return (int)n;
 }
 
 /* Very small line reader built on recv_clean (handles telnet sequences). */
@@ -4490,6 +4492,8 @@ void *session_thread_main(void *arg) {
       send_str(s, "\r\nIdle timeout.\r\n");
       break;
     }
+    if (n < 0)
+      break; /* peer disconnected or the socket failed */
     send_str(s, "\r\n");
 
     /* F-key intercept: ESC sequences from remote sysop */

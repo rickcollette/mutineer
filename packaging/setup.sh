@@ -292,6 +292,9 @@ required_plugins=(
 )
 required_libs=(
   lib/libnotcurses-core.so
+  lib/libtinfo.so.6
+  lib/libunistring.so.2
+  lib/libdeflate.so.0
   lib/libssl.so.1.1
   lib/libcrypto.so.1.1
 )

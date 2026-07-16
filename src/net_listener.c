@@ -47,6 +47,33 @@ extern volatile sig_atomic_t g_stop;
 extern volatile sig_atomic_t g_broadcast_pending;
 void broadcast_check(const char* data_path);
 
+static pthread_mutex_t g_admission_mu = PTHREAD_MUTEX_INITIALIZER;
+static unsigned g_admitted_sessions;
+
+static bool session_admit(void) {
+  bool admitted = false;
+  pthread_mutex_lock(&g_admission_mu);
+  if (g_admitted_sessions < MAX_ONLINE) {
+    g_admitted_sessions++;
+    admitted = true;
+  }
+  pthread_mutex_unlock(&g_admission_mu);
+  return admitted;
+}
+
+static void session_release(void) {
+  pthread_mutex_lock(&g_admission_mu);
+  if (g_admitted_sessions > 0)
+    g_admitted_sessions--;
+  pthread_mutex_unlock(&g_admission_mu);
+}
+
+static void *admitted_session_main(void *arg) {
+  void *result = session_thread_main(arg);
+  session_release();
+  return result;
+}
+
 int net_run_listener(const BbsConfig* cfg, BbsDb* db, volatile sig_atomic_t* stop_flag) {
   int lfd = make_listener(cfg->bind, cfg->port);
   if (lfd < 0) {
@@ -88,7 +115,19 @@ int net_run_listener(const BbsConfig* cfg, BbsDb* db, volatile sig_atomic_t* sto
       continue;
     }
 
+    if (!session_admit()) {
+      const char* msg = "\r\nAll nodes are busy. Please try again later.\r\n";
+      fd_write_all(cfd, msg, strlen(msg));
+      close(cfd);
+      continue;
+    }
+
     Session* s = (Session*)calloc(1, sizeof(Session));
+    if (!s) {
+      session_release();
+      close(cfd);
+      continue;
+    }
     s->fd = cfd;
     (void)db;
     s->db = db_open(cfg->db_path);
@@ -98,6 +137,7 @@ int net_run_listener(const BbsConfig* cfg, BbsDb* db, volatile sig_atomic_t* sto
       fprintf(stderr, "session db_open failed for %s\n", cfg->db_path);
       close(cfd);
       free(s);
+      session_release();
       continue;
     }
     s->alive = 1;
@@ -114,9 +154,11 @@ int net_run_listener(const BbsConfig* cfg, BbsDb* db, volatile sig_atomic_t* sto
     telnet_send_initial(cfd);
 
     pthread_t th;
-    if (pthread_create(&th, NULL, session_thread_main, s) != 0) {
+    if (pthread_create(&th, NULL, admitted_session_main, s) != 0) {
       close(cfd);
+      db_close(s->db);
       free(s);
+      session_release();
       continue;
     }
     pthread_detach(th);

@@ -7,6 +7,8 @@
 #include "bbs_db.h"
 #include "bbs_menu.h"
 
+#define MAX_ONLINE 256
+
 typedef struct Session {
   int fd;
   int (*io_write)(void *user_data, const uint8_t *data, size_t len);

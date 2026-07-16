@@ -59,7 +59,11 @@ fi
 
 # Test mutineer-msgpack --help
 echo -n "mutineer-msgpack --help... "
-if "$BUILD_DIR/mutineer-msgpack" --help 2>&1 | grep -q "Pack/purge old messages"; then
+# Capture first instead of piping the instrumented process into grep -q.  grep
+# exits as soon as it matches, which can deliver SIGPIPE while ASan is still
+# flushing stdio and turn a harmless help check into a DEADLYSIGNAL flood.
+msgpack_help="$($BUILD_DIR/mutineer-msgpack --help 2>&1)"
+if grep -q "Pack/purge old messages" <<<"$msgpack_help"; then
     pass "mutineer-msgpack --help"
 else
     fail "mutineer-msgpack --help"

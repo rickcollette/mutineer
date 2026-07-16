@@ -153,6 +153,12 @@ add_library(bbslib STATIC
   $<TARGET_OBJECTS:bbs_core_obj>
   $<TARGET_OBJECTS:buccaneer_obj>
 )
+if (ENABLE_ASAN)
+  # bbs_core_obj is instrumented above and is embedded in this static library.
+  # Propagate the sanitizer runtime to every executable that consumes bbslib;
+  # otherwise those targets fail to link with unresolved __asan/__ubsan symbols.
+  target_link_options(bbslib PUBLIC -fsanitize=address,undefined)
+endif()
 set_target_properties(bbslib PROPERTIES OUTPUT_NAME bbslib)
 target_include_directories(bbslib PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
